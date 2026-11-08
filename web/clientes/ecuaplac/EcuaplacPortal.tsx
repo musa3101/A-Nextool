@@ -38,6 +38,10 @@ import {
   ShieldCheck,
   Check,
   MessageSquare,
+  Copy,
+  RotateCcw,
+  Inbox,
+  Send,
   Home,
   LayoutDashboard,
   Grid2x2,
@@ -68,10 +72,12 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Switch } from '@/components/ui/Switch';
+import { SpaceLogin } from '@/components/ui/space-login';
 import { ECUAPLAC_CONFIG } from './config';
 import { ecuaplacConnector, EcuaplacLeadItem } from './conector';
 import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
 import { autoTranslateWork } from './traductor';
+import { insforge } from '@/lib/insforge';
 
 // Catálogo inicial auténtico de Ecuaplac (9 Obras Reales de Portada y 11 Proyectos de Galería)
 const INITIAL_WORKS = DEFAULT_WORKS;
@@ -365,6 +371,92 @@ export const EcuaplacPortal: React.FC = () => {
     }
   };
 
+  // Estados avanzados de Bandeja Ejecutiva de Leads (Estilo Gmail)
+  const [leadSearchQuery, setLeadSearchQuery] = useState('');
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [isSyncingLeads, setIsSyncingLeads] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const cleanPhoneForWhatsApp = (phone?: string) => {
+    if (!phone) return '';
+    const digits = phone.replace(/[^0-9]/g, '');
+    if (digits.length === 9 && (digits.startsWith('6') || digits.startsWith('7') || digits.startsWith('8') || digits.startsWith('9'))) {
+      return `34${digits}`;
+    }
+    return digits;
+  };
+
+  const handleCopyLeadInfo = (text: string, label: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {});
+      }
+    } catch {
+      // Ignorar fallo de permisos en webview o headless
+    }
+    setCopiedField(label);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleRefreshLeads = async () => {
+    setIsSyncingLeads(true);
+    showSyncToast(
+      panelLang === 'es' ? 'Consultando leads en Supabase (ecuaplac.com)...' : 'Checking leads in Supabase...',
+      'syncing'
+    );
+    try {
+      const liveLeads = await ecuaplacConnector.fetchLeadsOnline();
+      if (liveLeads && liveLeads.length > 0) {
+        setLeads(liveLeads);
+        showSyncToast(
+          panelLang === 'es'
+            ? `Sincronizados ${liveLeads.length} presupuestos desde Supabase`
+            : `${liveLeads.length} leads synced from Supabase`,
+          'success'
+        );
+      } else {
+        showSyncToast(
+          panelLang === 'es'
+            ? 'Backend Supabase conectado (0 solicitudes nuevas en la web)'
+            : 'Supabase connected (0 new inquiries)',
+          'success'
+        );
+      }
+    } catch {
+      showSyncToast(
+        panelLang === 'es' ? 'Error al contactar con Supabase' : 'Error contacting Supabase',
+        'error'
+      );
+    } finally {
+      setIsSyncingLeads(false);
+    }
+  };
+
+  const handleDeleteLead = async (leadId: string, leadName: string) => {
+    const confirmMsg =
+      panelLang === 'es'
+        ? `¿Seguro que deseas eliminar la solicitud de "${leadName}"?`
+        : `Are you sure you want to delete inquiry from "${leadName}"?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setLeads((prev) => prev.filter((l) => l.id !== leadId));
+    if (selectedLeadId === leadId) setSelectedLeadId(null);
+    await ecuaplacConnector.deleteLead(leadId);
+    showSyncToast(
+      panelLang === 'es' ? `Presupuesto de ${leadName} eliminado` : `Lead ${leadName} deleted`,
+      'success'
+    );
+  };
+
+  const handleRestoreDefaultLeads = () => {
+    setLeads(defaultLeads);
+    ecuaplacConnector.saveLeads(defaultLeads);
+    showSyncToast(
+      panelLang === 'es' ? 'Presupuestos de demostración restaurados' : 'Demo leads restored',
+      'success'
+    );
+  };
+
   const handleUpdateLeadStatus = (leadId: string, newStatus: EcuaplacLeadItem['status']) => {
     setLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l))
@@ -386,8 +478,18 @@ export const EcuaplacPortal: React.FC = () => {
   };
 
   const filteredLeads = leads.filter((l) => {
-    if (leadFilter === 'all') return true;
-    return l.status === leadFilter;
+    const matchesFilter = leadFilter === 'all' || l.status === leadFilter;
+    if (!matchesFilter) return false;
+    if (!leadSearchQuery.trim()) return true;
+    const q = leadSearchQuery.toLowerCase();
+    return (
+      l.name.toLowerCase().includes(q) ||
+      l.phone.toLowerCase().includes(q) ||
+      l.email.toLowerCase().includes(q) ||
+      l.work_type.toLowerCase().includes(q) ||
+      l.budget_estimate.toLowerCase().includes(q) ||
+      (l.notes && l.notes.toLowerCase().includes(q))
+    );
   });
 
   // Modal State
@@ -545,9 +647,24 @@ export const EcuaplacPortal: React.FC = () => {
 
   // Facturas y Documentos del Proyecto (Plegadas / Escondiditas por defecto)
   const [isFacturasOpen, setIsFacturasOpen] = useState(false);
+  const facturasSectionRef = useRef<HTMLDivElement>(null);
   const [activeDocTab, setActiveDocTab] = useState<'factura' | 'gmail'>('factura');
   const docFileInputRef = useRef<HTMLInputElement>(null);
   const invoiceFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleToggleFacturas = () => {
+    const willOpen = !isFacturasOpen;
+    setIsFacturasOpen(willOpen);
+    if (willOpen) {
+      setTimeout(() => {
+        if (facturasSectionRef.current) {
+          const yOffset = -24;
+          const y = facturasSectionRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 120);
+    }
+  };
 
   interface ProjectDocItem {
     id: string;
@@ -743,6 +860,35 @@ export const EcuaplacPortal: React.FC = () => {
   const handleViewDoc = (doc: ProjectDocItem) => {
     setSelectedInvoiceForView(doc);
     setIsInvoiceViewerOpen(true);
+  };
+
+  const handleViewInvoicePdf = (fileUrl?: string, fileName?: string) => {
+    if (!fileUrl) {
+      window.print();
+      return;
+    }
+
+    if (fileUrl.startsWith('data:')) {
+      try {
+        const parts = fileUrl.split(',');
+        const mime = parts[0].split(':')[1]?.split(';')[0] || 'application/pdf';
+        const byteCharacters = atob(parts[1]);
+        const byteNumbers = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const blob = new Blob([byteNumbers], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        const win = window.open(blobUrl, '_blank');
+        if (!win) {
+          window.location.href = blobUrl;
+        }
+        return;
+      } catch (e) {
+        console.warn('Error al abrir PDF:', e);
+      }
+    }
+    window.open(fileUrl, '_blank');
   };
 
   const handleOpenFullscreenInvoice = (fileUrl?: string, fileName?: string) => {
@@ -1357,162 +1503,26 @@ export const EcuaplacPortal: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="w-full min-h-screen bg-[#F4F1EA] flex flex-col justify-between items-center p-4 sm:p-6 text-slate-900 select-none animate-in fade-in duration-300">
-        <div className="w-full max-w-sm my-auto pt-6 pb-8">
-          {/* Header Card */}
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-[#0B1523] border-2 border-stone-800 shadow-xl p-3.5 mb-4 relative">
-              <img
-                src="/ecuaplac/fav-sin-fondo.svg"
-                alt="Ecuaplac"
-                className="w-full h-full object-contain"
-              />
-              <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#C5A059] border-2 border-[#0B1523] flex items-center justify-center text-slate-950 font-black text-[9px] shadow-sm">
-                NT
-              </span>
-            </div>
-            <h1 className="text-2xl font-black text-slate-950 tracking-tight font-display">
-              Gestor de Ecuaplac
-            </h1>
-            <p className="text-xs text-stone-500 mt-1 font-sans">
-              Introduce tu correo Gmail y contraseña para acceder
-            </p>
-          </div>
-
-          {/* Login Form Card */}
-          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 border border-stone-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              {loginError && (
-                <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                  <span>{loginError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5 font-display">
-                  Correo Electrónico / Gmail
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="ejemplo@gmail.com"
-                    required
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-stone-200 text-xs text-slate-900 bg-stone-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C5A059] transition-all font-sans"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5 font-display">
-                  Contraseña de Acceso
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Introduce tu contraseña (inicial: admin)"
-                    required
-                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-stone-200 text-xs text-slate-900 bg-stone-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C5A059] transition-all font-sans"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={loginRemember}
-                    onChange={(e) => setLoginRemember(e.target.checked)}
-                    className="w-4 h-4 rounded border-stone-300 text-slate-900 focus:ring-[#C5A059]"
-                  />
-                  <span className="text-[11.5px] text-stone-600 font-sans">
-                    Recordar en este móvil
-                  </span>
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loginLoading}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-slate-900 to-[#162E4D] text-white font-bold text-xs shadow-md hover:brightness-110 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {loginLoading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-[#C5A059]" />
-                    <span>Verificando acceso...</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4 text-[#C5A059]" />
-                    <span>Entrar al Panel</span>
-                  </>
-                )}
-              </button>
-
-              {/* Botones de Rápido Relleno para Pruebas / Demostración */}
-              <div className="pt-3 border-t border-stone-100">
-                <span className="text-[10px] text-stone-400 uppercase tracking-wider block font-bold mb-2 text-center">
-                  Cuentas Registradas (Clave inicial: admin)
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('ecuaplacbyjyg@gmail.com');
-                      setLoginPassword('admin');
-                    }}
-                    className="p-2 rounded-xl bg-stone-50 hover:bg-stone-100 border border-stone-200 text-left text-[11px] transition-colors cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-900 block truncate">José (Ecuaplac)</span>
-                    <span className="text-[9.5px] text-stone-400 block truncate">Dueño Negocio</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('mynextbymusa@gmail.com');
-                      setLoginPassword('admin');
-                    }}
-                    className="p-2 rounded-xl bg-amber-50/60 hover:bg-amber-100/60 border border-amber-200 text-left text-[11px] transition-colors cursor-pointer"
-                  >
-                    <span className="font-bold text-amber-950 block truncate">👑 Musa</span>
-                    <span className="text-[9.5px] text-amber-700 block truncate">Superadmin</span>
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        {/* Footer Marca NexTool */}
-        <div className="pt-2 pb-4 flex flex-col items-center justify-center text-center">
-          <div className="w-12 h-12 rounded-[18px] bg-gradient-to-b from-[#141A28] to-[#0A0E18] p-2 shadow-md border border-stone-800/80 flex items-center justify-center mb-1.5">
-            <img
-              src="/icons/nextool-sinfondo.png"
-              alt="NexTool"
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <span className="text-[11px] font-black tracking-[0.24em] text-slate-800 uppercase font-display">
-            NEXT TOOLS
-          </span>
-          <span className="text-[10px] font-mono text-stone-400 mt-0.5">
-            Versión {installedVersion} · InsForge Cloud
-          </span>
-        </div>
-      </div>
+      <SpaceLogin
+        title="Sign In"
+        brandBadge="ECUAPLAC REFORMAS"
+        buttonLabel="Acceder a Ecuaplac"
+        defaultEmail="ecuaplacbyjyg@gmail.com"
+        errorMessage={loginError}
+        onSubmit={async (data) => {
+          setLoginError(null);
+          const res = await signInWithEmail(data.email, data.password, data.rememberMe);
+          if (!res.success) {
+            setLoginError(res.error || (panelLang === 'es' ? 'Error al iniciar sesión' : 'Sign in failed'));
+            throw new Error(res.error || 'Login failed');
+          } else {
+            showSyncToast(
+              panelLang === 'es' ? 'Bienvenido a tu panel de Ecuaplac' : 'Welcome to your Ecuaplac portal',
+              'success'
+            );
+          }
+        }}
+      />
     );
   }
 
@@ -1797,8 +1807,8 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Bloque: Facturas (Plegable / Escondidito por defecto) */}
-          <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
+          {/* Bloque: Facturas (Plegable / Escondidito por defecto con Scroll Suave Inteligente) */}
+          <div ref={facturasSectionRef} className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
             {/* Cabecera / Trigger de Facturas */}
             <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -1825,7 +1835,7 @@ export const EcuaplacPortal: React.FC = () => {
               {/* Botón Abrir / Ocultar Facturas */}
               <button
                 type="button"
-                onClick={() => setIsFacturasOpen(!isFacturasOpen)}
+                onClick={handleToggleFacturas}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold active:scale-95 transition-all shadow-xs font-sans group cursor-pointer shrink-0"
                 title={isFacturasOpen ? 'Ocultar panel de facturas' : 'Abrir facturas'}
               >
@@ -1840,7 +1850,7 @@ export const EcuaplacPortal: React.FC = () => {
 
             {/* Panel Desplegable hacia abajo (cuando se pulsa "Abrir Facturas") */}
             {isFacturasOpen && (
-              <div className="border-t border-stone-100 p-4 sm:p-5 pt-3 space-y-3.5 bg-stone-50/50">
+              <div className="border-t border-stone-100 p-4 sm:p-5 pt-3 space-y-3.5 bg-stone-50/50 animate-in fade-in slide-in-from-top-2 duration-250">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-xs font-bold text-slate-700 font-sans">
                     Documentos en PDF ({invoices.length})
@@ -3020,203 +3030,401 @@ export const EcuaplacPortal: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 5. Modal Dedicado de Bandeja de Presupuestos (CRM Leads de ecuaplac.com) */}
+      {/* 5. Modal Dedicado de Bandeja de Presupuestos (CRM Leads de ecuaplac.com — Estilo Gmail Executive) */}
       <Modal
         isOpen={isLeadsModalOpen}
         onClose={() => setIsLeadsModalOpen(false)}
+        theme="dark"
+        maxWidth="3xl"
         title={panelLang === 'es' ? 'Bandeja de Presupuestos' : 'Inquiries & Quotes Inbox'}
         subtitle={
           panelLang === 'es'
             ? 'Solicitudes de clientes recibidas desde ecuaplac.com'
             : 'Customer inquiries received from ecuaplac.com'
         }
+        headerExtra={
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Supabase Live
+            </span>
+            <button
+              type="button"
+              onClick={handleRefreshLeads}
+              disabled={isSyncingLeads}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-white/10 hover:border-amber-400/40 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              title={panelLang === 'es' ? 'Sincronizar con Supabase' : 'Sync with Supabase'}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[#F0CF85] ${isSyncingLeads ? 'animate-spin' : ''}`} />
+              <span className="hidden md:inline">{panelLang === 'es' ? 'Sincronizar' : 'Sync'}</span>
+            </button>
+          </div>
+        }
         footer={
-          <Button
-            variant="secondary"
-            size="md"
-            type="button"
-            onClick={() => setIsLeadsModalOpen(false)}
-          >
-            {panelLang === 'es' ? 'Cerrar' : 'Close'}
-          </Button>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              {leads.length === 0 && (
+                <button
+                  type="button"
+                  onClick={handleRestoreDefaultLeads}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-xs font-bold transition-all active:scale-95"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-[#F0CF85]" />
+                  <span>{panelLang === 'es' ? 'Restaurar Ejemplos' : 'Restore Demo Leads'}</span>
+                </button>
+              )}
+              {copiedField && (
+                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 animate-in fade-in">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{copiedField} copiado</span>
+                </span>
+              )}
+            </div>
+            <Button
+              variant="secondary"
+              size="md"
+              type="button"
+              onClick={() => setIsLeadsModalOpen(false)}
+              className="bg-slate-900 hover:bg-slate-800 text-slate-200 border-white/10"
+            >
+              {panelLang === 'es' ? 'Cerrar' : 'Close'}
+            </Button>
+          </div>
         }
       >
         <div className="space-y-4">
-          {/* Filtros rápidos con Conteo Dinámico */}
+          {/* Barra de Búsqueda Inteligente (Estilo Gmail) */}
+          <div className="relative">
+            <div className="flex items-center bg-slate-900/90 border border-white/10 focus-within:border-amber-400/50 rounded-2xl px-3.5 py-2.5 transition-all shadow-inner">
+              <Search className="w-4 h-4 text-slate-400 shrink-0 mr-2.5" />
+              <input
+                type="search"
+                inputMode="search"
+                enterKeyHint="search"
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={leadSearchQuery}
+                onChange={(e) => setLeadSearchQuery(e.target.value)}
+                placeholder={
+                  panelLang === 'es'
+                    ? 'Buscar por cliente, teléfono, email, localidad o descripción...'
+                    : 'Search by client, phone, email, location or work...'
+                }
+                className="w-full bg-transparent text-base sm:text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none"
+              />
+              {leadSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setLeadSearchQuery('')}
+                  className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filtros rápidos con Conteo Dinámico estilo Pestañas de Correo */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
             <button
               type="button"
               onClick={() => setLeadFilter('all')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'all'
-                  ? 'bg-slate-900 text-white shadow-sm ring-1 ring-slate-900'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  ? 'bg-[#C5A059] text-slate-950 shadow-md font-extrabold ring-1 ring-[#C5A059]'
+                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-white/5'
               }`}
             >
-              {panelLang === 'es' ? 'Todos' : 'All'} ({leads.length})
+              <Inbox className="w-3.5 h-3.5" />
+              <span>{panelLang === 'es' ? 'Todos' : 'All'}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'all' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
+                {leads.length}
+              </span>
             </button>
+
             <button
               type="button"
               onClick={() => setLeadFilter('new')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'new'
-                  ? 'bg-rose-600 text-white shadow-sm ring-1 ring-rose-600'
-                  : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                  ? 'bg-rose-600 text-white shadow-md ring-1 ring-rose-500'
+                  : 'bg-rose-950/30 text-rose-300 border border-rose-500/20 hover:bg-rose-950/50'
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'new' ? 'bg-white' : 'bg-rose-500'}`} />
-              {panelLang === 'es' ? 'No contestados' : 'Unanswered'} ({leads.filter((l) => l.status === 'new').length})
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'new' ? 'bg-white' : 'bg-rose-500 animate-pulse'}`} />
+              <span>{panelLang === 'es' ? 'No contestados' : 'Unanswered'}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'new' ? 'bg-white/20 text-white' : 'bg-rose-900/40 text-rose-300'}`}>
+                {leads.filter((l) => l.status === 'new').length}
+              </span>
             </button>
+
             <button
               type="button"
               onClick={() => setLeadFilter('contacted')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'contacted'
-                  ? 'bg-amber-600 text-white shadow-sm ring-1 ring-amber-600'
-                  : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                  ? 'bg-amber-600 text-white shadow-md ring-1 ring-amber-500'
+                  : 'bg-amber-950/30 text-amber-300 border border-amber-500/20 hover:bg-amber-950/50'
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'contacted' ? 'bg-white' : 'bg-amber-500'}`} />
-              {panelLang === 'es' ? 'En contacto' : 'Contacted'} ({leads.filter((l) => l.status === 'contacted').length})
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'contacted' ? 'bg-white' : 'bg-amber-400'}`} />
+              <span>{panelLang === 'es' ? 'En contacto' : 'Contacted'}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'contacted' ? 'bg-white/20 text-white' : 'bg-amber-900/40 text-amber-300'}`}>
+                {leads.filter((l) => l.status === 'contacted').length}
+              </span>
             </button>
+
             <button
               type="button"
               onClick={() => setLeadFilter('approved')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'approved'
-                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-600'
-                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-500'
+                  : 'bg-emerald-950/30 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-950/50'
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'approved' ? 'bg-white' : 'bg-emerald-500'}`} />
-              {panelLang === 'es' ? 'Aprobados' : 'Accepted'} ({leads.filter((l) => l.status === 'approved').length})
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'approved' ? 'bg-white' : 'bg-emerald-400'}`} />
+              <span>{panelLang === 'es' ? 'Aprobados' : 'Accepted'}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'approved' ? 'bg-white/20 text-white' : 'bg-emerald-900/40 text-emerald-300'}`}>
+                {leads.filter((l) => l.status === 'approved').length}
+              </span>
             </button>
           </div>
 
-          {/* Lista de Leads */}
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-            {filteredLeads.map((lead) => (
-              <div
-                key={lead.id}
-                className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200/80 shadow-xs flex flex-col gap-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h4 className="font-black text-sm sm:text-base text-slate-900 tracking-tight">
-                      {lead.name}
-                    </h4>
-                    <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-medium mt-0.5">
-                      <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                      <span>{panelLang === 'es' ? 'Recibido:' : 'Received:'} {lead.date}</span>
-                    </div>
-                  </div>
-
-                  {lead.status === 'new' ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-black shrink-0">
-                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                      {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
-                    </span>
-                  ) : lead.status === 'contacted' ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black shrink-0">
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black shrink-0">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      {panelLang === 'es' ? 'Obra Aceptada' : 'Accepted'}
-                    </span>
-                  )}
+          {/* Lista de Leads (Estilo Bandeja Gmail) */}
+          <div className="space-y-3 max-h-[62vh] overflow-y-auto pr-1">
+            {filteredLeads.length === 0 ? (
+              <div className="py-12 px-4 text-center rounded-2xl bg-slate-900/50 border border-white/5 space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800/80 text-[#F0CF85] flex items-center justify-center mx-auto shadow-inner">
+                  <Inbox className="w-6 h-6" />
                 </div>
-
-                <div className="bg-white rounded-xl p-3 border border-stone-200/80 shadow-xs">
-                  <p className="text-xs sm:text-sm text-stone-700 leading-relaxed font-medium">
-                    «{lead.work_type}»
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {lead.budget_estimate && (
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200/80 text-stone-700 text-xs font-semibold">
-                      <span className="text-[10px] text-stone-400 uppercase tracking-wider font-bold">
-                        {panelLang === 'es' ? 'Presupuesto aprox:' : 'Estimated budget:'}
-                      </span>
-                      <span className="font-mono font-bold text-slate-900">
-                        {lead.budget_estimate}
-                      </span>
-                    </div>
-                  )}
-                  {lead.email && (
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-50 border border-stone-200/60 text-stone-500 text-xs font-mono">
-                      <Mail className="w-3 h-3 text-stone-400" />
-                      <span>{lead.email}</span>
-                    </div>
-                  )}
-                </div>
-
-                {lead.notes && (
-                  <div className="flex items-start gap-2 bg-amber-50/70 border border-amber-200/60 rounded-xl p-2.5 text-xs text-amber-900">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>{panelLang === 'es' ? 'Nota:' : 'Note:'}</strong> {lead.notes}
-                    </span>
-                  </div>
+                <h4 className="font-bold text-sm text-slate-200">
+                  {panelLang === 'es' ? 'No hay presupuestos en esta sección' : 'No inquiries found'}
+                </h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  {leadSearchQuery
+                    ? panelLang === 'es'
+                      ? `No hay resultados para "${leadSearchQuery}". Prueba con otro término.`
+                      : `No results for "${leadSearchQuery}".`
+                    : panelLang === 'es'
+                    ? 'Cuando un cliente solicite un presupuesto en ecuaplac.com, aparecerá aquí automáticamente.'
+                    : 'When a customer requests a quote on ecuaplac.com, it will appear here.'}
+                </p>
+                {leads.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={handleRestoreDefaultLeads}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[#F0CF85] text-xs font-bold border border-white/10 transition-all active:scale-95"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>{panelLang === 'es' ? 'Cargar ejemplos visuales' : 'Load visual examples'}</span>
+                  </button>
                 )}
-
-                <div className="pt-2 border-t border-stone-200/60 flex flex-wrap items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                        `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto.`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span>WhatsApp</span>
-                    </a>
-                    <a
-                      href={`tel:${lead.phone}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all active:scale-95"
-                    >
-                      <Phone className="w-3.5 h-3.5 text-[#C5A059]" />
-                      <span>{lead.phone}</span>
-                    </a>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {lead.status !== 'new' && (
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateLeadStatus(lead.id, 'new')}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-all active:scale-95"
-                      >
-                        {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
-                      </button>
-                    )}
-                    {lead.status !== 'contacted' && (
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateLeadStatus(lead.id, 'contacted')}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-all active:scale-95"
-                      >
-                        {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
-                      </button>
-                    )}
-                    {lead.status !== 'approved' && (
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateLeadStatus(lead.id, 'approved')}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-all active:scale-95"
-                      >
-                        {panelLang === 'es' ? 'Marcar Aprobado' : 'Mark Accepted'}
-                      </button>
-                    )}
-                  </div>
-                </div>
               </div>
-            ))}
+            ) : (
+              filteredLeads.map((lead) => {
+                const initials = lead.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase();
+
+                const isSelected = selectedLeadId === lead.id;
+
+                return (
+                  <div
+                    key={lead.id}
+                    onClick={() => setSelectedLeadId((prev) => (prev === lead.id ? null : lead.id))}
+                    className={`group relative rounded-2xl p-4 transition-all duration-200 border cursor-pointer ${
+                      isSelected
+                        ? 'bg-slate-800/95 border-amber-400/40 shadow-xl ring-1 ring-[#C5A059]/30'
+                        : 'bg-[#0F172A]/90 hover:bg-slate-800/80 border-white/5 hover:border-white/15 shadow-sm'
+                    } flex flex-col gap-3.5`}
+                  >
+                    {/* Fila Cabecera: Monograma, Nombre y Estado */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        {/* Avatar Iniciales */}
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-950 text-[#F0CF85] border border-white/10 flex items-center justify-center font-bold text-sm tracking-wider shadow-inner shrink-0 group-hover:scale-105 transition-transform">
+                          {initials || 'EC'}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                              {lead.name}
+                            </h4>
+                            <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                              #{String(lead.id || '').slice(0, 8)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                            <Clock className="w-3 h-3 text-slate-500 shrink-0" />
+                            <span>{lead.date}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Badge de Estado */}
+                      <div className="shrink-0">
+                        {lead.status === 'new' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-extrabold">
+                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                            {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
+                          </span>
+                        ) : lead.status === 'contacted' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-extrabold">
+                            <span className="w-2 h-2 rounded-full bg-amber-400" />
+                            {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-extrabold">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                            {panelLang === 'es' ? 'Obra Aceptada' : 'Accepted'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Mensaje / Tipo de Obra (Estilo Asunto de Gmail) */}
+                    <div className="bg-slate-950/70 rounded-xl p-3 border border-white/5 shadow-inner">
+                      <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
+                        «{lead.work_type}»
+                      </p>
+                    </div>
+
+                    {/* Fila de Datos: Presupuesto, Teléfono, Email */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {lead.budget_estimate && (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/80 border border-[#C5A059]/25 text-[#F0CF85] text-xs font-bold shadow-xs">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                            {panelLang === 'es' ? 'Presupuesto:' : 'Budget:'}
+                          </span>
+                          <span className="font-mono">{lead.budget_estimate}</span>
+                        </div>
+                      )}
+
+                      {lead.phone && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyLeadInfo(lead.phone, 'Teléfono');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/50 border border-white/5 text-slate-300 hover:text-white hover:border-white/20 text-xs font-mono transition-colors"
+                          title="Clic para copiar teléfono"
+                        >
+                          <Phone className="w-3 h-3 text-[#F0CF85]" />
+                          <span>{lead.phone}</span>
+                          <Copy className="w-2.5 h-2.5 text-slate-500 ml-0.5" />
+                        </button>
+                      )}
+
+                      {lead.email && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyLeadInfo(lead.email, 'Email');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/50 border border-white/5 text-slate-400 hover:text-white hover:border-white/20 text-xs font-mono transition-colors truncate max-w-[220px]"
+                          title="Clic para copiar correo"
+                        >
+                          <Mail className="w-3 h-3 text-slate-400" />
+                          <span className="truncate">{lead.email}</span>
+                          <Copy className="w-2.5 h-2.5 text-slate-500 ml-0.5 shrink-0" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Nota interna si existe */}
+                    {lead.notes && (
+                      <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 text-xs text-amber-200/90">
+                        <Sparkles className="w-3.5 h-3.5 text-[#F0CF85] shrink-0 mt-0.5" />
+                        <span>
+                          <strong className="text-[#F0CF85]">{panelLang === 'es' ? 'Nota:' : 'Note:'}</strong> {lead.notes}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Barra de Acciones Ejecutivas 1-Tap */}
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="pt-2.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5"
+                    >
+                      {/* Botones de Contacto Directo */}
+                      <div className="flex items-center gap-2">
+                        {lead.phone && (
+                          <>
+                            <a
+                              href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone)}?text=${encodeURIComponent(
+                                `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto para: ${lead.work_type}.`
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-3.5 py-2 min-h-[40px] rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-md shadow-emerald-950/40 transition-all active:scale-95"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              <span>WhatsApp</span>
+                            </a>
+                            <a
+                              href={`tel:${lead.phone}`}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-white/10 shadow-xs transition-all active:scale-95"
+                            >
+                              <Phone className="w-3.5 h-3.5 text-[#F0CF85]" />
+                              <span>{panelLang === 'es' ? 'Llamar' : 'Call'}</span>
+                            </a>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Botones de Cambio de Estado y Borrado */}
+                      <div className="flex items-center gap-1.5 flex-wrap ml-auto">
+                        {lead.status !== 'new' && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLeadStatus(lead.id, 'new')}
+                            className="px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-bold text-rose-300 bg-rose-950/40 border border-rose-500/20 hover:bg-rose-900/40 transition-all active:scale-95"
+                          >
+                            {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
+                          </button>
+                        )}
+                        {lead.status !== 'contacted' && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLeadStatus(lead.id, 'contacted')}
+                            className="px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-bold text-amber-300 bg-amber-950/40 border border-amber-500/20 hover:bg-amber-900/40 transition-all active:scale-95"
+                          >
+                            {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
+                          </button>
+                        )}
+                        {lead.status !== 'approved' && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLeadStatus(lead.id, 'approved')}
+                            className="px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-bold text-emerald-300 bg-emerald-950/40 border border-emerald-500/20 hover:bg-emerald-900/40 transition-all active:scale-95"
+                          >
+                            {panelLang === 'es' ? 'Aprobado' : 'Accepted'}
+                          </button>
+                        )}
+
+                        {/* Botón de Borrar Lead (para limpiar los falsos fácilmente con tap target seguro) */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLead(lead.id, lead.name)}
+                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl text-rose-400 hover:text-rose-200 hover:bg-rose-950/50 border border-rose-500/20 transition-all active:scale-95 ml-1"
+                          title={panelLang === 'es' ? 'Eliminar solicitud' : 'Delete inquiry'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </Modal>
@@ -3580,14 +3788,16 @@ export const EcuaplacPortal: React.FC = () => {
               </p>
             </div>
 
-            {/* Ficha Resumida */}
+            {/* Ficha Resumida Sin Datos Falsos */}
             <div className="grid grid-cols-2 gap-2.5 max-w-sm mx-auto text-left text-xs bg-white p-3.5 rounded-2xl border border-stone-200/80 shadow-2xs">
               <div>
                 <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
-                  {panelLang === 'es' ? 'Emisor' : 'Issuer'}
+                  {panelLang === 'es' ? 'Emisor / Tipo' : 'Issuer / Type'}
                 </span>
                 <span className="font-extrabold text-slate-800 block text-xs mt-0.5 truncate">
-                  ECUAPLAC J&G S.L.
+                  {selectedInvoiceForView?.isCustomUpload
+                    ? (panelLang === 'es' ? 'Documento adjunto' : 'Attached document')
+                    : (selectedInvoiceForView?.clientName || 'ECUAPLAC J&G S.L.')}
                 </span>
               </div>
               <div>
@@ -3595,15 +3805,15 @@ export const EcuaplacPortal: React.FC = () => {
                   {panelLang === 'es' ? 'Fecha' : 'Date'}
                 </span>
                 <span className="font-semibold text-slate-700 block text-xs mt-0.5">
-                  {selectedInvoiceForView?.issueDate || selectedInvoiceForView?.uploadDate || '03/11/2026'}
+                  {selectedInvoiceForView?.issueDate || selectedInvoiceForView?.uploadDate || 'Hoy'}
                 </span>
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
-                  {panelLang === 'es' ? 'Nº Factura' : 'Invoice Nº'}
+                  {panelLang === 'es' ? 'Identificador' : 'Identifier'}
                 </span>
-                <span className="font-mono font-bold text-slate-900 block text-xs mt-0.5">
-                  {selectedInvoiceForView?.number || 'FAC-2026-001'}
+                <span className="font-mono font-bold text-slate-900 block text-xs mt-0.5 truncate">
+                  {selectedInvoiceForView?.number || 'FAC-PDF'}
                 </span>
               </div>
               <div>
@@ -3611,26 +3821,36 @@ export const EcuaplacPortal: React.FC = () => {
                   {panelLang === 'es' ? 'Importe' : 'Amount'}
                 </span>
                 <span className="font-mono font-black text-[#9E782F] block text-xs mt-0.5">
-                  {(selectedInvoiceForView?.totalAmount || 1028.5).toFixed(2)} €
+                  {selectedInvoiceForView?.totalAmount && selectedInvoiceForView.totalAmount > 0
+                    ? `${selectedInvoiceForView.totalAmount.toFixed(2)} €`
+                    : (panelLang === 'es' ? 'Ver en el PDF' : 'See in PDF')}
                 </span>
               </div>
             </div>
 
             <p className="text-xs text-stone-500 max-w-md mx-auto leading-relaxed">
               {panelLang === 'es'
-                ? 'Descarga el documento oficial en formato PDF para visualizarlo en pantalla completa con zoom táctil y guardarlo en tu móvil.'
-                : 'Download the official PDF document to view in fullscreen with pinch-to-zoom and save to your mobile device.'}
+                ? 'Puedes abrir la factura directamente en pantalla completa para revisarla al detalle con zoom táctil o descargarla en tu dispositivo.'
+                : 'You can open the invoice in full screen to inspect details with pinch-to-zoom or download it to your device.'}
             </p>
 
-            {/* Botón Principal Prominente */}
-            <div className="pt-2">
+            {/* Acciones de Visualización y Descarga */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-2 max-w-sm mx-auto">
+              <button
+                type="button"
+                onClick={() => handleViewInvoicePdf(selectedInvoiceForView?.fileUrl, selectedInvoiceForView?.name)}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-xs sm:text-sm font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
+              >
+                <Eye className="w-4 h-4 text-[#C5A059]" />
+                <span>{panelLang === 'es' ? 'Abrir Factura Completa' : 'Open Full Invoice'}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => handleOpenFullscreenInvoice(selectedInvoiceForView?.fileUrl, selectedInvoiceForView?.name)}
-                className="w-full inline-flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-sm font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 py-3 px-4 rounded-2xl bg-stone-100 hover:bg-stone-200 text-slate-800 text-xs sm:text-sm font-bold transition-all border border-stone-200 active:scale-98 cursor-pointer"
               >
-                <Download className="w-4 h-4 text-[#C5A059]" />
-                <span>{panelLang === 'es' ? 'Descargar Factura Oficial (PDF)' : 'Download Official Invoice (PDF)'}</span>
+                <Download className="w-4 h-4 text-stone-600" />
+                <span>{panelLang === 'es' ? 'Descargar' : 'Download'}</span>
               </button>
             </div>
           </div>

@@ -18,6 +18,7 @@ import { GalleryManager } from './views/client/GalleryManager';
 import { MenusManager } from './views/client/MenusManager';
 import { LeadsManager } from './views/client/LeadsManager';
 import { AccountSettings } from './views/client/AccountSettings';
+import { LoginView } from './views/auth/LoginView';
 
 export const App: React.FC = () => {
   return (
@@ -28,6 +29,9 @@ export const App: React.FC = () => {
             <Route path="/" element={<AppLayout />}>
               {/* Default Redirect to Ecuaplac */}
               <Route index element={<Navigate to="/ecuaplac" replace />} />
+
+              {/* Universal Space Login */}
+              <Route path="login" element={<LoginView />} />
 
               {/* Direct Client Access URLs */}
               <Route path="ecuaplac" element={<EcuaplacPortal />} />

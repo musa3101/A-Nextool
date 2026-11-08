@@ -42,20 +42,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const saved = localStorage.getItem(LOCAL_STORAGE_SESSION_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed?.userId) return parsed;
+        if (parsed?.userId && parsed?.email) return parsed;
       }
     } catch {
       // Ignorar fallos de lectura
     }
-    // Por defecto inicia con sesión activa (Ecuaplac / Musa) para experiencia fluida
-    return {
-      userId: 'usr_ecuaplac_owner',
-      name: 'José Rivadeneira',
-      email: 'ecuaplacbyjyg@gmail.com',
-      role: 'CLIENT_USER',
-      tenantId: '0bc42bdf-6929-4c06-8667-1fd646288513',
-      isImpersonating: false,
-    };
+    // Estado inicial de invitado (requiere login con Gmail + contraseña)
+    return GUEST_SESSION;
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);

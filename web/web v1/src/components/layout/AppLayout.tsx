@@ -1,13 +1,27 @@
 import React, { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 
 export const AppLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
 
-  // La appweb de Ecuaplac es un portal autónomo White-Label para el cliente final
+  const isAuthPage = location.pathname === '/login';
+
+  // Si no está autenticado o está en la ruta /login:
+  // Renderizamos pantalla completa espacial limpia en #03060f (cero blanco en cabecera ni pie)
+  if (!isAuthenticated || isAuthPage) {
+    return (
+      <div className="min-h-screen min-h-[100dvh] w-full bg-[#03060f] text-white overflow-x-hidden">
+        <Outlet />
+      </div>
+    );
+  }
+
+  // La appweb de Ecuaplac es un portal autónomo White-Label para el cliente final (cuando ya está autenticado)
   const isEcuaplacPortal =
     location.pathname.startsWith('/app/ecuaplac') ||
     location.pathname === '/ecuaplac' ||
