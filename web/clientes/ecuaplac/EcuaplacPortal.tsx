@@ -992,15 +992,24 @@ export const EcuaplacPortal: React.FC = () => {
           panelLang === 'es' ? '¡Obra eliminada de ecuaplac.com!' : 'Project deleted from ecuaplac.com!',
           'success'
         );
+        addAuditLog(
+          `Obra «${item.title_es}» eliminada de la web`,
+          'Ecuaplac Web',
+          'warning'
+        );
       } catch (err) {
         console.warn('Error al eliminar en Supabase:', err);
+        // Rollback reactivo si la red falla
+        if (isCarousel) {
+          setWorks((prev) => [item, ...prev]);
+        } else {
+          setMoreProjects((prev) => [item, ...prev]);
+        }
+        showSyncToast(
+          panelLang === 'es' ? 'Error al eliminar en la web' : 'Error deleting from website',
+          'error'
+        );
       }
-
-      addAuditLog(
-        `Obra «${item.title_es}» eliminada de la web`,
-        'Ecuaplac Web',
-        'warning'
-      );
     }
   };
 
@@ -1105,25 +1114,39 @@ export const EcuaplacPortal: React.FC = () => {
       if (isCarousel) {
         setWorks((prev) => [newItem, ...prev]);
         try {
-          await ecuaplacConnector.saveWork(newItem);
+          const saved = await ecuaplacConnector.saveWork(newItem);
+          if (saved && saved.id) {
+            setWorks((prev) => prev.map((i) => (i.id === newItem.id ? { ...newItem, ...saved } : i)));
+          }
           showSyncToast(
             panelLang === 'es' ? '¡Foto publicada en ecuaplac.com!' : 'Photo published on ecuaplac.com!',
             'success'
           );
         } catch (e) {
           console.warn('Error al guardar en Supabase:', e);
+          showSyncToast(
+            panelLang === 'es' ? 'Error al sincronizar con la web' : 'Error syncing with website',
+            'error'
+          );
         }
         setActiveTab('obras');
       } else {
         setMoreProjects((prev) => [newItem, ...prev]);
         try {
-          await ecuaplacConnector.saveProject(newItem);
+          const saved = await ecuaplacConnector.saveProject(newItem);
+          if (saved && saved.id) {
+            setMoreProjects((prev) => prev.map((i) => (i.id === newItem.id ? { ...newItem, ...saved } : i)));
+          }
           showSyncToast(
             panelLang === 'es' ? '¡Proyecto publicado en ecuaplac.com!' : 'Project published on ecuaplac.com!',
             'success'
           );
         } catch (e) {
           console.warn('Error al guardar en Supabase:', e);
+          showSyncToast(
+            panelLang === 'es' ? 'Error al sincronizar con la web' : 'Error syncing with website',
+            'error'
+          );
         }
         setActiveTab('more_projects');
       }
@@ -3165,18 +3188,30 @@ export const EcuaplacPortal: React.FC = () => {
         }
       >
         <div className="space-y-3 pt-1">
+          {/* Botón Abrir Factura Completa en Pantalla Completa */}
+          {selectedInvoiceForView?.fileUrl ? (
+            <a
+              href={selectedInvoiceForView.fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-xs font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
+            >
+              <ExternalLink className="w-4 h-4 text-[#C5A059]" />
+              <span>{panelLang === 'es' ? 'Abrir Factura Completa en Pantalla Completa' : 'Open Full Invoice in Fullscreen'}</span>
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-xs font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
+            >
+              <ExternalLink className="w-4 h-4 text-[#C5A059]" />
+              <span>{panelLang === 'es' ? 'Abrir Factura Completa en Pantalla Completa' : 'Open Full Invoice in Fullscreen'}</span>
+            </button>
+          )}
+
           {selectedInvoiceForView?.fileUrl ? (
             <div className="space-y-3">
-              <a
-                href={selectedInvoiceForView.fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-xs font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98"
-              >
-                <ExternalLink className="w-4 h-4 text-[#C5A059]" />
-                <span>{panelLang === 'es' ? 'Abrir Factura Completa en Pantalla Completa' : 'Open Full Invoice in Fullscreen'}</span>
-              </a>
-
               <div className="w-full max-h-[60vh] overflow-y-auto rounded-2xl border border-stone-200 bg-stone-100/90 p-2 shadow-inner flex items-center justify-center">
                 {selectedInvoiceForView.fileUrl.startsWith('data:image') ||
                 selectedInvoiceForView.fileUrl.match(/\.(jpg|jpeg|png|webp|gif)$/i) ? (
