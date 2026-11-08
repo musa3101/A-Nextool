@@ -474,31 +474,49 @@ export const EcuaplacPortal: React.FC = () => {
     return cached;
   });
   const [simulatedUpdateAvailable, setSimulatedUpdateAvailable] = useState(false);
+  const [newVersionNotice, setNewVersionNotice] = useState<string | null>(null);
 
-  // Sincronización proactiva de versión con InsForge Cloud
+  // Sincronización proactiva de versión y auto-actualizaciones con InsForge Cloud
   useEffect(() => {
     let isMounted = true;
-    ecuaplacConnector.fetchTenantVersion().then((cloudVer) => {
-      if (!isMounted) return;
-      if (cloudVer && cloudVer !== '000') {
-        if (cloudVer !== installedVersion) {
+    const checkVersion = async () => {
+      try {
+        const cloudVer = await ecuaplacConnector.fetchTenantVersion();
+        if (!isMounted) return;
+        if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion) {
+          setNewVersionNotice(cloudVer);
           setSimulatedUpdateAvailable(true);
+        } else {
+          setNewVersionNotice(null);
         }
+      } catch {}
+    };
+
+    checkVersion();
+    const interval = setInterval(() => {
+      if (autoCheckUpdates) {
+        checkVersion();
       }
-    }).catch(() => {});
-    return () => { isMounted = false; };
-  }, [installedVersion]);
+    }, 25000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [installedVersion, autoCheckUpdates]);
 
   const handleCheckUpdates = async () => {
     setUpdateCheckState('checking');
     try {
       const cloudVer = await ecuaplacConnector.fetchTenantVersion();
       if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion) {
+        setNewVersionNotice(cloudVer);
         setSimulatedUpdateAvailable(true);
         setUpdateCheckState('available');
       } else if (simulatedUpdateAvailable) {
         setUpdateCheckState('available');
       } else {
+        setNewVersionNotice(null);
         setUpdateCheckState('up-to-date');
       }
     } catch {
@@ -508,7 +526,7 @@ export const EcuaplacPortal: React.FC = () => {
 
   const handleInstallUpdate = async () => {
     setUpdateCheckState('installing');
-    const targetVer = simulatedUpdateAvailable ? '002' : CURRENT_SYSTEM_VERSION;
+    const targetVer = newVersionNotice || (simulatedUpdateAvailable ? '002' : CURRENT_SYSTEM_VERSION);
     try {
       await ecuaplacConnector.updateTenantVersion(targetVer);
     } catch {}
@@ -517,6 +535,7 @@ export const EcuaplacPortal: React.FC = () => {
       setInstalledVersion(targetVer);
       localStorage.setItem('nextool_app_version', targetVer);
       setSimulatedUpdateAvailable(false);
+      setNewVersionNotice(null);
       addAuditLog(`Actualización aplicada: Versión ${targetVer} en producción`, 'Next Tools Core', 'success');
       setTimeout(() => {
         window.location.reload();
@@ -644,46 +663,81 @@ export const EcuaplacPortal: React.FC = () => {
     },
   ]);
 
+  // Carga inicial y sincronización en tiempo real de facturas/documentos desde InsForge Cloud
+  useEffect(() => {
+    let isMounted = true;
+    ecuaplacConnector.fetchDocumentsOnline().then((liveDocs) => {
+      if (!isMounted) return;
+      if (liveDocs && liveDocs.length > 0) {
+        setProjectDocs(liveDocs);
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
+
   const handleUploadDoc = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const sizeInKb = Math.round(file.size / 1024);
     const sizeFormatted = sizeInKb > 1024 ? `${(sizeInKb / 1024).toFixed(1)} MB` : `${sizeInKb} KB`;
-    const objectUrl = URL.createObjectURL(file);
 
-    const newDoc: ProjectDocItem = {
-      id: `doc-${Date.now()}`,
-      number: `FAC-2026-${String(projectDocs.length + 1).padStart(3, '0')}`,
-      name: file.name,
-      fileUrl: objectUrl,
-      fileSize: sizeFormatted,
-      uploadDate: 'Hoy, ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-      issueDate: new Date().toLocaleDateString('es-ES'),
-      dueDate: '30 días',
-      category: activeDocTab,
-      status: 'oficial',
-      clientName: 'Ecuaplac J&G S.L.',
-      clientCif: 'B-07982341',
-      clientAddress: 'Palma de Mallorca, Illes Balears',
-      notes: `Documento PDF (${activeDocTab === 'factura' ? 'Facturación' : 'Gmail & Drive'}) subido desde este dispositivo.`,
-      isCustomUpload: true,
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const fileDataUrl = (reader.result as string) || '';
+      const docNumber = `FAC-2026-${String(projectDocs.length + 1).padStart(3, '0')}`;
+
+      showSyncToast(panelLang === 'es' ? 'Sincronizando con InsForge Cloud...' : 'Syncing with InsForge Cloud...', 'syncing');
+
+      // 1. Guardar en Base de Datos de InsForge Cloud para que esté disponible en Safari móvil y ordenador
+      const savedId = await ecuaplacConnector.saveDocumentOnline({
+        doc_number: docNumber,
+        name: file.name,
+        file_url: fileDataUrl,
+        file_size: sizeFormatted,
+        category: activeDocTab,
+        status: 'oficial',
+        total_amount: 0,
+        notes: `Factura subida desde el portal de Ecuaplac`,
+      });
+
+      const newDoc: ProjectDocItem = {
+        id: savedId || `doc-${Date.now()}`,
+        number: docNumber,
+        name: file.name,
+        fileUrl: fileDataUrl,
+        fileSize: sizeFormatted,
+        uploadDate: 'Hoy, ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        issueDate: new Date().toLocaleDateString('es-ES'),
+        dueDate: '30 días',
+        category: activeDocTab,
+        status: 'oficial',
+        clientName: 'Ecuaplac J&G S.L.',
+        clientCif: 'B-07982341',
+        clientAddress: 'Palma de Mallorca, Illes Balears',
+        notes: `Documento PDF (${activeDocTab === 'factura' ? 'Facturación' : 'Gmail & Drive'}) sincronizado en la nube.`,
+        isCustomUpload: true,
+      };
+
+      setProjectDocs((prev) => [newDoc, ...prev]);
+      setIsFacturasOpen(true);
+      showSyncToast(panelLang === 'es' ? 'Documento sincronizado con InsForge' : 'Document synced with InsForge', 'success');
+      addAuditLog(`Documento PDF subido: «${file.name}» (${sizeFormatted})`, 'Documentación', 'success');
     };
-
-    setProjectDocs((prev) => [newDoc, ...prev]);
-    setIsFacturasOpen(true);
-    addAuditLog(`Documento PDF subido: «${file.name}» (${sizeFormatted})`, 'Documentación', 'success');
+    reader.readAsDataURL(file);
 
     if (docFileInputRef.current) docFileInputRef.current.value = '';
     if (invoiceFileInputRef.current) invoiceFileInputRef.current.value = '';
   };
 
-  const handleDeleteDoc = (id: string) => {
+  const handleDeleteDoc = async (id: string) => {
     const doc = projectDocs.find((i) => i.id === id);
     setProjectDocs((prev) => prev.filter((i) => i.id !== id));
     if (doc) {
       addAuditLog(`Documento eliminado: «${doc.name}»`, 'Documentación', 'info');
     }
+    await ecuaplacConnector.deleteDocumentOnline(id);
+    showSyncToast(panelLang === 'es' ? 'Eliminado de InsForge Cloud' : 'Deleted from InsForge Cloud', 'success');
   };
 
   const handleViewDoc = (doc: ProjectDocItem) => {
@@ -692,11 +746,12 @@ export const EcuaplacPortal: React.FC = () => {
   };
 
   const handleOpenFullscreenInvoice = (fileUrl?: string, fileName?: string) => {
+    const targetName = fileName || selectedInvoiceForView?.name || 'Factura_Ecuaplac.pdf';
+
     if (!fileUrl) {
       window.print();
       return;
     }
-    const targetName = fileName || selectedInvoiceForView?.name || 'Factura_Ecuaplac.pdf';
 
     if (fileUrl.startsWith('data:')) {
       try {
@@ -1512,6 +1567,35 @@ export const EcuaplacPortal: React.FC = () => {
           <span className="hidden sm:inline">{panelLang === 'es' ? 'Ver Web' : 'View Web'}</span>
         </a>
       </header>
+
+      {/* Banner Notificación Auto-Actualización (InsForge Cloud) */}
+      {newVersionNotice && (
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-3">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0E1726] border border-[#C5A059]/50 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3 w-3 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#C5A059]"></span>
+              </span>
+              <div>
+                <span className="text-xs sm:text-sm font-black text-white block font-display">
+                  ¡Nueva versión v{newVersionNotice} lista!
+                </span>
+                <span className="text-[11px] text-stone-300 font-sans block mt-0.5">
+                  {panelLang === 'es' ? 'Hay mejoras publicadas en el sistema. Pulsa para aplicar.' : 'System improvements available. Tap to apply.'}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleInstallUpdate}
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-[#C5A059] hover:from-amber-300 hover:to-amber-500 text-slate-950 text-xs font-black shadow-md active:scale-95 transition-all shrink-0 cursor-pointer"
+            >
+              {panelLang === 'es' ? 'Actualizar' : 'Update'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. Workspace Principal */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-4">
@@ -3478,214 +3562,78 @@ export const EcuaplacPortal: React.FC = () => {
         }
       >
         <div className="space-y-4 pt-1">
-          {selectedInvoiceForView?.fileUrl ? (
-            /* Ficha de Documento PDF Oficial (Sin iframe que se recorte en iOS) */
-            <div className="rounded-3xl border border-stone-200 bg-stone-50/80 p-5 sm:p-7 text-center space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-[#0B111E] border border-[#C5A059]/40 flex items-center justify-center text-[#C5A059] shadow-md">
-                <FileText className="w-8 h-8" />
-              </div>
+          {/* Ficha Universal de Documento PDF Oficial (Siempre limpia y nítida en móvil y escritorio) */}
+          <div className="rounded-3xl border border-stone-200 bg-stone-50/80 p-5 sm:p-7 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#0B111E] border border-[#C5A059]/40 flex items-center justify-center text-[#C5A059] shadow-md">
+              <FileText className="w-8 h-8" />
+            </div>
 
-              <div>
-                <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold uppercase tracking-wider mb-2">
-                  ✓ {panelLang === 'es' ? 'Documento Oficial Contabilizado' : 'Official Accounting Document'}
-                </span>
-                <h4 className="text-base sm:text-lg font-black text-slate-900 font-display tracking-tight break-all">
-                  {selectedInvoiceForView.name}
-                </h4>
-                <p className="text-xs text-stone-500 font-mono mt-1">
-                  {selectedInvoiceForView.number || 'FAC-2026-001'} · {selectedInvoiceForView.fileSize || '320 KB'}
-                </p>
-              </div>
-
-              {/* Ficha Resumida */}
-              <div className="grid grid-cols-2 gap-2.5 max-w-sm mx-auto text-left text-xs bg-white p-3.5 rounded-2xl border border-stone-200/80 shadow-2xs">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
-                    {panelLang === 'es' ? 'Emisor' : 'Issuer'}
-                  </span>
-                  <span className="font-extrabold text-slate-800 block text-xs mt-0.5 truncate">
-                    ECUAPLAC J&G S.L.
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
-                    {panelLang === 'es' ? 'Fecha' : 'Date'}
-                  </span>
-                  <span className="font-semibold text-slate-700 block text-xs mt-0.5">
-                    {selectedInvoiceForView.issueDate || selectedInvoiceForView.uploadDate || '03/11/2026'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
-                    {panelLang === 'es' ? 'Nº Factura' : 'Invoice Nº'}
-                  </span>
-                  <span className="font-mono font-bold text-slate-900 block text-xs mt-0.5">
-                    {selectedInvoiceForView.number || 'FAC-2026-001'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
-                    {panelLang === 'es' ? 'Estado' : 'Status'}
-                  </span>
-                  <span className="font-bold text-emerald-700 block text-xs mt-0.5 capitalize">
-                    {selectedInvoiceForView.status || (panelLang === 'es' ? 'Oficial' : 'Official')}
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-xs text-stone-500 max-w-md mx-auto leading-relaxed">
-                {panelLang === 'es'
-                  ? 'Descarga el documento oficial en formato PDF para visualizarlo en pantalla completa con zoom táctil y guardarlo en tu móvil.'
-                  : 'Download the official PDF document to view in fullscreen with pinch-to-zoom and save to your mobile device.'}
+            <div>
+              <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold uppercase tracking-wider mb-2">
+                ✓ {panelLang === 'es' ? 'Documento Oficial Contabilizado' : 'Official Accounting Document'}
+              </span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 font-display tracking-tight break-all">
+                {selectedInvoiceForView?.name || 'Factura_Ecuaplac.pdf'}
+              </h4>
+              <p className="text-xs text-stone-500 font-mono mt-1">
+                {selectedInvoiceForView?.number || 'FAC-2026-001'} · {selectedInvoiceForView?.fileSize || '320 KB'}
               </p>
+            </div>
 
-              {/* Botón Principal Prominente */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => handleOpenFullscreenInvoice(selectedInvoiceForView.fileUrl, selectedInvoiceForView.name)}
-                  className="w-full inline-flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-sm font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
-                >
-                  <Download className="w-4 h-4 text-[#C5A059]" />
-                  <span>{panelLang === 'es' ? 'Descargar Factura Oficial (PDF)' : 'Download Official Invoice (PDF)'}</span>
-                </button>
+            {/* Ficha Resumida */}
+            <div className="grid grid-cols-2 gap-2.5 max-w-sm mx-auto text-left text-xs bg-white p-3.5 rounded-2xl border border-stone-200/80 shadow-2xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
+                  {panelLang === 'es' ? 'Emisor' : 'Issuer'}
+                </span>
+                <span className="font-extrabold text-slate-800 block text-xs mt-0.5 truncate">
+                  ECUAPLAC J&G S.L.
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
+                  {panelLang === 'es' ? 'Fecha' : 'Date'}
+                </span>
+                <span className="font-semibold text-slate-700 block text-xs mt-0.5">
+                  {selectedInvoiceForView?.issueDate || selectedInvoiceForView?.uploadDate || '03/11/2026'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
+                  {panelLang === 'es' ? 'Nº Factura' : 'Invoice Nº'}
+                </span>
+                <span className="font-mono font-bold text-slate-900 block text-xs mt-0.5">
+                  {selectedInvoiceForView?.number || 'FAC-2026-001'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
+                  {panelLang === 'es' ? 'Importe' : 'Amount'}
+                </span>
+                <span className="font-mono font-black text-[#9E782F] block text-xs mt-0.5">
+                  {(selectedInvoiceForView?.totalAmount || 1028.5).toFixed(2)} €
+                </span>
               </div>
             </div>
-          ) : (
-            /* Documento de Factura Oficial Estilo Papel A4 / PDF */
-            <div className="p-4 sm:p-7 rounded-2xl border border-stone-200/90 bg-white shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] space-y-5 font-sans select-text">
-              {/* Cabecera de la Factura: Emisor y Metadatos */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-stone-200 pb-5">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-[#0B111E] text-[#C5A059] flex items-center justify-center font-bold font-display border border-[#C5A059]/30 shadow-xs">
-                      EP
-                    </div>
-                    <div>
-                      <h4 className="text-base font-black text-slate-950 font-display tracking-tight">
-                        ECUAPLAC J&G S.L.
-                      </h4>
-                      <p className="text-[11px] text-stone-500 font-sans">
-                        Reformas Integrales Mallorca • NIF B-07982341
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-2.5 text-xs text-stone-500 space-y-0.5">
-                    <p>Carrer Gremi de Teixidors, 24, Polígon Son Castelló</p>
-                    <p>07009 Palma de Mallorca, Illes Balears</p>
-                    <p>Tel: +34 642 12 34 56 • Email: ecuaplacbyjyg@gmail.com</p>
-                  </div>
-                </div>
 
-                {/* Bloque Factura Nº y Fecha */}
-                <div className="text-left sm:text-right bg-stone-50 sm:bg-transparent p-3 sm:p-0 rounded-xl sm:rounded-none border sm:border-none border-stone-100">
-                  <span className="text-[11px] font-bold tracking-widest text-[#C5A059] uppercase block font-display">
-                    FACTURA OFICIAL
-                  </span>
-                  <span className="text-xl sm:text-2xl font-black text-slate-950 font-mono block mt-0.5">
-                    {selectedInvoiceForView?.number || 'FAC-2026-001'}
-                  </span>
-                  <div className="mt-2 text-xs text-stone-600 space-y-0.5">
-                    <p><span className="text-stone-400">Fecha de emisión:</span> <span className="font-semibold text-slate-800">{selectedInvoiceForView?.issueDate || '03/11/2026'}</span></p>
-                    <p><span className="text-stone-400">Vencimiento:</span> <span className="font-semibold text-slate-800">{selectedInvoiceForView?.dueDate || 'Al contado'}</span></p>
-                    <p><span className="text-stone-400">Forma de pago:</span> <span className="font-semibold text-slate-800">Transferencia</span></p>
-                  </div>
-                </div>
-              </div>
+            <p className="text-xs text-stone-500 max-w-md mx-auto leading-relaxed">
+              {panelLang === 'es'
+                ? 'Descarga el documento oficial en formato PDF para visualizarlo en pantalla completa con zoom táctil y guardarlo en tu móvil.'
+                : 'Download the official PDF document to view in fullscreen with pinch-to-zoom and save to your mobile device.'}
+            </p>
 
-              {/* Datos del Cliente */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-stone-50/80 border border-stone-200/70 text-xs">
-                <div>
-                  <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
-                    Facturado a (Cliente)
-                  </span>
-                  <p className="font-black text-slate-900 text-sm font-display">
-                    {selectedInvoiceForView?.clientName || 'Ecuaplac J&G S.L.'}
-                  </p>
-                  <p className="text-stone-600 mt-0.5">NIF: {selectedInvoiceForView?.clientCif || 'B-07982341'}</p>
-                  <p className="text-stone-500">{selectedInvoiceForView?.clientAddress || 'Palma de Mallorca'}</p>
-                </div>
-                <div className="flex flex-col sm:items-end justify-center">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>DOCUMENTO CONTABILIZADO</span>
-                  </div>
-                  <span className="text-[10px] text-stone-400 mt-1 sm:text-right">
-                    Registro de IVA trimestral Mod. 303
-                  </span>
-                </div>
-              </div>
-
-              {/* Tabla de Conceptos */}
-              <div className="overflow-x-auto rounded-xl border border-stone-200">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-[#0B111E] text-white uppercase text-[10px] tracking-wider font-bold">
-                    <tr>
-                      <th className="py-2.5 px-3 sm:px-4">Descripción del Servicio</th>
-                      <th className="py-2.5 px-2 text-center w-16">Cant.</th>
-                      <th className="py-2.5 px-3 text-right w-24">Precio</th>
-                      <th className="py-2.5 px-3 sm:px-4 text-right w-24">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100 bg-white">
-                    {(selectedInvoiceForView?.items || [
-                      { description: 'Desarrollo web Nextool y despliegue Cloudflare Edge', qty: 1, unitPrice: 850, total: 850 },
-                    ]).map((item, idx) => (
-                      <tr key={idx} className="hover:bg-stone-50/50">
-                        <td className="py-2.5 px-3 sm:px-4 font-medium text-slate-900">
-                          {item.description}
-                        </td>
-                        <td className="py-2.5 px-2 text-center text-stone-600 font-mono">
-                          {item.qty}
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-stone-600 font-mono">
-                          {item.unitPrice.toFixed(2)} €
-                        </td>
-                        <td className="py-2.5 px-3 sm:px-4 text-right font-bold text-slate-900 font-mono">
-                          {item.total.toFixed(2)} €
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Cuadro de Totales */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-1">
-                <div className="text-xs text-stone-500 max-w-xs space-y-1">
-                  <p className="font-semibold text-slate-800">Observaciones:</p>
-                  <p>{selectedInvoiceForView?.notes || 'Factura emitida y liquidada mediante transferencia.'}</p>
-                  <p className="text-[10px] text-stone-400 font-mono mt-1">IBAN: ES76 2100 0418 4502 0005 1234</p>
-                </div>
-
-                <div className="w-full sm:w-64 space-y-1.5 p-3.5 rounded-xl bg-stone-50 border border-stone-200/80 text-xs">
-                  <div className="flex justify-between text-stone-600">
-                    <span>Base Imponible:</span>
-                    <span className="font-mono font-semibold">
-                      {(selectedInvoiceForView?.subtotal || 850).toFixed(2)} €
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-stone-600">
-                    <span>IVA (21%):</span>
-                    <span className="font-mono font-semibold">
-                      {(selectedInvoiceForView?.vatAmount || 178.5).toFixed(2)} €
-                    </span>
-                  </div>
-                  <div className="border-t border-stone-200 pt-1.5 flex justify-between text-sm sm:text-base font-black text-slate-950 font-display">
-                    <span>TOTAL FACTURA:</span>
-                    <span className="font-mono text-[#9E782F]">
-                      {(selectedInvoiceForView?.totalAmount || 1028.5).toFixed(2)} €
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pie Legal */}
-              <div className="pt-3 border-t border-stone-100 text-[10px] text-stone-400 text-center sm:text-left">
-                Documento mercantil oficial de ECUAPLAC J&G S.L. • Inscrita en el Registro Mercantil de Palma de Mallorca, Tomo 2341, Folio 89, Hoja PM-45123.
-              </div>
+            {/* Botón Principal Prominente */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => handleOpenFullscreenInvoice(selectedInvoiceForView?.fileUrl, selectedInvoiceForView?.name)}
+                className="w-full inline-flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-sm font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-[#C5A059]" />
+                <span>{panelLang === 'es' ? 'Descargar Factura Oficial (PDF)' : 'Download Official Invoice (PDF)'}</span>
+              </button>
             </div>
-          )}
+          </div>
         </div>
       </Modal>
 

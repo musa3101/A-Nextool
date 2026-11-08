@@ -15,7 +15,7 @@ export const AppLayout: React.FC = () => {
 
   if (isEcuaplacPortal) {
     return (
-      <div className="min-h-screen bg-[#F4F1EA] w-full max-w-full overflow-x-hidden">
+      <div className="min-h-screen bg-[#F4F1EA] w-full max-w-full overflow-x-clip">
         <Outlet />
       </div>
     );
