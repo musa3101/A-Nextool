@@ -1,0 +1,18 @@
+{
+  "name": "NexTool — Plataforma para Negocios",
+  "short_name": "NexTool",
+  "description": "Plataforma de gestión de galerías, presupuestos y control para negocios locales.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B111E",
+  "theme_color": "#0B111E",
+  "icons": [
+    {
+      "src": "/icons/nextool-appinicio.jpg",
+      "sizes": "923x918",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

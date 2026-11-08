@@ -6,7 +6,7 @@ import { EcuaplacWorkItem } from '@/types';
  */
 export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
   {
-    id: 'def-1',
+    id: '406782b8-cd0a-4ffb-8fbe-33278a5906a4',
     type: 'carousel',
     title_es: 'Baño de Diseño con Bañera Exenta',
     title_en: 'Designer Bathroom with Freestanding Bathtub',
@@ -18,7 +18,7 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
     fit_mode: 'cover',
   },
   {
-    id: 'def-2',
+    id: '8ed9970f-a0eb-4383-ad3f-7753af1e12b0',
     type: 'carousel',
     title_es: 'Escalera Helicoidal de Yeso Pulido',
     title_en: 'Sculptural Helical Staircase',
@@ -30,7 +30,7 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
     fit_mode: 'cover',
   },
   {
-    id: 'def-3',
+    id: '46326e76-88c2-43c2-86ce-ffe63672e744',
     type: 'carousel',
     title_es: 'Ducha de Obra con Hornacinas Iluminadas',
     title_en: 'Custom Shower with Illuminated Niches',
@@ -42,7 +42,7 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
     fit_mode: 'cover',
   },
   {
-    id: 'def-4',
+    id: '3fafe434-23e9-48a8-af94-2cab90780fa2',
     type: 'carousel',
     title_es: 'Cocina Moderna Integrada y Minimalista',
     title_en: 'Integrated Minimalist Modern Kitchen',
@@ -54,7 +54,7 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
     fit_mode: 'cover',
   },
   {
-    id: 'def-5',
+    id: '6cd9ef3e-2ae0-4f63-80a6-ace92c422028',
     type: 'carousel',
     title_es: 'Terraza Exterior y Solárium',
     title_en: 'Outdoor Terrace & Solarium',
@@ -66,7 +66,7 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
     fit_mode: 'cover',
   },
   {
-    id: 'def-6',
+    id: '05f50304-6d77-4d4e-8cf9-847d52021131',
     type: 'carousel',
     title_es: 'Aseo Minimalista de Cortesía',
     title_en: 'Minimalist Guest Toilet',
@@ -78,7 +78,7 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
     fit_mode: 'cover',
   },
   {
-    id: 'def-7',
+    id: 'dea03861-5ee7-481e-a773-91fabb7d6776',
     type: 'carousel',
     title_es: 'Distribuidor con Iluminación Indirecta',
     title_en: 'Corridor with Indirect Lighting',
@@ -90,7 +90,7 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
     fit_mode: 'cover',
   },
   {
-    id: 'def-8',
+    id: 'c1d4a8b1-190c-44fd-9381-7699746705bb',
     type: 'carousel',
     title_es: 'Nicho Iluminado para Coleccionismo',
     title_en: 'Illuminated Display Niche',
@@ -102,7 +102,7 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
     fit_mode: 'cover',
   },
   {
-    id: 'def-9',
+    id: '1c61073e-1697-46bb-93b6-305b0a536200',
     type: 'carousel',
     title_es: 'Detalle de Escalera Helicoidal',
     title_en: 'Helical Staircase Detail',
@@ -113,6 +113,18 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
     active: true,
     fit_mode: 'cover',
   },
+  {
+    id: '134ec758-6b27-4828-b247-69dd381d4453',
+    type: 'carousel',
+    title_es: 'Test 1 mnxr',
+    title_en: 'Test 1 mnxr',
+    location_es: 'Palma de Mallorca',
+    location_en: 'Palma de Mallorca',
+    image_url: 'https://wkfddccsantywcrsxpox.supabase.co/storage/v1/object/public/ecuaplac-media/carousel/1794062869495_r30lp6.webp',
+    sort_order: 100,
+    active: false,
+    fit_mode: 'cover',
+  },
 ];
 
 /**
@@ -120,41 +132,41 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
  */
 export const DEFAULT_MORE_PROJECTS: EcuaplacWorkItem[] = [
   {
-    id: 'more-1',
+    id: '8b4a5520-23ab-4473-8354-396c27654abc',
     type: 'more_projects',
-    title_es: 'Reforma integral de baño — Fase de obra',
-    title_en: 'Full bathroom renovation — Construction phase',
-    image_url: '/ecuaplac/portfolio/galeria/bano-antes-collage.webp',
+    title_es: 'Reforma Integral de Baño',
+    title_en: 'Complete Bathroom Remodel',
+    image_url: '/ecuaplac/portfolio/galeria/bano-despues-collage.webp',
     sort_order: 10,
     active: true,
     fit_mode: 'cover',
   },
   {
-    id: 'more-2',
+    id: 'c5adde72-92e0-4454-bba1-2a7226858e6c',
     type: 'more_projects',
-    title_es: 'Reforma integral de baño — Resultado final',
-    title_en: 'Full bathroom renovation — Final result',
-    image_url: '/ecuaplac/portfolio/galeria/bano-despues-collage.webp',
+    title_es: 'Lavabo Flotante a Medida',
+    title_en: 'Custom Floating Sink',
+    image_url: '/ecuaplac/portfolio/galeria/bano-piedra-espejos.webp',
     sort_order: 20,
     active: true,
     fit_mode: 'cover',
   },
   {
-    id: 'more-3',
+    id: 'ec905cf9-09ac-448b-bfcf-c5364ccaf707',
     type: 'more_projects',
-    title_es: 'Baño en piedra natural con espejos retroiluminados',
-    title_en: 'Natural stone bathroom with backlit mirrors',
-    image_url: '/ecuaplac/portfolio/galeria/bano-piedra-espejos.webp',
+    title_es: 'Vestidor de Pladur y Roble',
+    title_en: 'Drywall and Oak Walk-in Closet',
+    image_url: '/ecuaplac/portfolio/galeria/cerramiento-cristal-1.webp',
     sort_order: 30,
     active: true,
     fit_mode: 'cover',
   },
   {
-    id: 'more-4',
+    id: '29f1042b-ff7d-450e-8cb0-61bc1b340f63',
     type: 'more_projects',
-    title_es: 'Cerramiento de cristal con ventanales panorámicos',
-    title_en: 'Glass enclosure with panoramic windows',
-    image_url: '/ecuaplac/portfolio/galeria/cerramiento-cristal-1.webp',
+    title_es: 'Escalera y Distribuidor de Roble',
+    title_en: 'Oak Staircase and Hallway',
+    image_url: '/ecuaplac/portfolio/galeria/cerramiento-cristal-frontal.webp',
     sort_order: 40,
     active: true,
     fit_mode: 'cover',

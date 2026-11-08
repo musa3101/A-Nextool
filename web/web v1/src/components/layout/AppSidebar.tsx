@@ -75,8 +75,12 @@ export const AppSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
           {/* Brand Header */}
           <div className="p-6 border-b border-navy-800/80 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-champagne-500 text-navy-900 flex items-center justify-center font-extrabold text-sm shadow-atelier-sm">
-                NT
+              <div className="w-10 h-10 rounded-2xl bg-[#0C121E] p-1.5 border border-white/10 flex items-center justify-center shadow-md shrink-0">
+                <img
+                  src="/icons/nextool-sinfondo.png"
+                  alt="NexTool"
+                  className="w-full h-full object-contain"
+                />
               </div>
               <div>
                 <span className="font-display font-bold text-base tracking-tight text-white block">

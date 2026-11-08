@@ -416,10 +416,19 @@ export class EcuaplacConnector {
   }
 
   /**
+   * Comprueba si un identificador corresponde a un UUID estándar de Postgres
+   */
+  private isUUID(id?: string): boolean {
+    if (!id) return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  }
+
+  /**
    * Guarda o actualiza una obra de portada en Supabase
    */
   async saveWork(work: Partial<EcuaplacWorkItem>): Promise<EcuaplacWorkItem> {
-    const isNew = !work.id || work.id.startsWith('def-') || work.id.startsWith('local-');
+    // Si no tiene ID o es un ID temporal de cliente (ecuaplac-, def-, local-), es nuevo y se inserta con POST
+    const isNew = !work.id || !this.isUUID(work.id);
     const endpoint = isNew
       ? `${this.url}/rest/v1/${this.tables.carousel}`
       : `${this.url}/rest/v1/${this.tables.carousel}?id=eq.${work.id}`;
@@ -449,7 +458,7 @@ export class EcuaplacConnector {
    * Guarda o actualiza un proyecto en Supabase (Galería 2: Más Reformas)
    */
   async saveProject(project: Partial<EcuaplacWorkItem>): Promise<EcuaplacWorkItem> {
-    const isNew = !project.id || project.id.startsWith('proj-') || project.id.startsWith('ecuaplac-') || project.id.startsWith('local-');
+    const isNew = !project.id || !this.isUUID(project.id);
     const endpoint = isNew
       ? `${this.url}/rest/v1/${this.tables.projects}`
       : `${this.url}/rest/v1/${this.tables.projects}?id=eq.${project.id}`;
@@ -487,8 +496,9 @@ export class EcuaplacConnector {
 
     if (res.ok) {
       await this.addAuditLog('delete', `Elemento eliminado: ID ${id}`);
+      return true;
     }
-    return res.ok;
+    throw new Error(`Error al eliminar elemento en Supabase (${res.status})`);
   }
 
   /**
