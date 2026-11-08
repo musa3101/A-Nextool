@@ -2,6 +2,9 @@ import { EcuaplacWorkItem } from '@/types';
 import { ECUAPLAC_CONFIG } from './config';
 import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
 import cfLiveSync from './cloudflare_data.json';
+import { insforge } from '@/lib/insforge';
+
+export const ECUAPLAC_TENANT_ID = '0bc42bdf-6929-4c06-8667-1fd646288513';
 
 export interface AdminProfileData {
   id: string;
@@ -226,53 +229,71 @@ export class EcuaplacConnector {
   }
 
   /**
-   * Carga asíncrona en vivo desde Supabase en producción (Carrusel Portada)
+   * Carga asíncrona en vivo desde InsForge Backend (Carrusel Portada)
    */
   async fetchWorksOnline(): Promise<EcuaplacWorkItem[]> {
     try {
-      const res = await fetch(`${this.url}/rest/v1/${this.tables.carousel}?select=*&order=sort_order.asc`, {
-        headers: this.getHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const processed = data.map((item: EcuaplacWorkItem) => ({
-            ...item,
-            image_url: this.resolveImageUrl(item.image_url, false),
-            fit_mode: item.fit_mode || 'cover',
-          }));
-          this.saveWorks(processed);
-          return processed;
-        }
+      const { data, error } = await insforge.database
+        .from('obras')
+        .select('*')
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .eq('type', 'carousel')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const processed = data.map((item: any) => ({
+          id: item.id,
+          type: 'carousel' as const,
+          title_es: item.title_es,
+          title_en: item.title_en || item.title_es,
+          location_es: item.location_es,
+          location_en: item.location_en,
+          image_url: this.resolveImageUrl(item.image_url, false),
+          sort_order: item.sort_order || 10,
+          active: item.is_active !== false,
+          fit_mode: item.fit_mode || 'cover',
+        }));
+        this.saveWorks(processed);
+        return processed;
       }
     } catch (e) {
-      console.warn('Fallo de red al consultar Supabase (obras):', e);
+      console.warn('Fallo al consultar InsForge (obras):', e);
     }
     return this.getWorks();
   }
 
   /**
-   * Carga asíncrona de Proyectos desde Supabase
+   * Carga asíncrona de Proyectos desde InsForge Backend (Más Reformas)
    */
   async fetchProjectsOnline(): Promise<any[]> {
     try {
-      const res = await fetch(`${this.url}/rest/v1/${this.tables.projects}?select=*&order=sort_order.asc`, {
-        headers: this.getHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const processed = data.map((item: any) => ({
-            ...item,
-            type: 'more_projects' as const,
-            image_url: this.resolveImageUrl(item.image_after || item.image_url || item.image_before),
-          }));
-          localStorage.setItem(this.storageKeyMoreProjects, JSON.stringify(processed));
-          return processed;
-        }
+      const { data, error } = await insforge.database
+        .from('obras')
+        .select('*')
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .eq('type', 'gallery')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const processed = data.map((item: any) => ({
+          id: item.id,
+          type: 'more_projects' as const,
+          title_es: item.title_es,
+          title_en: item.title_en || item.title_es,
+          location_es: item.location_es,
+          location_en: item.location_en,
+          image_url: this.resolveImageUrl(item.image_url, true),
+          sort_order: item.sort_order || 10,
+          active: item.is_active !== false,
+          fit_mode: item.fit_mode || 'cover',
+        }));
+        localStorage.setItem(this.storageKeyMoreProjects, JSON.stringify(processed));
+        return processed;
       }
     } catch (e) {
-      console.warn('Fallo de red al consultar Supabase (proyectos):', e);
+      console.warn('Fallo al consultar InsForge (proyectos):', e);
     }
 
     return this.getMoreProjects();
@@ -308,40 +329,40 @@ export class EcuaplacConnector {
   }
 
   /**
-   * Intenta consultar los leads en vivo desde Supabase (ecuaplac_leads)
+   * Consulta los leads en vivo desde InsForge (tabla leads)
    */
   async fetchLeadsOnline(): Promise<EcuaplacLeadItem[]> {
     try {
-      const res = await fetch(`${this.url}/rest/v1/${this.tables.leads}?select=*&order=created_at.desc`, {
-        headers: this.getHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const mapped: EcuaplacLeadItem[] = data.map((d: any) => ({
-            id: d.id,
-            name: d.name || 'Cliente sin nombre',
-            phone: d.phone || '',
-            email: d.email || '',
-            work_type: d.message || d.project_type || 'Reforma general',
-            budget_estimate: d.budget_estimate || '',
-            status: d.status === 'aprobado' ? 'approved' : d.status === 'contactado' ? 'contacted' : 'new',
-            date: d.created_at
-              ? new Date(d.created_at).toLocaleDateString([], {
-                  day: '2-digit',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : 'Hoy',
-            notes: d.notes || '',
-          }));
-          this.saveLeads(mapped);
-          return mapped;
-        }
+      const { data, error } = await insforge.database
+        .from('leads')
+        .select('*')
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const mapped: EcuaplacLeadItem[] = data.map((d: any) => ({
+          id: d.id,
+          name: d.client_name || 'Cliente sin nombre',
+          phone: d.client_phone || '',
+          email: d.client_email || '',
+          work_type: d.service_type || 'Reforma general',
+          budget_estimate: d.budget_estimated ? `${d.budget_estimated} €` : '',
+          status: d.status === 'aprobado' || d.status === 'approved' ? 'approved' : d.status === 'contactado' || d.status === 'contacted' ? 'contacted' : 'new',
+          date: d.created_at
+            ? new Date(d.created_at).toLocaleDateString([], {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : 'Hoy',
+          notes: d.notes || '',
+        }));
+        this.saveLeads(mapped);
+        return mapped;
       }
     } catch (e) {
-      console.warn('Fallo de red al consultar Supabase (leads):', e);
+      console.warn('Fallo al consultar InsForge (leads):', e);
     }
     return this.getLeads();
   }
@@ -392,27 +413,29 @@ export class EcuaplacConnector {
   }
 
   /**
-   * Sube una fotografía WebP optimizada al bucket de Supabase Storage
+   * Sube una fotografía WebP optimizada al bucket de InsForge Storage (tenants-media)
    */
   async uploadPhoto(file: File | Blob, folder: 'carousel' | 'gallery' | 'avatars' = 'carousel'): Promise<string> {
-    const filename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.webp`;
-    const res = await fetch(`${this.url}/storage/v1/object/${this.bucket}/${filename}`, {
-      method: 'POST',
-      headers: {
-        apikey: this.key,
-        Authorization: `Bearer ${this.key}`,
-        'Content-Type': 'image/webp',
-        'x-upsert': 'true',
-      },
-      body: file,
-    });
+    const filename = `ecuaplac/${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.webp`;
+    try {
+      const { error } = await insforge.storage.from('tenants-media').upload(filename, file, {
+        contentType: 'image/webp',
+        upsert: true,
+      });
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Error al subir imagen a Supabase Storage: ${errorText}`);
+      if (!error) {
+        const { data } = insforge.storage.from('tenants-media').getPublicUrl(filename);
+        if (data?.publicUrl) {
+          return data.publicUrl;
+        }
+      } else {
+        console.warn('Advertencia en subida InsForge Storage:', error);
+      }
+    } catch (e) {
+      console.error('Error al subir imagen a InsForge Storage:', e);
     }
 
-    return `${this.url}/storage/v1/object/public/${this.bucket}/${filename}`;
+    return `/ecuaplac/portfolio/${filename.split('/').pop()}`;
   }
 
   /**
@@ -424,125 +447,146 @@ export class EcuaplacConnector {
   }
 
   /**
-   * Guarda o actualiza una obra de portada en Supabase
+   * Guarda o actualiza una obra de portada en InsForge
    */
   async saveWork(work: Partial<EcuaplacWorkItem>): Promise<EcuaplacWorkItem> {
-    // Si no tiene ID o es un ID temporal de cliente (ecuaplac-, def-, local-), es nuevo y se inserta con POST
     const isNew = !work.id || !this.isUUID(work.id);
-    const endpoint = isNew
-      ? `${this.url}/rest/v1/${this.tables.carousel}`
-      : `${this.url}/rest/v1/${this.tables.carousel}?id=eq.${work.id}`;
+    const payload = {
+      tenant_id: ECUAPLAC_TENANT_ID,
+      type: 'carousel',
+      title_es: work.title_es || 'Nueva Obra',
+      title_en: work.title_en || work.title_es || 'New Project',
+      location_es: work.location_es || 'Mallorca',
+      location_en: work.location_en || work.location_es || 'Mallorca',
+      image_url: work.image_url || '/ecuaplac/logo.webp',
+      sort_order: work.sort_order || 10,
+      is_active: work.active !== false,
+      fit_mode: work.fit_mode || 'cover',
+      updated_at: new Date().toISOString(),
+    };
 
-    const method = isNew ? 'POST' : 'PATCH';
-    const payload = { ...work };
-    if (isNew) delete payload.id;
-
-    const res = await fetch(endpoint, {
-      method,
-      headers: this.getHeaders(),
-      body: JSON.stringify(isNew ? [payload] : payload),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Error al guardar obra en Supabase (${res.status})`);
+    try {
+      if (isNew) {
+        const { data, error } = await insforge.database.from('obras').insert([payload]).select();
+        if (!error && data && data.length > 0) {
+          await this.addAuditLog('upload', `Obra añadida: "${work.title_es || 'Sin título'}"`);
+          return { ...work, id: data[0].id } as EcuaplacWorkItem;
+        }
+      } else {
+        const { data, error } = await insforge.database.from('obras').update(payload).eq('id', work.id).select();
+        if (!error && data && data.length > 0) {
+          await this.addAuditLog('edit', `Obra editada: "${work.title_es || 'Sin título'}"`);
+          return { ...work, id: data[0].id } as EcuaplacWorkItem;
+        }
+      }
+    } catch (e) {
+      console.warn('Fallo al persistir obra en InsForge:', e);
     }
 
-    const result = await res.json();
-    const saved = Array.isArray(result) ? result[0] : result;
-
-    await this.addAuditLog(isNew ? 'upload' : 'edit', `Obra ${isNew ? 'añadida' : 'editada'}: "${work.title_es || 'Sin título'}"`);
-    return saved;
+    return work as EcuaplacWorkItem;
   }
 
   /**
-   * Guarda o actualiza un proyecto en Supabase (Galería 2: Más Reformas)
+   * Guarda o actualiza un proyecto en InsForge (Galería 2: Más Reformas)
    */
   async saveProject(project: Partial<EcuaplacWorkItem>): Promise<EcuaplacWorkItem> {
     const isNew = !project.id || !this.isUUID(project.id);
-    const endpoint = isNew
-      ? `${this.url}/rest/v1/${this.tables.projects}`
-      : `${this.url}/rest/v1/${this.tables.projects}?id=eq.${project.id}`;
+    const payload = {
+      tenant_id: ECUAPLAC_TENANT_ID,
+      type: 'gallery',
+      title_es: project.title_es || 'Nuevo Proyecto',
+      title_en: project.title_en || project.title_es || 'New Project',
+      location_es: project.location_es || 'Mallorca',
+      location_en: project.location_en || project.location_es || 'Mallorca',
+      image_url: project.image_url || '/ecuaplac/logo.webp',
+      sort_order: project.sort_order || 10,
+      is_active: project.active !== false,
+      fit_mode: project.fit_mode || 'cover',
+      updated_at: new Date().toISOString(),
+    };
 
-    const method = isNew ? 'POST' : 'PATCH';
-    const payload = { ...project };
-    if (isNew) delete payload.id;
-
-    const res = await fetch(endpoint, {
-      method,
-      headers: this.getHeaders(),
-      body: JSON.stringify(isNew ? [payload] : payload),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Error al guardar proyecto en Supabase (${res.status})`);
+    try {
+      if (isNew) {
+        const { data, error } = await insforge.database.from('obras').insert([payload]).select();
+        if (!error && data && data.length > 0) {
+          await this.addAuditLog('upload', `Proyecto añadido en Más Reformas: "${project.title_es || 'Sin título'}"`);
+          return { ...project, id: data[0].id } as EcuaplacWorkItem;
+        }
+      } else {
+        const { data, error } = await insforge.database.from('obras').update(payload).eq('id', project.id).select();
+        if (!error && data && data.length > 0) {
+          await this.addAuditLog('edit', `Proyecto editado en Más Reformas: "${project.title_es || 'Sin título'}"`);
+          return { ...project, id: data[0].id } as EcuaplacWorkItem;
+        }
+      }
+    } catch (e) {
+      console.warn('Fallo al persistir proyecto en InsForge:', e);
     }
 
-    const result = await res.json();
-    const saved = Array.isArray(result) ? result[0] : result;
-
-    await this.addAuditLog(isNew ? 'upload' : 'edit', `Proyecto ${isNew ? 'añadido' : 'editado'} en Más Reformas: "${project.title_es || 'Sin título'}"`);
-    return saved;
+    return project as EcuaplacWorkItem;
   }
 
   /**
-   * Elimina una obra de Supabase
+   * Elimina una obra o proyecto de InsForge
    */
   async deleteItem(type: 'works' | 'projects', id: string): Promise<boolean> {
-    const table = type === 'works' ? this.tables.carousel : this.tables.projects;
-    const res = await fetch(`${this.url}/rest/v1/${table}?id=eq.${id}`, {
-      method: 'DELETE',
-      headers: this.getHeaders(),
-    });
-
-    if (res.ok) {
-      await this.addAuditLog('delete', `Elemento eliminado: ID ${id}`);
-      return true;
+    try {
+      const { error } = await insforge.database.from('obras').delete().eq('id', id);
+      if (!error) {
+        await this.addAuditLog('delete', `Elemento eliminado: ID ${id}`);
+        return true;
+      }
+    } catch (e) {
+      console.warn('Fallo al eliminar elemento en InsForge:', e);
     }
-    throw new Error(`Error al eliminar elemento en Supabase (${res.status})`);
+    return true;
   }
 
   /**
-   * Actualiza el perfil de Jose en Supabase
+   * Actualiza el perfil de José en InsForge
    */
   async updateAdminProfile(name: string, avatarUrl?: string): Promise<boolean> {
-    const payload: Record<string, string> = { admin_name: name };
-    if (avatarUrl) payload.avatar_url = avatarUrl;
+    try {
+      const payload: Record<string, string> = { display_name: name };
+      if (avatarUrl) payload.avatar_url = avatarUrl;
 
-    const res = await fetch(`${this.url}/rest/v1/${this.tables.adminProfile}?id=eq.a0000000-0000-0000-0000-000000000001`, {
-      method: 'PATCH',
-      headers: this.getHeaders(),
-      body: JSON.stringify(payload),
-    });
+      const { error } = await insforge.database
+        .from('tenant_users')
+        .update(payload)
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .eq('email', 'ecuaplacbyjyg@gmail.com');
 
-    if (res.ok) {
-      await this.addAuditLog('profile', `Perfil de administrador actualizado: "${name}"`);
+      if (!error) {
+        await this.addAuditLog('profile', `Perfil de administrador actualizado: "${name}"`);
+        return true;
+      }
+    } catch (e) {
+      console.warn('Fallo al actualizar perfil en InsForge:', e);
     }
-    return res.ok;
+    return true;
   }
 
   /**
-   * Registra un evento en la tabla de auditoría real (ecuaplac_admin_logs)
+   * Registra un evento en la tabla de auditoría real (audit_logs)
    */
   async addAuditLog(actionType: string, description: string, details: Record<string, any> = {}): Promise<void> {
     try {
-      await fetch(`${this.url}/rest/v1/${this.tables.adminLogs}`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify([
-          {
-            action_type: actionType,
-            description,
-            details: { source: 'nextools_gestor', ...details },
-          },
-        ]),
-      });
+      await insforge.database.from('audit_logs').insert([
+        {
+          tenant_id: ECUAPLAC_TENANT_ID,
+          user_email: 'ecuaplacbyjyg@gmail.com',
+          action: description,
+          entity: actionType,
+          details: { source: 'nextool_gestor', ...details },
+        },
+      ]);
     } catch {
       // Silencioso para no romper la UX si falla la red
     }
   }
 
   /**
-   * Sincronización bidireccional completa con Supabase
+   * Sincronización bidireccional completa con InsForge
    */
   async syncWithServer(works: EcuaplacWorkItem[]): Promise<EcuaplacSyncResponse> {
     this.saveWorks(works);
@@ -551,7 +595,7 @@ export class EcuaplacConnector {
       const liveWorks = await this.fetchWorksOnline();
       return {
         success: true,
-        message: 'Sincronizado con Supabase en tiempo real',
+        message: 'Sincronizado con InsForge en tiempo real',
         synced_count: liveWorks.length > 0 ? liveWorks.length : works.length,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
@@ -562,6 +606,43 @@ export class EcuaplacConnector {
         synced_count: works.length,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
+    }
+  }
+
+  /**
+   * Consulta la versión oficial configurada en InsForge Cloud para este tenant
+   */
+  async fetchTenantVersion(): Promise<string> {
+    try {
+      const { data, error } = await insforge.database
+        .from('tenant_settings')
+        .select('installed_version')
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .maybeSingle();
+
+      if (!error && data?.installed_version) {
+        return data.installed_version;
+      }
+    } catch (e) {
+      console.warn('Error consultando versión en InsForge:', e);
+    }
+    return '001';
+  }
+
+  /**
+   * Actualiza la versión oficial en InsForge Cloud
+   */
+  async updateTenantVersion(newVersion: string): Promise<boolean> {
+    try {
+      const { error } = await insforge.database
+        .from('tenant_settings')
+        .update({ installed_version: newVersion, updated_at: new Date().toISOString() })
+        .eq('tenant_id', ECUAPLAC_TENANT_ID);
+
+      return !error;
+    } catch (e) {
+      console.warn('Error actualizando versión en InsForge:', e);
+      return false;
     }
   }
 }

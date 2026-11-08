@@ -78,12 +78,12 @@ export const Modal: React.FC<ModalProps> = ({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain flex min-h-full items-center justify-center px-3 sm:px-4 pt-[max(20px,env(safe-area-inset-top))] pb-[max(20px,env(safe-area-inset-bottom))] text-center select-none"
+      className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain flex min-h-full items-start sm:items-center justify-center px-3 sm:px-4 pt-[max(56px,calc(env(safe-area-inset-top)+16px))] pb-[max(24px,env(safe-area-inset-bottom))] text-center select-none"
       style={{ touchAction: 'pan-y' }}
     >
-      {/* Backdrop Oscuro con Desenfoque de Lujo (Bloqueo absoluto de clics y toques al fondo) */}
+      {/* Backdrop Oscuro Sólido Nítido (Sin blur que interfiera con la barra de estado de iOS) */}
       <div
-        className="fixed inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity pointer-events-auto"
+        className="fixed inset-0 bg-slate-950/85 transition-opacity pointer-events-auto"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -91,7 +91,7 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Dialog Card */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full ${maxWidthClasses[maxWidth]} max-h-[86vh] sm:max-h-[90vh] flex flex-col transform overflow-hidden rounded-3xl bg-white p-4 sm:p-6 text-left shadow-2xl transition-all border border-stone-200/90 z-10 relative overscroll-contain animate-in fade-in zoom-in-95 duration-150 select-text my-auto`}
+        className={`w-full ${maxWidthClasses[maxWidth]} max-h-[82vh] sm:max-h-[88vh] flex flex-col transform overflow-hidden rounded-3xl bg-white p-4 sm:p-6 text-left shadow-2xl transition-all border border-stone-200 z-10 relative overscroll-contain animate-in fade-in zoom-in-95 duration-150 select-text my-0 sm:my-auto`}
       >
         <div className="shrink-0 flex items-start justify-between pb-3.5 border-b border-stone-100">
           <div>
