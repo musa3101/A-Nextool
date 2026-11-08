@@ -546,9 +546,24 @@ export const EcuaplacPortal: React.FC = () => {
 
   // Facturas y Documentos del Proyecto (Plegadas / Escondiditas por defecto)
   const [isFacturasOpen, setIsFacturasOpen] = useState(false);
+  const facturasSectionRef = useRef<HTMLDivElement>(null);
   const [activeDocTab, setActiveDocTab] = useState<'factura' | 'gmail'>('factura');
   const docFileInputRef = useRef<HTMLInputElement>(null);
   const invoiceFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleToggleFacturas = () => {
+    const willOpen = !isFacturasOpen;
+    setIsFacturasOpen(willOpen);
+    if (willOpen) {
+      setTimeout(() => {
+        if (facturasSectionRef.current) {
+          const yOffset = -24;
+          const y = facturasSectionRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 120);
+    }
+  };
 
   interface ProjectDocItem {
     id: string;
@@ -1691,8 +1706,8 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Bloque: Facturas (Plegable / Escondidito por defecto) */}
-          <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
+          {/* Bloque: Facturas (Plegable / Escondidito por defecto con Scroll Suave Inteligente) */}
+          <div ref={facturasSectionRef} className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
             {/* Cabecera / Trigger de Facturas */}
             <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -1719,7 +1734,7 @@ export const EcuaplacPortal: React.FC = () => {
               {/* Botón Abrir / Ocultar Facturas */}
               <button
                 type="button"
-                onClick={() => setIsFacturasOpen(!isFacturasOpen)}
+                onClick={handleToggleFacturas}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold active:scale-95 transition-all shadow-xs font-sans group cursor-pointer shrink-0"
                 title={isFacturasOpen ? 'Ocultar panel de facturas' : 'Abrir facturas'}
               >
@@ -1734,7 +1749,7 @@ export const EcuaplacPortal: React.FC = () => {
 
             {/* Panel Desplegable hacia abajo (cuando se pulsa "Abrir Facturas") */}
             {isFacturasOpen && (
-              <div className="border-t border-stone-100 p-4 sm:p-5 pt-3 space-y-3.5 bg-stone-50/50">
+              <div className="border-t border-stone-100 p-4 sm:p-5 pt-3 space-y-3.5 bg-stone-50/50 animate-in fade-in slide-in-from-top-2 duration-250">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-xs font-bold text-slate-700 font-sans">
                     Documentos en PDF ({invoices.length})
