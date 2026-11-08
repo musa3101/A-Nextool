@@ -28,6 +28,7 @@ out/
 Thumbs.db
 .gemini/
 .system_generated/
+.wrangler/
 *.tmp
 *.local.json
 mcp_config.json
