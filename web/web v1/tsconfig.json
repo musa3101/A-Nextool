@@ -23,7 +23,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@clientes/*": ["../clientes/*"]
+      "@clientes/*": ["../clientes/*"],
+      "react": ["node_modules/@types/react", "node_modules/react"],
+      "react-dom": ["node_modules/@types/react-dom", "node_modules/react-dom"],
+      "react/jsx-runtime": ["node_modules/@types/react/jsx-runtime", "node_modules/react/jsx-runtime"],
+      "react-router-dom": ["node_modules/react-router-dom"],
+      "lucide-react": ["node_modules/lucide-react"]
     }
   },
   "include": ["src", "../clientes"]
