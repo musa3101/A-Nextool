@@ -659,6 +659,34 @@ export const EcuaplacPortal: React.FC = () => {
     setIsInvoiceViewerOpen(true);
   };
 
+  const handleOpenFullscreenInvoice = (fileUrl?: string) => {
+    if (!fileUrl) {
+      window.print();
+      return;
+    }
+    if (fileUrl.startsWith('data:')) {
+      try {
+        const parts = fileUrl.split(',');
+        const mime = parts[0].split(':')[1]?.split(';')[0] || 'application/pdf';
+        const byteCharacters = atob(parts[1]);
+        const byteNumbers = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const blob = new Blob([byteNumbers], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        const win = window.open(blobUrl, '_blank');
+        if (!win) {
+          window.location.href = blobUrl;
+        }
+        return;
+      } catch (e) {
+        console.warn('Error al decodificar data URL para pantalla completa:', e);
+      }
+    }
+    window.open(fileUrl, '_blank');
+  };
+
   const handleUploadInvoice = handleUploadDoc;
   const handleDeleteInvoice = handleDeleteDoc;
   const handleViewInvoice = handleViewDoc;
@@ -1368,8 +1396,8 @@ export const EcuaplacPortal: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Header Oficial de Ecuaplac (Deep Sapphire Navy & Gold Trim) */}
-      <header className="sticky top-0 z-30 bg-[#0E1726]/95 backdrop-blur-xl border-b border-blue-500/20 shadow-[0_4px_24px_rgba(14,23,38,0.35)] px-4 sm:px-6 py-3 flex items-center justify-between">
+      {/* 1. Header Oficial de Ecuaplac (Deep Sapphire Navy & Gold Trim - Safe Area Nítida) */}
+      <header className="sticky top-0 z-30 bg-[#0E1726] border-b border-blue-500/20 shadow-[0_4px_20px_rgba(0,0,0,0.35)] px-4 sm:px-6 pt-[max(12px,env(safe-area-inset-top))] pb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10">
             <img
@@ -3381,43 +3409,39 @@ export const EcuaplacPortal: React.FC = () => {
       >
         <div className="space-y-3 pt-1">
           {/* Botón Abrir Factura Completa en Pantalla Completa */}
-          {selectedInvoiceForView?.fileUrl ? (
-            <a
-              href={selectedInvoiceForView.fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-xs font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
-            >
-              <ExternalLink className="w-4 h-4 text-[#C5A059]" />
-              <span>{panelLang === 'es' ? 'Abrir Factura Completa en Pantalla Completa' : 'Open Full Invoice in Fullscreen'}</span>
-            </a>
-          ) : (
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-xs font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
-            >
-              <ExternalLink className="w-4 h-4 text-[#C5A059]" />
-              <span>{panelLang === 'es' ? 'Abrir Factura Completa en Pantalla Completa' : 'Open Full Invoice in Fullscreen'}</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => handleOpenFullscreenInvoice(selectedInvoiceForView?.fileUrl)}
+            className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-xs font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
+          >
+            <ExternalLink className="w-4 h-4 text-[#C5A059]" />
+            <span>{panelLang === 'es' ? 'Abrir Factura Completa en Pantalla Completa' : 'Open Full Invoice in Fullscreen'}</span>
+          </button>
 
           {selectedInvoiceForView?.fileUrl ? (
-            <div className="space-y-3">
-              <div className="w-full max-h-[60vh] overflow-y-auto rounded-2xl border border-stone-200 bg-stone-100/90 p-2 shadow-inner flex items-center justify-center">
+            <div className="space-y-2">
+              {/* Contenedor adaptativo con scroll horizontal y vertical táctil para no recortar la factura en móvil */}
+              <div className="w-full rounded-2xl border border-stone-200 bg-stone-100/90 shadow-inner overflow-hidden">
                 {selectedInvoiceForView.fileUrl.startsWith('data:image') ||
                 selectedInvoiceForView.fileUrl.match(/\.(jpg|jpeg|png|webp|gif)$/i) ? (
-                  <img
-                    src={selectedInvoiceForView.fileUrl}
-                    alt={selectedInvoiceForView.name}
-                    className="w-full h-auto max-h-[55vh] object-contain rounded-xl shadow-xs"
-                  />
+                  <div className="p-2 flex items-center justify-center max-h-[50vh] overflow-y-auto">
+                    <img
+                      src={selectedInvoiceForView.fileUrl}
+                      alt={selectedInvoiceForView.name}
+                      className="w-full h-auto max-h-[48vh] object-contain rounded-xl shadow-xs"
+                    />
+                  </div>
                 ) : (
-                  <iframe
-                    src={`${selectedInvoiceForView.fileUrl}#view=FitH`}
-                    title={selectedInvoiceForView.name}
-                    className="w-full h-[55vh] rounded-xl border border-stone-200 bg-white"
-                  />
+                  <div className="w-full overflow-x-auto overflow-y-auto max-h-[48vh] sm:max-h-[55vh] p-1 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    <div className="text-[10.5px] text-stone-500 font-bold px-2 py-1 text-center bg-stone-200/70 rounded-lg mb-1 flex items-center justify-center gap-1.5">
+                      <span>↔ {panelLang === 'es' ? 'Desliza hacia los lados para ver todas las columnas' : 'Swipe horizontally to view all columns'}</span>
+                    </div>
+                    <iframe
+                      src={`${selectedInvoiceForView.fileUrl}#view=FitH`}
+                      title={selectedInvoiceForView.name}
+                      className="w-full min-w-[550px] sm:min-w-[650px] h-[44vh] sm:h-[50vh] rounded-xl border border-stone-200 bg-white"
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -3565,7 +3589,7 @@ export const EcuaplacPortal: React.FC = () => {
           ? 'hidden opacity-0 pointer-events-none'
           : ''
       }`}>
-        <div className="pointer-events-auto w-full bg-[#0E1726]/95 backdrop-blur-2xl border-t border-blue-500/20 shadow-[0_-8px_32px_rgba(14,23,38,0.5)]">
+        <div className="pointer-events-auto w-full bg-[#0E1726] border-t border-blue-500/20 shadow-[0_-6px_24px_rgba(0,0,0,0.45)]">
           <nav className="max-w-md sm:max-w-lg mx-auto px-4 pt-2 pb-[max(12px,env(safe-area-inset-bottom))] flex items-center justify-between relative">
             {/* Tab 1: Inicio */}
             <button
