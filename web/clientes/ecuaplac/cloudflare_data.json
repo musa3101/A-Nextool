@@ -1,0 +1,32 @@
+{
+  "30d": {
+    "period": "30d",
+    "periodLabel": "Últimos 30 días",
+    "totalVisits": 50,
+    "uniqueVisitors": 50,
+    "pageViews": 60,
+    "avgLoadTime": "0.65s",
+    "uptime": "100%",
+    "edgeHitRatio": "98.2%",
+    "leadsCount": 3,
+    "trendPercentage": "+15.4%",
+    "isPositiveTrend": true,
+    "status": "optimal",
+    "updatedAt": "2026-11-08T15:29:59.772Z"
+  },
+  "3m": {
+    "period": "3m",
+    "periodLabel": "Últimos 3 meses",
+    "totalVisits": 310,
+    "uniqueVisitors": 310,
+    "pageViews": 380,
+    "avgLoadTime": "0.68s",
+    "uptime": "99.99%",
+    "edgeHitRatio": "97.5%",
+    "leadsCount": 8,
+    "trendPercentage": "+28.6%",
+    "isPositiveTrend": true,
+    "status": "optimal",
+    "updatedAt": "2026-11-08T15:29:59.772Z"
+  }
+}

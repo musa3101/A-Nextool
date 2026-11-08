@@ -1,0 +1,3271 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  Plus,
+  Star,
+  Eye,
+  EyeOff,
+  Trash2,
+  MapPin,
+  ExternalLink,
+  Sparkles,
+  Search,
+  CheckCircle2,
+  Upload,
+  Globe,
+  Layers,
+  Sliders,
+  Phone,
+  Mail,
+  Lock,
+  Save,
+  Pencil,
+  Camera,
+  Image as ImageIcon,
+  Images,
+  Link as LinkIcon,
+  Settings,
+  User,
+  Smartphone,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  ChevronRight,
+  RefreshCw,
+  LogOut,
+  ClipboardList,
+  AlertCircle,
+  ShieldCheck,
+  Check,
+  MessageSquare,
+  Home,
+  LayoutDashboard,
+  Grid2x2,
+  BarChart3,
+  TrendingUp,
+  Zap,
+  Users,
+  ArrowUpRight,
+  Activity,
+  Bell,
+  X,
+  Shield,
+  SlidersHorizontal,
+  Loader2,
+  Languages,
+  Download,
+  FileText,
+  Receipt,
+  Folder,
+  FolderArchive,
+  HardDrive,
+} from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { useTenant } from '@/context/TenantContext';
+import { EcuaplacWorkItem } from '@/types';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import { Switch } from '@/components/ui/Switch';
+import { ECUAPLAC_CONFIG } from './config';
+import { ecuaplacConnector, EcuaplacLeadItem } from './conector';
+import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
+import { autoTranslateWork } from './traductor';
+
+// Catálogo inicial auténtico de Ecuaplac (9 Obras Reales de Portada y 11 Proyectos de Galería)
+const INITIAL_WORKS = DEFAULT_WORKS;
+const INITIAL_MORE_PROJECTS = DEFAULT_MORE_PROJECTS;
+
+// Motor universal de compresión y conversión a WebP (< 250 KB)
+const compressImageUniversal = (
+  file: File,
+  maxWidth = 1400,
+  quality = 0.82
+): Promise<{ dataUrl: string; sizeKb: number; mime: string }> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          const raw = e.target?.result as string;
+          return resolve({
+            dataUrl: raw,
+            sizeKb: Math.round(file.size / 1024),
+            mime: file.type,
+          });
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let targetMime = 'image/webp';
+        let testData = canvas.toDataURL(targetMime, quality);
+        if (!testData.startsWith('data:image/webp')) {
+          targetMime = 'image/jpeg';
+          testData = canvas.toDataURL(targetMime, quality);
+        }
+
+        const head = `data:${targetMime};base64,`;
+        const sizeBytes = Math.round(((testData.length - head.length) * 3) / 4);
+
+        resolve({
+          dataUrl: testData,
+          sizeKb: Math.max(1, Math.round(sizeBytes / 1024)),
+          mime: targetMime,
+        });
+      };
+      img.onerror = () => reject(new Error('No se pudo decodificar el archivo de imagen'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+};
+
+// Componente interactivo para contador numérico animado suave (Estilo Stripe/Apple)
+const AnimatedCounter: React.FC<{ value: number; duration?: number; suffix?: string }> = ({
+  value,
+  duration = 850,
+  suffix = '',
+}) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let startTimestamp: number | null = null;
+    const startValue = 0;
+    let animationFrameId: number;
+
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      const current = Math.floor(startValue + (value - startValue) * easeProgress);
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(step);
+      } else {
+        setDisplayValue(value);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [value, duration]);
+
+  return <span>{displayValue.toLocaleString('es-ES')}{suffix}</span>;
+};
+
+export const EcuaplacPortal: React.FC = () => {
+  const { session, stopImpersonation } = useAuth();
+  const { addAuditLog } = useTenant();
+
+  // Tab: 'inicio' | 'obras' (Galería 1) | 'more_projects' (Galería 2) | 'ajustes'
+  const [activeTab, setActiveTab] = useState<'inicio' | 'obras' | 'more_projects' | 'ajustes'>('inicio');
+
+  // Idioma del Panel ('es' | 'en') persistido en localStorage
+  const [panelLang, setPanelLang] = useState<'es' | 'en'>(() => {
+    try {
+      return (localStorage.getItem('ecuaplac_panel_lang') as 'es' | 'en') || 'es';
+    } catch {
+      return 'es';
+    }
+  });
+
+  const handleToggleLang = (lang: 'es' | 'en') => {
+    setPanelLang(lang);
+    try {
+      localStorage.setItem('ecuaplac_panel_lang', lang);
+    } catch {}
+    addAuditLog(
+      lang === 'es' ? 'Idioma del panel cambiado a Español' : 'Panel language switched to English',
+      'Configuración',
+      'info'
+    );
+  };
+
+  // Cloudflare Analytics Timeframe: '30d' | '3m'
+  const [cfPeriod, setCfPeriod] = useState<'30d' | '3m'>('30d');
+  const cfMetrics = ecuaplacConnector.getCloudflareMetrics(cfPeriod);
+
+  // Filter state
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'active' | 'hidden'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Collections state
+  const [works, setWorks] = useState<EcuaplacWorkItem[]>(() =>
+    ecuaplacConnector.getWorks(INITIAL_WORKS)
+  );
+  const [moreProjects, setMoreProjects] = useState<EcuaplacWorkItem[]>(() =>
+    ecuaplacConnector.getMoreProjects(INITIAL_MORE_PROJECTS)
+  );
+
+  // Carga inicial en vivo desde Supabase (sincroniza fotos reales de Mallorca)
+  useEffect(() => {
+    ecuaplacConnector.fetchWorksOnline().then((liveWorks) => {
+      if (liveWorks && liveWorks.length > 0) {
+        setWorks(liveWorks);
+      }
+    });
+
+    ecuaplacConnector.fetchProjectsOnline().then((liveProjects) => {
+      if (liveProjects && liveProjects.length > 0) {
+        setMoreProjects(liveProjects);
+      }
+    });
+  }, []);
+
+  // Auto-persist works & moreProjects via connector
+  useEffect(() => {
+    ecuaplacConnector.saveWorks(works);
+  }, [works]);
+
+  useEffect(() => {
+    ecuaplacConnector.saveMoreProjects(moreProjects);
+  }, [moreProjects]);
+
+  // Leads State & Filter (Sincronizado con Supabase y LocalStorage)
+  const defaultLeads: EcuaplacLeadItem[] = [
+    {
+      id: 'lead-1',
+      name: 'Alfonso Durán',
+      phone: '+34 655 443 221',
+      email: 'alfonso.duran@gmail.com',
+      work_type: 'Reforma de techos de pladur en vivienda unifamiliar en Andratx (aprox 120m²)',
+      budget_estimate: '3.500 € - 5.000 €',
+      status: 'new',
+      date: 'Hoy, 10:15',
+      notes: 'Interesado en empezar en 2 semanas.',
+    },
+    {
+      id: 'lead-2',
+      name: 'Beatriz Riera',
+      phone: '+34 677 889 900',
+      email: 'beatriz.riera@hotmail.com',
+      work_type: 'Aislamiento acústico y térmico con tabiquería seca en dormitorio principal',
+      budget_estimate: '1.800 € - 2.400 €',
+      status: 'contacted',
+      date: 'Ayer, 17:40',
+      notes: 'Llamada realizada. Pendiente de medir el jueves.',
+    },
+    {
+      id: 'lead-3',
+      name: 'Carlos Mendoza',
+      phone: '+34 612 345 678',
+      email: 'carlos.mendoza@gmail.com',
+      work_type: 'Reforma de tabiques y falso techo con foseado LED en salón',
+      budget_estimate: '4.200 €',
+      status: 'approved',
+      date: 'Hace 3 días',
+      notes: 'Presupuesto firmado y aceptado.',
+    },
+  ];
+
+  const [leadFilter, setLeadFilter] = useState<'all' | 'new' | 'contacted' | 'approved'>('all');
+  const [leads, setLeads] = useState<EcuaplacLeadItem[]>(() =>
+    ecuaplacConnector.getLeads(defaultLeads)
+  );
+
+  // Carga reactiva de Leads desde Supabase
+  useEffect(() => {
+    ecuaplacConnector.fetchLeadsOnline().then((liveLeads) => {
+      if (liveLeads && liveLeads.length > 0) {
+        setLeads(liveLeads);
+      }
+    });
+  }, []);
+
+  // Persistencia local automática de Leads
+  useEffect(() => {
+    ecuaplacConnector.saveLeads(leads);
+  }, [leads]);
+
+  // Estado para Forzar Actualización / Sincronización en vivo
+  const [isForceSyncing, setIsForceSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState(false);
+
+  const handleForceSync = async () => {
+    if (isForceSyncing) return;
+    setIsForceSyncing(true);
+    setSyncFeedback(false);
+    try {
+      const [liveWorks, liveProjects, liveLeads] = await Promise.all([
+        ecuaplacConnector.fetchWorksOnline(),
+        ecuaplacConnector.fetchProjectsOnline(),
+        ecuaplacConnector.fetchLeadsOnline(),
+      ]);
+      if (liveWorks && liveWorks.length > 0) setWorks(liveWorks);
+      if (liveProjects && liveProjects.length > 0) setMoreProjects(liveProjects);
+      if (liveLeads && liveLeads.length > 0) setLeads(liveLeads);
+      setSyncFeedback(true);
+      setTimeout(() => setSyncFeedback(false), 2500);
+      addAuditLog('Actualización forzada: Web y backend sincronizados', 'Ecuaplac Web', 'success');
+    } catch (err) {
+      console.error('Error al forzar actualización:', err);
+    } finally {
+      setIsForceSyncing(false);
+    }
+  };
+
+  const handleUpdateLeadStatus = (leadId: string, newStatus: EcuaplacLeadItem['status']) => {
+    setLeads((prev) =>
+      prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l))
+    );
+    ecuaplacConnector.updateLeadStatus(leadId, newStatus);
+    const targetLead = leads.find((l) => l.id === leadId);
+    if (targetLead) {
+      const statusLabels: Record<string, string> = {
+        new: 'No Contestado',
+        contacted: 'En Contacto',
+        approved: 'Obra Aceptada',
+      };
+      addAuditLog(
+        `Lead «${targetLead.name}» cambiado a ${statusLabels[newStatus] || newStatus}`,
+        'Ecuaplac Leads',
+        'info'
+      );
+    }
+  };
+
+  const filteredLeads = leads.filter((l) => {
+    if (leadFilter === 'all') return true;
+    return l.status === leadFilter;
+  });
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<EcuaplacWorkItem | null>(null);
+
+  // Form State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [formTargetGallery, setFormTargetGallery] = useState<'carousel' | 'projects'>('carousel');
+  const [formTitleEs, setFormTitleEs] = useState('');
+  const [formTitleEn, setFormTitleEn] = useState('');
+  const [formTitleDe, setFormTitleDe] = useState('');
+  const [formLocation, setFormLocation] = useState('Mallorca');
+  const [formImageUrl, setFormImageUrl] = useState('');
+  const [formActive, setFormActive] = useState(true);
+  const [formFitMode, setFormFitMode] = useState<'cover' | 'contain'>('cover');
+  const [showEnglishFields, setShowEnglishFields] = useState(true);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [uploadStats, setUploadStats] = useState<{ sizeKb: number; mime: string } | null>(null);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translatedSuccess, setTranslatedSuccess] = useState(false);
+
+  const handleAutoTranslate = async () => {
+    if (!formTitleEs.trim()) {
+      alert('Escribe primero el título en español para poder traducirlo con IA.');
+      return;
+    }
+    setIsTranslating(true);
+    setTranslatedSuccess(false);
+    try {
+      const res = await autoTranslateWork(formTitleEs, formLocation);
+      setFormTitleEn(res.titleEn);
+      setFormTitleDe(res.titleDe);
+      setShowEnglishFields(true);
+      setTranslatedSuccess(true);
+      setTimeout(() => setTranslatedSuccess(false), 2500);
+    } catch (err) {
+      console.error('Error al autotraducir:', err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  // Estados para Ajustes, Perfil y CRM Leads (Diseño Estilo Pinterest)
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [adminName, setAdminName] = useState('José Rivadeneira');
+  const [nameInput, setNameInput] = useState('José Rivadeneira');
+  const [adminAvatar, setAdminAvatar] = useState('/ecuaplac/fav-sin-fondo.svg');
+  const [nameSuccess, setNameSuccess] = useState(false);
+  const [avatarSuccess, setAvatarSuccess] = useState(false);
+
+  // Modales Dedicados
+  const [isLeadsModalOpen, setIsLeadsModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationFeedback, setNotificationFeedback] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<'es' | 'en'>('es');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Seguridad
+  const [currPass, setCurrPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+
+  // Dispositivo
+  const [deviceFeedback, setDeviceFeedback] = useState<string | null>(null);
+
+  // Actualizaciones de Sistema Next Tools
+  const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
+  const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
+  const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
+  const [installedVersion, setInstalledVersion] = useState('000');
+  const [simulatedUpdateAvailable, setSimulatedUpdateAvailable] = useState(false);
+
+  const handleCheckUpdates = () => {
+    setUpdateCheckState('checking');
+    setTimeout(() => {
+      if (simulatedUpdateAvailable) {
+        setUpdateCheckState('available');
+      } else {
+        setUpdateCheckState('up-to-date');
+      }
+    }, 1100);
+  };
+
+  const handleInstallUpdate = () => {
+    setUpdateCheckState('installing');
+    setTimeout(() => {
+      setUpdateCheckState('installed');
+      setInstalledVersion('001');
+      setSimulatedUpdateAvailable(false);
+      addAuditLog('Actualización aplicada: Versión 001 instalada', 'Next Tools Core', 'success');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1800);
+    }, 1600);
+  };
+
+  // Facturas y Documentos del Proyecto (Plegadas / Escondiditas por defecto)
+  const [isFacturasOpen, setIsFacturasOpen] = useState(false);
+  const [activeDocTab, setActiveDocTab] = useState<'factura' | 'gmail'>('factura');
+  const docFileInputRef = useRef<HTMLInputElement>(null);
+  const invoiceFileInputRef = useRef<HTMLInputElement>(null);
+
+  interface ProjectDocItem {
+    id: string;
+    number?: string;
+    name: string;
+    fileUrl: string;
+    fileSize: string;
+    uploadDate: string;
+    issueDate?: string;
+    dueDate?: string;
+    category: 'factura' | 'gmail';
+    status: 'pagada' | 'oficial' | 'pendiente';
+    clientName?: string;
+    clientCif?: string;
+    clientAddress?: string;
+    items?: Array<{ description: string; qty: number; unitPrice: number; total: number }>;
+    subtotal?: number;
+    vatAmount?: number;
+    totalAmount?: number;
+    notes?: string;
+    isCustomUpload?: boolean;
+  }
+
+  const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<ProjectDocItem | null>(null);
+  const [isInvoiceViewerOpen, setIsInvoiceViewerOpen] = useState(false);
+
+  const [projectDocs, setProjectDocs] = useState<ProjectDocItem[]>([
+    {
+      id: 'doc-001',
+      number: 'FAC-2026-001',
+      name: 'Factura_001_Desarrollo_Web_Ecuaplac.pdf',
+      fileUrl: '',
+      fileSize: '320 KB',
+      uploadDate: '3 Nov 2026',
+      issueDate: '03/11/2026',
+      dueDate: 'Al contado',
+      category: 'factura',
+      status: 'pagada',
+      clientName: 'Ecuaplac J&G S.L.',
+      clientCif: 'B-07982341',
+      clientAddress: 'C/ Gremi Teixidors 24, Palma de Mallorca',
+      items: [
+        {
+          description: 'Desarrollo del panel de control web móvil Nextool Web para Ecuaplac',
+          qty: 1,
+          unitPrice: 850.0,
+          total: 850.0,
+        },
+        {
+          description: 'Configuración DNS Cloudflare Edge, SSL y optimización WebP ultra-rápida',
+          qty: 1,
+          unitPrice: 250.0,
+          total: 250.0,
+        },
+      ],
+      subtotal: 1100.0,
+      vatAmount: 231.0,
+      totalAmount: 1331.0,
+      notes: 'Transferencia bancaria recibida. Proyecto entregado y operativo al 100%.',
+    },
+    {
+      id: 'doc-002',
+      number: 'FAC-2026-002',
+      name: 'Presupuesto_Hosting_Cloudflare_2026.pdf',
+      fileUrl: '',
+      fileSize: '185 KB',
+      uploadDate: '1 Nov 2026',
+      issueDate: '01/11/2026',
+      dueDate: '15/11/2026',
+      category: 'factura',
+      status: 'oficial',
+      clientName: 'Ecuaplac J&G S.L.',
+      clientCif: 'B-07982341',
+      clientAddress: 'C/ Gremi Teixidors 24, Palma de Mallorca',
+      items: [
+        {
+          description: 'Hosting y CDN Cloudflare Edge Workers Anual (Servidor Mallorca)',
+          qty: 1,
+          unitPrice: 180.0,
+          total: 180.0,
+        },
+        {
+          description: 'Mantenimiento de copias y mitigación DDoS Cloudflare Pro',
+          qty: 1,
+          unitPrice: 60.0,
+          total: 60.0,
+        },
+      ],
+      subtotal: 240.0,
+      vatAmount: 50.4,
+      totalAmount: 290.4,
+      notes: 'Presupuesto oficial y factura proforma Cloudflare Edge anual.',
+    },
+    {
+      id: 'doc-003',
+      name: 'Resumen_Correos_Gmail_Clientes_Noviembre.pdf',
+      fileUrl: '',
+      fileSize: '412 KB',
+      uploadDate: '4 Nov 2026',
+      category: 'gmail',
+      status: 'oficial',
+      notes: 'Backup sincronizado de hilos de consulta de presupuestos recibidos en Gmail.',
+    },
+    {
+      id: 'doc-004',
+      name: 'Planos_Arquitectonicos_Drive_Palma.pdf',
+      fileUrl: '',
+      fileSize: '1.2 MB',
+      uploadDate: '28 Oct 2026',
+      category: 'gmail',
+      status: 'oficial',
+      notes: 'Planos acotados y mediciones de techos suspendidos vinculados a Google Drive.',
+    },
+  ]);
+
+  const handleUploadDoc = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const sizeInKb = Math.round(file.size / 1024);
+    const sizeFormatted = sizeInKb > 1024 ? `${(sizeInKb / 1024).toFixed(1)} MB` : `${sizeInKb} KB`;
+    const objectUrl = URL.createObjectURL(file);
+
+    const newDoc: ProjectDocItem = {
+      id: `doc-${Date.now()}`,
+      number: `FAC-2026-${String(projectDocs.length + 1).padStart(3, '0')}`,
+      name: file.name,
+      fileUrl: objectUrl,
+      fileSize: sizeFormatted,
+      uploadDate: 'Hoy, ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      issueDate: new Date().toLocaleDateString('es-ES'),
+      dueDate: '30 días',
+      category: activeDocTab,
+      status: 'oficial',
+      clientName: 'Ecuaplac J&G S.L.',
+      clientCif: 'B-07982341',
+      clientAddress: 'Palma de Mallorca, Illes Balears',
+      notes: `Documento PDF (${activeDocTab === 'factura' ? 'Facturación' : 'Gmail & Drive'}) subido desde este dispositivo.`,
+      isCustomUpload: true,
+    };
+
+    setProjectDocs((prev) => [newDoc, ...prev]);
+    setIsFacturasOpen(true);
+    addAuditLog(`Documento PDF subido: «${file.name}» (${sizeFormatted})`, 'Documentación', 'success');
+
+    if (docFileInputRef.current) docFileInputRef.current.value = '';
+    if (invoiceFileInputRef.current) invoiceFileInputRef.current.value = '';
+  };
+
+  const handleDeleteDoc = (id: string) => {
+    const doc = projectDocs.find((i) => i.id === id);
+    setProjectDocs((prev) => prev.filter((i) => i.id !== id));
+    if (doc) {
+      addAuditLog(`Documento eliminado: «${doc.name}»`, 'Documentación', 'info');
+    }
+  };
+
+  const handleViewDoc = (doc: ProjectDocItem) => {
+    setSelectedInvoiceForView(doc);
+    setIsInvoiceViewerOpen(true);
+  };
+
+  const handleUploadInvoice = handleUploadDoc;
+  const handleDeleteInvoice = handleDeleteDoc;
+  const handleViewInvoice = handleViewDoc;
+  const invoices = projectDocs;
+  const setInvoices = setProjectDocs;
+
+  // Auditoría & Logs
+  const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
+  const [logs, setLogs] = useState([
+    { id: '1', action: 'Obra editada y web actualizada: "Baño de Diseño con Bañera Exenta"', time: 'Hoy, 20:45', type: 'edit' },
+    { id: '2', action: 'Fotografía optimizada en WebP (184 KB)', time: 'Hoy, 20:12', type: 'upload' },
+    { id: '3', action: 'Nombre de administrador confirmado: "José Rivadeneira"', time: 'Hoy, 19:30', type: 'profile' },
+    { id: '4', action: 'Sesión iniciada desde dispositivo móvil', time: 'Hoy, 19:15', type: 'auth' },
+    { id: '5', action: 'Proyecto fijado como Portada Principal en carrusel', time: 'Ayer, 18:20', type: 'status' },
+    { id: '6', action: 'Presupuesto #LEAD-104 marcado como Gestionado', time: 'Ayer, 16:50', type: 'lead' },
+  ]);
+
+  // Acordeón activo: 'leads' | 'profile' | 'security' | 'device' | 'logs' | null
+  const [openAccordion, setOpenAccordion] = useState<'leads' | 'profile' | 'security' | 'device' | 'logs' | null>('leads');
+
+  const toggleAccordion = (section: 'leads' | 'profile' | 'security' | 'device' | 'logs') => {
+    setOpenAccordion((prev) => (prev === section ? null : section));
+  };
+
+  const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const { dataUrl } = await compressImageUniversal(file, 400, 0.85);
+      setAdminAvatar(dataUrl);
+      setAvatarSuccess(true);
+      setTimeout(() => setAvatarSuccess(false), 3000);
+      setLogs((prev) => [
+        { id: String(Date.now()), action: 'Avatar de administrador actualizado', time: 'Ahora mismo', type: 'profile' },
+        ...prev,
+      ]);
+      addAuditLog('Avatar de administrador actualizado', 'Ecuaplac App', 'success');
+    } catch (err) {
+      console.warn('Error al procesar avatar:', err);
+    }
+  };
+
+  const handleSaveName = () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    setAdminName(trimmed);
+    setNameSuccess(true);
+    setTimeout(() => setNameSuccess(false), 3000);
+    setLogs((prev) => [
+      { id: String(Date.now()), action: `Nombre de administrador cambiado a: "${trimmed}"`, time: 'Ahora mismo', type: 'profile' },
+      ...prev,
+    ]);
+    addAuditLog(`Nombre de administrador cambiado a: "${trimmed}"`, 'Ecuaplac App', 'success');
+  };
+
+  const handleSavePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (currPass !== 'admin' && currPass !== 'ecuaplac2024') {
+      setPasswordFeedback({ type: 'error', msg: 'La contraseña actual no es válida (usa "admin")' });
+      return;
+    }
+    if (newPass.length < 4) {
+      setPasswordFeedback({ type: 'error', msg: 'La nueva contraseña debe tener al menos 4 caracteres' });
+      return;
+    }
+    if (newPass !== confirmPass) {
+      setPasswordFeedback({ type: 'error', msg: 'Las contraseñas no coinciden' });
+      return;
+    }
+    setPasswordFeedback({ type: 'success', msg: '¡Contraseña actualizada correctamente!' });
+    setCurrPass('');
+    setNewPass('');
+    setConfirmPass('');
+    setTimeout(() => setPasswordFeedback(null), 4000);
+    setLogs((prev) => [
+      { id: String(Date.now()), action: 'Contraseña de administrador actualizada', time: 'Ahora mismo', type: 'security' },
+      ...prev,
+    ]);
+    addAuditLog('Contraseña de administrador actualizada', 'Ecuaplac App', 'success');
+  };
+
+  const handleToggleNotifications = async (checked: boolean) => {
+    if (!checked) {
+      setNotificationsEnabled(false);
+      setNotificationFeedback(null);
+      addAuditLog('Notificaciones desactivadas en este dispositivo', 'Ecuaplac App', 'info');
+      return;
+    }
+
+    // Solicitar permiso nativo al dispositivo móvil / navegador (iOS Safari, Android Chrome, etc.)
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          setNotificationsEnabled(true);
+          setNotificationFeedback('Permiso concedido en este dispositivo');
+          setTimeout(() => setNotificationFeedback(null), 3500);
+          addAuditLog('Permiso concedido: Notificaciones activas para nuevos presupuestos', 'Ecuaplac App', 'success');
+
+          try {
+            new Notification('Ecuaplac · Notificaciones Activas', {
+              body: 'Recibirás un aviso en tu móvil cada vez que un cliente solicite un presupuesto.',
+              icon: '/ecuaplac/fav-sin-fondo.svg',
+            });
+          } catch {
+            // Manejo silencioso en navegadores móviles que requieran ServiceWorker
+          }
+        } else if (permission === 'denied') {
+          setNotificationsEnabled(false);
+          setNotificationFeedback('Permiso bloqueado en ajustes del navegador');
+          setTimeout(() => setNotificationFeedback(null), 4000);
+          addAuditLog('Permiso de notificaciones denegado en el dispositivo', 'Ecuaplac App', 'warning');
+        } else {
+          setNotificationsEnabled(false);
+        }
+      } catch (err) {
+        console.warn('Error al solicitar permiso de notificación:', err);
+        setNotificationsEnabled(true);
+        setNotificationFeedback('Notificaciones activadas');
+        setTimeout(() => setNotificationFeedback(null), 3500);
+      }
+    } else {
+      setNotificationsEnabled(true);
+      setNotificationFeedback('Notificaciones activadas (simulado)');
+      setTimeout(() => setNotificationFeedback(null), 3500);
+      addAuditLog('Notificaciones activadas (simulación en navegador sin Web Push)', 'Ecuaplac App', 'info');
+    }
+  };
+
+  const handleRefreshLogs = () => {
+    setIsRefreshingLogs(true);
+    setTimeout(() => {
+      setIsRefreshingLogs(false);
+      setLogs((prev) => [
+        { id: String(Date.now()), action: 'Historial sincronizado con Supabase / Servidor', time: 'Ahora mismo', type: 'sync' },
+        ...prev,
+      ]);
+    }, 600);
+  };
+
+  // Current collection being viewed
+  const currentCollection = activeTab === 'obras' ? works : moreProjects;
+  const setCurrentCollection = activeTab === 'obras' ? setWorks : setMoreProjects;
+
+  // Filtered items
+  const filteredItems = currentCollection.filter((item) => {
+    const matchesSearch =
+      item.title_es.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.location_es && item.location_es.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesVisibility =
+      visibilityFilter === 'all'
+        ? true
+        : visibilityFilter === 'active'
+        ? item.active
+        : !item.active;
+
+    return matchesSearch && matchesVisibility;
+  });
+
+  const activeCount = currentCollection.filter((i) => i.active).length;
+  const hiddenCount = currentCollection.filter((i) => !i.active).length;
+
+  const handleOpenAdd = () => {
+    setEditingItem(null);
+    setFormTitleEs('');
+    setFormTitleEn('');
+    setFormTitleDe('');
+    setFormLocation('Mallorca');
+    setFormImageUrl('');
+    setUploadStats(null);
+    setShowUrlInput(false);
+    setFormActive(true);
+    setFormFitMode('cover');
+    setShowEnglishFields(true);
+    setFormTargetGallery(activeTab === 'more_projects' ? 'projects' : 'carousel');
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (item: EcuaplacWorkItem) => {
+    setEditingItem(item);
+    setFormTitleEs(item.title_es || '');
+    setFormTitleEn(item.title_en || '');
+    setFormTitleDe((item as any).title_de || '');
+    setFormLocation(item.location_es || 'Mallorca');
+    setFormImageUrl(item.image_url || '');
+    setUploadStats(null);
+    setShowUrlInput(false);
+    setFormActive(item.active);
+    setFormFitMode(item.fit_mode || 'cover');
+    setShowEnglishFields(true);
+    setFormTargetGallery(item.type === 'more_projects' ? 'projects' : 'carousel');
+    setIsModalOpen(true);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressing(true);
+    try {
+      const { dataUrl, sizeKb, mime } = await compressImageUniversal(file, 1400, 0.82);
+      setFormImageUrl(dataUrl);
+      setUploadStats({ sizeKb, mime });
+    } catch (err) {
+      console.warn('Fallo compresión en canvas, usando DataURL directa:', err);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFormImageUrl(reader.result as string);
+        setUploadStats({ sizeKb: Math.round(file.size / 1024), mime: file.type });
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleToggleActive = (item: EcuaplacWorkItem) => {
+    setCurrentCollection((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, active: !i.active } : i))
+    );
+    addAuditLog(
+      `Foto «${item.title_es}» ${item.active ? 'ocultada' : 'publicada'}`,
+      'Ecuaplac Web',
+      'info'
+    );
+  };
+
+  const handleMoveUp = async (item: EcuaplacWorkItem) => {
+    const isCarousel = activeTab === 'obras';
+    const list = isCarousel ? [...works] : [...moreProjects];
+    const index = list.findIndex((i) => i.id === item.id);
+    if (index <= 0) return;
+
+    const prevItem = list[index - 1];
+    list[index - 1] = item;
+    list[index] = prevItem;
+
+    const reordered = list.map((it, idx) => ({
+      ...it,
+      sort_order: (idx + 1) * 10,
+    }));
+
+    if (isCarousel) {
+      setWorks(reordered);
+      ecuaplacConnector.saveWorks(reordered);
+      ecuaplacConnector.saveWork({ id: item.id, sort_order: reordered[index - 1].sort_order });
+      ecuaplacConnector.saveWork({ id: prevItem.id, sort_order: reordered[index].sort_order });
+    } else {
+      setMoreProjects(reordered);
+      ecuaplacConnector.saveMoreProjects(reordered);
+      ecuaplacConnector.saveProject({ id: item.id, sort_order: reordered[index - 1].sort_order });
+      ecuaplacConnector.saveProject({ id: prevItem.id, sort_order: reordered[index].sort_order });
+    }
+
+    addAuditLog(
+      `Orden actualizado: «${item.title_es}» movido hacia arriba`,
+      'Ecuaplac Web',
+      'info'
+    );
+  };
+
+  const handleMoveDown = async (item: EcuaplacWorkItem) => {
+    const isCarousel = activeTab === 'obras';
+    const list = isCarousel ? [...works] : [...moreProjects];
+    const index = list.findIndex((i) => i.id === item.id);
+    if (index === -1 || index >= list.length - 1) return;
+
+    const nextItem = list[index + 1];
+    list[index + 1] = item;
+    list[index] = nextItem;
+
+    const reordered = list.map((it, idx) => ({
+      ...it,
+      sort_order: (idx + 1) * 10,
+    }));
+
+    if (isCarousel) {
+      setWorks(reordered);
+      ecuaplacConnector.saveWorks(reordered);
+      ecuaplacConnector.saveWork({ id: item.id, sort_order: reordered[index + 1].sort_order });
+      ecuaplacConnector.saveWork({ id: nextItem.id, sort_order: reordered[index].sort_order });
+    } else {
+      setMoreProjects(reordered);
+      ecuaplacConnector.saveMoreProjects(reordered);
+      ecuaplacConnector.saveProject({ id: item.id, sort_order: reordered[index + 1].sort_order });
+      ecuaplacConnector.saveProject({ id: nextItem.id, sort_order: reordered[index].sort_order });
+    }
+
+    addAuditLog(
+      `Orden actualizado: «${item.title_es}» movido hacia abajo`,
+      'Ecuaplac Web',
+      'info'
+    );
+  };
+
+  const handleDelete = (item: EcuaplacWorkItem) => {
+    if (window.confirm(`¿Eliminar la obra "${item.title_es}"?`)) {
+      setCurrentCollection((prev) => prev.filter((i) => i.id !== item.id));
+      addAuditLog(
+        `Obra «${item.title_es}» eliminada de la web`,
+        'Ecuaplac Web',
+        'warning'
+      );
+    }
+  };
+
+  const handleSaveForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formTitleEs.trim()) {
+      alert('Indica un título en español para la obra');
+      return;
+    }
+
+    const finalImage =
+      formImageUrl.trim() ||
+      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
+
+    // Generación automática inteligente si se deja en blanco
+    let finalTitleEn = formTitleEn.trim();
+    let finalTitleDe = formTitleDe.trim();
+    if (!finalTitleEn) {
+      const autoTr = await autoTranslateWork(formTitleEs, formLocation);
+      finalTitleEn = autoTr.titleEn;
+      if (!finalTitleDe) finalTitleDe = autoTr.titleDe;
+    }
+
+    const isCarousel = formTargetGallery === 'carousel';
+
+    if (editingItem) {
+      const updatedItem: EcuaplacWorkItem = {
+        ...editingItem,
+        type: isCarousel ? 'carousel' : 'more_projects',
+        title_es: formTitleEs,
+        title_en: finalTitleEn,
+        location_es: formLocation,
+        image_url: finalImage,
+        active: formActive,
+        fit_mode: formFitMode,
+      };
+
+      if (isCarousel) {
+        setWorks((prev) => prev.map((i) => (i.id === editingItem.id ? updatedItem : i)));
+        ecuaplacConnector.saveWork(updatedItem);
+      } else {
+        setMoreProjects((prev) => prev.map((i) => (i.id === editingItem.id ? updatedItem : i)));
+        ecuaplacConnector.saveProject(updatedItem);
+      }
+
+      addAuditLog(`Obra editada: «${formTitleEs}»`, 'Ecuaplac Web', 'success');
+    } else {
+      const newItem: EcuaplacWorkItem = {
+        id: `ecuaplac-${Date.now()}`,
+        type: isCarousel ? 'carousel' : 'more_projects',
+        title_es: formTitleEs,
+        title_en: finalTitleEn,
+        location_es: formLocation,
+        image_url: finalImage,
+        sort_order: 1, // al principio
+        active: formActive,
+        fit_mode: formFitMode,
+      };
+
+      if (isCarousel) {
+        setWorks((prev) => [newItem, ...prev]);
+        ecuaplacConnector.saveWork(newItem);
+        setActiveTab('obras');
+      } else {
+        setMoreProjects((prev) => [newItem, ...prev]);
+        ecuaplacConnector.saveProject(newItem);
+        setActiveTab('more_projects');
+      }
+
+      addAuditLog(
+        `Nueva obra añadida a ${isCarousel ? 'Portada (Carrusel)' : 'Más Reformas'}: «${formTitleEs}»`,
+        'Ecuaplac Web',
+        'success'
+      );
+    }
+
+    setIsModalOpen(false);
+  };
+
+  return (
+    <div className="w-full max-w-full min-w-0 bg-[#F4F1EA] min-h-screen text-slate-900 pb-20 sm:pb-24">
+      {/* 1. Header Oficial de Ecuaplac (Deep Sapphire Navy & Gold Trim) */}
+      <header className="sticky top-0 z-30 bg-[#0E1726]/95 backdrop-blur-xl border-b border-blue-500/20 shadow-[0_4px_24px_rgba(14,23,38,0.35)] px-4 sm:px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10">
+            <img
+              src="/ecuaplac/fav-sin-fondo.svg"
+              alt="Logo Ecuaplac"
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/ecuaplac/logo.webp';
+              }}
+            />
+          </div>
+          <div>
+            <span className="text-base font-bold text-white tracking-tight leading-none block">
+              ecuaplac.com
+            </span>
+            <span className="text-[10px] text-sky-400 font-bold tracking-wider uppercase block mt-0.5">
+              {panelLang === 'es' ? 'Gestor Oficial' : 'Official Manager'}
+            </span>
+          </div>
+        </div>
+
+        {/* Botón Ver Web Directo (Limpio en todos los apartados) */}
+        <a
+          href="https://ecuaplac.com"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-md shadow-xs text-white hover:text-[#C5A059] transition-all text-xs font-semibold"
+          title={panelLang === 'es' ? 'Ver ecuaplac.com en directo' : 'View ecuaplac.com live'}
+        >
+          <ExternalLink className="w-3.5 h-3.5 text-[#C5A059]" />
+          <span className="hidden sm:inline">{panelLang === 'es' ? 'Ver Web' : 'View Web'}</span>
+        </a>
+      </header>
+
+      {/* 2. Workspace Principal */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-4">
+        {/* 3. Vistas según Pestaña (Transición Cinemática Suave) */}
+      {activeTab === 'inicio' ? (
+        /* Pestaña 1: Inicio (Dashboard Ejecutivo Premium con Micro-Gradientes, Halos y Números Animados) */
+        <div className="space-y-4 sm:space-y-5 animate-tab-enter">
+          {/* Header de Bienvenida con Halos & Selector Táctil */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FAF7F0] to-[#F3ECE0] rounded-3xl p-5 sm:p-6 border border-[#E6DECD] shadow-[0_10px_32px_-6px_rgba(20,25,35,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Halo de luz ámbar de fondo */}
+            <div className="pointer-events-none absolute -right-10 -top-10 w-48 h-48 bg-[#C5A059]/15 rounded-full blur-3xl" />
+
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 text-[10px] font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Cloudflare Edge en Directo</span>
+                </span>
+                <span className="text-[11px] font-mono text-stone-500 font-semibold">ecuaplac.com</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight font-display">
+                {new Date().getHours() < 13 ? 'Buenos días' : new Date().getHours() < 20 ? 'Buenas tardes' : 'Buenas noches'}, José 👋
+              </h1>
+              <p className="text-xs sm:text-sm text-stone-500 mt-1 leading-relaxed font-normal font-sans">
+                Panel de rendimiento, tráfico web y presupuestos de reformas en Mallorca.
+              </p>
+            </div>
+
+            {/* Selector de Período 30 Días / 3 Meses */}
+            <div className="relative z-10 bg-stone-200/80 p-1 rounded-full flex items-center gap-1 border border-stone-300/60 self-start sm:self-auto shrink-0 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setCfPeriod('30d')}
+                className={`px-4 py-1.5 rounded-full text-xs font-black transition-all active:scale-95 ${
+                  cfPeriod === '30d'
+                    ? 'bg-slate-900 text-[#F0CF85] shadow-md'
+                    : 'text-stone-600 hover:text-slate-900'
+                }`}
+              >
+                30 Días
+              </button>
+              <button
+                type="button"
+                onClick={() => setCfPeriod('3m')}
+                className={`px-4 py-1.5 rounded-full text-xs font-black transition-all active:scale-95 ${
+                  cfPeriod === '3m'
+                    ? 'bg-slate-900 text-[#F0CF85] shadow-md'
+                    : 'text-stone-600 hover:text-slate-900'
+                }`}
+              >
+                3 Meses
+              </button>
+            </div>
+          </div>
+
+          {/* Bloque 1: Métricas Maestras con Estética de Lujo & Animación de Cifras */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            {/* KPI 1: Audiencia & Visitantes Reales */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-5 sm:p-6 border border-sky-100 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-4">
+              {/* Resplandor suave */}
+              <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-sky-400/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="flex items-center justify-between relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(14,165,233,0.35)] group-hover:scale-105 transition-transform">
+                  <Users className="w-6 h-6" />
+                </div>
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-xs font-black shadow-xs">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{cfMetrics.trendPercentage}</span>
+                </span>
+              </div>
+
+              <div className="relative z-10">
+                <span className="text-[11px] font-black text-stone-400 uppercase tracking-wider block">
+                  Visitantes Únicos ({cfMetrics.periodLabel})
+                </span>
+                <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight block mt-1 font-mono">
+                  <AnimatedCounter value={cfMetrics.uniqueVisitors} />
+                </span>
+                <span className="text-xs text-stone-500 mt-1.5 flex items-center gap-1.5 font-medium">
+                  <Activity className="w-3.5 h-3.5 text-sky-500" />
+                  <span>
+                    <AnimatedCounter value={cfMetrics.pageViews} /> páginas de reformas vistas
+                  </span>
+                </span>
+              </div>
+
+              {/* Visualización de Actividad Semanal */}
+              <div className="pt-2 border-t border-sky-100/80 flex items-end justify-between gap-1.5 h-7 relative z-10">
+                {[35, 60, 50, 75, 65, 90, 100].map((height, i) => (
+                  <div
+                    key={i}
+                    className={`flex-1 rounded-t-sm transition-all duration-300 ${
+                      i === 6 ? 'bg-sky-500 shadow-xs' : 'bg-sky-200/60 hover:bg-sky-300'
+                    }`}
+                    style={{ height: `${height}%` }}
+                    title={`Pico de tráfico día ${i + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* KPI 2: Rendimiento & Velocidad Cloudflare Edge */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FFFDF8] to-[#FEF9EC] rounded-3xl p-5 sm:p-6 border border-amber-200/60 shadow-[0_10px_30px_-8px_rgba(212,175,55,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(212,175,55,0.18)] transition-all group flex flex-col justify-between gap-4">
+              {/* Resplandor suave */}
+              <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="flex items-center justify-between relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 via-[#C5A059] to-[#9E782F] text-slate-950 flex items-center justify-center shadow-[0_6px_18px_rgba(212,175,55,0.35)] group-hover:scale-105 transition-transform">
+                  <Zap className="w-6 h-6 fill-slate-950" />
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-xs font-mono font-bold shadow-xs">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  <span>{cfMetrics.uptime} online</span>
+                </span>
+              </div>
+
+              <div className="relative z-10">
+                <span className="text-[11px] font-black text-stone-400 uppercase tracking-wider block">
+                  Velocidad de Carga Media
+                </span>
+                <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight block mt-1 font-mono">
+                  {cfMetrics.avgLoadTime}
+                </span>
+                <span className="text-xs text-stone-500 mt-1.5 flex items-center gap-1.5 font-medium">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{cfMetrics.edgeHitRatio} en caché ultra-rápida (Edge)</span>
+                </span>
+              </div>
+
+              {/* Barra de progreso de caché */}
+              <div className="pt-2 border-t border-amber-200/50 relative z-10 space-y-1">
+                <div className="flex justify-between text-[10px] font-bold text-stone-500">
+                  <span>Caché Servidor Mallorca</span>
+                  <span className="text-amber-800 font-mono">{cfMetrics.edgeHitRatio}</span>
+                </div>
+                <div className="w-full bg-stone-200/60 rounded-full h-2 overflow-hidden shadow-inner">
+                  <div
+                    className="bg-gradient-to-r from-amber-400 to-[#C5A059] h-full rounded-full transition-all duration-1000"
+                    style={{ width: cfMetrics.edgeHitRatio }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* KPI 3: Solicitudes de Presupuesto (Leads) */}
+            <div className="sm:col-span-2 lg:col-span-1 relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-emerald-100 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
+              {/* Resplandor suave */}
+              <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="flex items-center justify-between relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(16,185,129,0.35)] group-hover:scale-105 transition-transform">
+                  <Mail className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold shadow-xs">
+                  {leads.filter((l) => l.status === 'new').length} pendientes
+                </span>
+              </div>
+
+              <div className="relative z-10">
+                <span className="text-[11px] font-black text-stone-400 uppercase tracking-wider block">
+                  Presupuestos Entrantes
+                </span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight font-mono">
+                    <AnimatedCounter
+                      value={
+                        cfPeriod === '30d'
+                          ? Math.max(leads.length, 3)
+                          : Math.max(leads.length * 2, 8)
+                      }
+                    />
+                  </span>
+                  <span className="text-xs font-bold text-stone-500">solicitudes</span>
+                </div>
+                <span className="text-xs text-stone-500 mt-1.5 block font-medium truncate">
+                  Último: <span className="font-bold text-slate-800">{leads[0]?.name || 'Cliente'}</span> ({leads[0]?.date || 'Hoy'})
+                </span>
+              </div>
+
+              {/* Botón compacto de acceso a Leads */}
+              <div className="pt-2.5 border-t border-emerald-100/70 relative z-10 flex items-center justify-between">
+                <span className="text-[11px] text-stone-500 font-normal font-sans">
+                  Gestión rápida
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsLeadsModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-xs active:scale-95 transition-all group/btn font-sans cursor-pointer"
+                  title="Abrir bandeja de presupuestos"
+                >
+                  <span>Ver Bandeja</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-[#C5A059] group-hover/btn:translate-x-0.5 transition-transform" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Bloque: Facturas (Plegable / Escondidito por defecto) */}
+          <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
+            {/* Cabecera / Trigger de Facturas */}
+            <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#0B111E] to-[#1E293B] text-[#C5A059] flex items-center justify-center border border-white/10 shadow-xs shrink-0">
+                  <Receipt className="w-5 h-5 text-[#C5A059]" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-slate-950 font-display tracking-tight">
+                      Facturas
+                    </h3>
+                    <span className="shrink-0 whitespace-nowrap px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 text-[10px] font-bold font-sans">
+                      {invoices.length} {invoices.length === 1 ? 'factura' : 'facturas'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-500 font-normal font-sans mt-0.5 truncate">
+                    {isFacturasOpen
+                      ? 'Historial y gestión de facturas en PDF'
+                      : 'Facturas oficiales y presupuestos archivados'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Botón Abrir / Ocultar Facturas */}
+              <button
+                type="button"
+                onClick={() => setIsFacturasOpen(!isFacturasOpen)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold active:scale-95 transition-all shadow-xs font-sans group cursor-pointer shrink-0"
+                title={isFacturasOpen ? 'Ocultar panel de facturas' : 'Abrir facturas'}
+              >
+                <span>{isFacturasOpen ? 'Ocultar Facturas' : 'Abrir Facturas'}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-[#C5A059] transition-transform duration-200 ${
+                    isFacturasOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Panel Desplegable hacia abajo (cuando se pulsa "Abrir Facturas") */}
+            {isFacturasOpen && (
+              <div className="border-t border-stone-100 p-4 sm:p-5 pt-3 space-y-3.5 bg-stone-50/50">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-slate-700 font-sans">
+                    Documentos en PDF ({invoices.length})
+                  </span>
+                  <div>
+                    <input
+                      type="file"
+                      ref={invoiceFileInputRef}
+                      accept=".pdf,application/pdf"
+                      onChange={handleUploadInvoice}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => invoiceFileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-stone-100 text-slate-900 text-xs font-bold active:scale-95 transition-all border border-stone-200 shadow-2xs font-sans cursor-pointer group"
+                      title="Subir factura en PDF"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-[#C5A059] group-hover:-translate-y-0.5 transition-transform" />
+                      <span>Subir Factura (PDF)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Listado de Facturas */}
+                <div className="divide-y divide-stone-100 rounded-2xl border border-stone-200/80 bg-white shadow-xs overflow-hidden">
+                  {invoices.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-stone-500 font-sans">
+                      No hay facturas archivadas. Pulsa «Subir Factura (PDF)» para añadir una.
+                    </div>
+                  ) : (
+                    invoices.map((inv) => (
+                      <div
+                        key={inv.id}
+                        className="p-3 sm:p-3.5 flex items-center justify-between gap-3 hover:bg-stone-50/80 transition-colors"
+                      >
+                        {/* Icono PDF y Metadatos */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200/70 flex flex-col items-center justify-center text-rose-600 shrink-0 shadow-2xs">
+                            <FileText className="w-4 h-4" />
+                            <span className="text-[7.5px] font-black uppercase tracking-tight leading-none mt-0.5">PDF</span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs sm:text-sm font-black text-slate-900 truncate block font-display">
+                              {inv.name}
+                            </span>
+                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-stone-500 font-normal font-sans flex-wrap">
+                              <span>{inv.uploadDate}</span>
+                              <span className="text-stone-300">•</span>
+                              <span className="font-mono text-stone-600 font-semibold">{inv.fileSize}</span>
+                              <span className="text-stone-300">•</span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-sans">
+                                {inv.status === 'pagada' ? 'Pagada' : 'Oficial'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Acciones: Ver (el ojo) / Descargar / Eliminar */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleViewInvoice(inv)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-stone-100 hover:bg-stone-200/80 text-slate-800 text-xs font-bold transition-all active:scale-95 border border-stone-200/60 font-sans cursor-pointer"
+                            title="Ver factura completa"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-slate-700" />
+                            <span className="hidden sm:inline">Ver</span>
+                          </button>
+                          {inv.fileUrl ? (
+                            <a
+                              href={inv.fileUrl}
+                              download={inv.name}
+                              className="p-1.5 rounded-full bg-stone-100 hover:bg-stone-200/80 text-stone-600 hover:text-slate-900 transition-all active:scale-95 border border-stone-200/60 cursor-pointer"
+                              title="Descargar PDF"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleViewInvoice(inv)}
+                              className="p-1.5 rounded-full bg-stone-100 hover:bg-stone-200/80 text-stone-600 hover:text-slate-900 transition-all active:scale-95 border border-stone-200/60 cursor-pointer"
+                              title="Descargar PDF"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInvoice(inv.id)}
+                            className="p-1.5 rounded-full hover:bg-rose-50 text-stone-400 hover:text-rose-600 transition-all active:scale-95 cursor-pointer"
+                            title="Eliminar factura"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === 'obras' || activeTab === 'more_projects' ? (
+        <div className="space-y-4 animate-tab-enter">
+          {/* Cabecera Compacta y Elegante */}
+          <div className="bg-white/95 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.05)] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-black tracking-tight">
+                  {activeTab === 'obras' ? (
+                    <>
+                      <span className="text-[#C5A059]">Galería 1</span>
+                      <span className="text-stone-300 mx-1.5 font-normal">·</span>
+                      <span className="text-slate-900">Carrusel de Portada</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-indigo-600">Galería 2</span>
+                      <span className="text-stone-300 mx-1.5 font-normal">·</span>
+                      <span className="text-slate-900">Más Proyectos</span>
+                    </>
+                  )}
+                </h2>
+                <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 shrink-0">
+                  {currentCollection.length} {currentCollection.length === 1 ? 'obra' : 'obras'}
+                </span>
+              </div>
+              <p className="text-xs text-stone-500 font-medium mt-0.5">
+                {activeTab === 'obras'
+                  ? 'Fotografías del carrusel principal en ecuaplac.com'
+                  : 'Catálogo de reformas completas en ecuaplac.com'}
+              </p>
+            </div>
+
+            {/* Mini Botón Forzar Actualización en color llamativo y variado */}
+            <button
+              type="button"
+              onClick={handleForceSync}
+              disabled={isForceSyncing}
+              className={`self-start sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full active:scale-95 border text-xs font-black transition-all shadow-sm ${
+                syncFeedback
+                  ? 'bg-emerald-600 border-emerald-500 text-white shadow-emerald-200'
+                  : 'bg-gradient-to-r from-[#C5A059] via-[#D8B467] to-[#E5C882] hover:brightness-105 border-[#B89248] text-slate-950 shadow-xs'
+              }`}
+              title="Sincronizar y forzar actualización con el backend"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-slate-950 ${isForceSyncing ? 'animate-spin' : ''}`} />
+              <span>{isForceSyncing ? 'Sincronizando...' : syncFeedback ? '¡Actualizado en la web!' : 'Forzar Actualización'}</span>
+            </button>
+          </div>
+
+          {/* Selector de Filtros iOS Style (Limpio y directo, sin buscador innecesario) */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="bg-stone-200/70 p-1 rounded-full flex items-center gap-1 border border-stone-300/50 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setVisibilityFilter('all')}
+                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                  visibilityFilter === 'all'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-stone-600 hover:text-slate-900'
+                }`}
+              >
+                Todas ({currentCollection.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisibilityFilter('active')}
+                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                  visibilityFilter === 'active'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-stone-600 hover:text-slate-900'
+                }`}
+              >
+                Visibles ({activeCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisibilityFilter('hidden')}
+                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                  visibilityFilter === 'hidden'
+                    ? 'bg-stone-700 text-white shadow-sm'
+                    : 'text-stone-600 hover:text-slate-900'
+                }`}
+              >
+                Ocultas ({hiddenCount})
+              </button>
+            </div>
+
+            <span className="text-[11px] text-stone-400 font-medium hidden sm:inline">
+              Usa las flechas para ordenar la posición en la web
+            </span>
+          </div>
+
+          {/* Rejilla de Cards (Proporción 4:3) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+            {filteredItems.map((item, index) => {
+              return (
+                <div
+                  key={item.id}
+                  className="bg-white rounded-3xl overflow-hidden border border-stone-200/90 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.05)] hover:shadow-[0_8px_30px_-6px_rgba(20,25,35,0.1)] transition-all flex flex-col justify-between group"
+                >
+                  {/* Zona Fotográfica con Proporción 4:3 Fija */}
+                  <div className="bg-white">
+                    <div
+                      onClick={() => handleOpenEdit(item)}
+                      className="relative aspect-[4/3] bg-stone-100 overflow-hidden cursor-pointer group/card border-b border-stone-100"
+                      title="Toca para editar esta obra"
+                    >
+                      <img
+                        src={item.image_url}
+                        alt={item.title_es}
+                        className={`w-full h-full ${
+                          item.fit_mode === 'contain' ? 'object-contain bg-black/90' : 'object-cover'
+                        } group-hover/card:scale-105 transition-transform duration-300`}
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/ecuaplac/portfolio/IMG_2131.webp';
+                        }}
+                      />
+
+                      {/* Badges superiores: Número de orden (#10, #20...) y Visible/Oculto (Fiel a la app oficial de iPhone) */}
+                      <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-950/85 backdrop-blur-sm text-[#C5A059] font-black text-xs border border-white/10 shadow-sm">
+                            #{item.sort_order || (index + 1) * 10}
+                          </span>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-xs ${
+                              item.active ? 'bg-emerald-600' : 'bg-stone-600'
+                            }`}
+                          >
+                            {item.active ? 'Visible' : 'Oculto'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Badge de Ubicación en la esquina inferior izquierda (Flotante blanco con pin) */}
+                      <div className="absolute bottom-3 left-3 pointer-events-none">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-sm text-slate-900 text-xs font-black shadow-md border border-stone-100/80">
+                          <span className="text-rose-500 text-xs leading-none">📍</span>
+                          <span>{item.location_es || 'Mallorca'}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Título limpio de la obra en blanco puro */}
+                    <div
+                      onClick={() => handleOpenEdit(item)}
+                      className="p-4 cursor-pointer"
+                    >
+                      <h3 className="font-black text-base text-slate-900 line-clamp-2 leading-snug group-hover/card:text-[#C5A059] transition-colors">
+                        {item.title_es}
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* Mini Footer en COLOR NEGRO con Controles Flotantes */}
+                  <div className="p-3 bg-[#0B111E] border-t border-white/10 flex items-center justify-between text-xs gap-2 select-none">
+                    {/* Flechas de ordenación (Subir / Bajar posición en la web) */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleMoveUp(item)}
+                        disabled={index === 0}
+                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-20 disabled:hover:bg-white/10 flex items-center justify-center text-white transition-all active:scale-90 border border-white/10 shadow-2xs"
+                        title="Subir posición en la web"
+                      >
+                        <ChevronUp className="w-4 h-4 stroke-[2.5]" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveDown(item)}
+                        disabled={index === filteredItems.length - 1}
+                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-20 disabled:hover:bg-white/10 flex items-center justify-center text-white transition-all active:scale-90 border border-white/10 shadow-2xs"
+                        title="Bajar posición en la web"
+                      >
+                        <ChevronDown className="w-4 h-4 stroke-[2.5]" />
+                      </button>
+                    </div>
+
+                    {/* Acciones principales: Ojo, Editar, Eliminar */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(item)}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+                          item.active
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30'
+                            : 'bg-white/10 text-stone-400 border border-white/10 hover:text-white hover:bg-white/20'
+                        }`}
+                        title={item.active ? 'Ocultar de la web' : 'Publicar en la web'}
+                      >
+                        {item.active ? (
+                          <Eye className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <EyeOff className="w-4 h-4 text-stone-400" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(item)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white font-extrabold text-xs transition-all shadow-2xs active:scale-95 border border-white/20"
+                        title="Editar obra y fotografía"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-[#F0CF85]" />
+                        <span>Editar</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item)}
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-stone-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all active:scale-95"
+                        title="Eliminar obra"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* Pestaña 4: Ajustes del Gestor (Diseño Pinterest After - Minimalista, iOS-Style y Elegante) */
+        <div className="max-w-2xl mx-auto flex flex-col gap-4 pb-32 animate-tab-enter">
+          {/* Card 1: Perfil Hero del Administrador */}
+          <div className="bg-white/95 rounded-3xl p-5 sm:p-6 border border-stone-200/80 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.06)] flex items-center gap-4 sm:gap-5">
+            {/* Avatar circular con badge de cámara */}
+            <div
+              onClick={() => avatarInputRef.current?.click()}
+              className="relative group cursor-pointer shrink-0"
+              title="Toca para cambiar fotografía"
+            >
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-[#0B1523] border-2 border-stone-200 group-hover:border-[#C5A059] transition-colors flex items-center justify-center shadow-md relative shrink-0">
+                {adminAvatar ? (
+                  <img
+                    src={adminAvatar}
+                    alt="Avatar Administrador"
+                    className="w-full h-full object-contain p-2"
+                  />
+                ) : (
+                  <span className="text-2xl font-black text-white">JR</span>
+                )}
+                <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-full">
+                  <Camera className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <button
+                type="button"
+                className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-[#C5A059] text-white flex items-center justify-center shadow-sm border-2 border-white"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Datos del Administrador (Limpio y Minimalista) */}
+            <div className="min-w-0 flex-1">
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 truncate font-display">
+                {adminName}
+              </h3>
+              <p className="text-xs text-stone-500 font-mono mt-0.5 truncate">
+                ecuaplacbyjyg@gmail.com
+              </p>
+            </div>
+          </div>
+
+          {/* Grupo 1: Cuenta (iOS Style Grouped List con Jerarquía Equilibrada) */}
+          <div className="space-y-2">
+            <div className="px-3.5 pt-1 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider font-display">
+                Cuenta
+              </h4>
+            </div>
+            <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
+              {/* Item 1: Gestionar Perfil */}
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(true)}
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-xs shrink-0">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                      Gestionar Perfil
+                    </span>
+                    <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
+                      Nombre visible y foto de avatar
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-stone-400" />
+              </button>
+
+              {/* Item 2: Seguridad y Clave */}
+              <button
+                type="button"
+                onClick={() => setIsSecurityModalOpen(true)}
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/70 flex items-center justify-center text-[#B38E46] shadow-xs shrink-0">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                      Seguridad y Clave
+                    </span>
+                    <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
+                      Actualizar contraseña de acceso
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-stone-400" />
+              </button>
+
+              {/* Item 3: Notificaciones (Con solicitud nativa de permisos en móvil y PC) */}
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs shrink-0">
+                    <Bell className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                      Notificaciones
+                    </span>
+                    <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
+                      {notificationFeedback || 'Avisos de nuevos presupuestos'}
+                    </span>
+                  </div>
+                </div>
+                <Switch
+                  checked={notificationsEnabled}
+                  onChange={handleToggleNotifications}
+                />
+              </div>
+
+              {/* Item 4: Idioma del Panel (Selector Bilingüe ES / EN Interactivo) */}
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 shadow-xs shrink-0">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                      {panelLang === 'es' ? 'Idioma del Panel' : 'Panel Language'}
+                    </span>
+                    <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
+                      {panelLang === 'es' ? 'Español (Mallorca)' : 'English (International)'}
+                    </span>
+                  </div>
+                </div>
+                <div className="inline-flex items-center p-1 rounded-xl bg-stone-100 border border-stone-200/80 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleLang('es')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      panelLang === 'es'
+                        ? 'bg-white text-slate-900 shadow-xs border border-stone-200/60 font-black scale-102'
+                        : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                  >
+                    ES
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleLang('en')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      panelLang === 'en'
+                        ? 'bg-white text-slate-900 shadow-xs border border-stone-200/60 font-black scale-102'
+                        : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                  >
+                    EN
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Grupo 2: Sistema y Dispositivo (Jerarquía y Título con Autoridad) */}
+          <div className="space-y-2 mt-3">
+            <div className="px-3.5 pt-1 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider font-display">
+                Sistema & Dispositivo
+              </h4>
+            </div>
+            <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
+              {/* Item 1: Sesión en este Dispositivo */}
+              <div className="p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-zinc-100 border border-zinc-200/80 flex items-center justify-center text-zinc-700 shadow-xs shrink-0">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                      Sesión en este Móvil
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      <span className="text-[11.5px] text-stone-500 font-normal truncate block font-sans">
+                        {deviceFeedback || 'Activa · Entrada automática segura'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeviceFeedback('Dispositivo olvidado. Pedirá clave en la próxima entrada.');
+                      addAuditLog('Preferencia de sesión actualizada: Olvidar este móvil', 'Ecuaplac App', 'info');
+                    }}
+                    className="text-[11px] font-bold text-stone-600 hover:text-rose-600 bg-stone-100 hover:bg-rose-50 hover:border-rose-200 px-3 py-1.5 rounded-full border border-stone-200 transition-all active:scale-95 font-sans"
+                    title="Olvidar inicio automático en este móvil"
+                  >
+                    Olvidar
+                  </button>
+                </div>
+              </div>
+
+              {/* Item 2: Actualizaciones (Desplegable y Gestión de Versión) */}
+              <div className="transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setIsUpdatesExpanded(!isUpdatesExpanded)}
+                  className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-700 shadow-xs shrink-0">
+                      <Sparkles className="w-5 h-5 text-[#C5A059]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                          Actualizaciones
+                        </span>
+                        {updateCheckState === 'available' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 font-sans">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                            <span>Nueva v001</span>
+                          </span>
+                        ) : updateCheckState === 'up-to-date' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-sans">
+                            <span>Al día</span>
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
+                        Versión {installedVersion} · Sistema Next Tools
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-stone-400">
+                      v{installedVersion}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-stone-400 transition-transform duration-200 ${
+                        isUpdatesExpanded ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </div>
+                </button>
+
+                {/* Contenido Desplegable de Actualizaciones */}
+                {isUpdatesExpanded && (
+                  <div className="px-4 pb-4 pt-1 bg-stone-50/70 border-t border-stone-100 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {/* Switch: Buscar automáticamente */}
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 block">
+                          Buscar actualizaciones automáticamente
+                        </span>
+                        <span className="text-[11px] text-stone-500 font-medium">
+                          Comprueba mejoras lanzadas en tiempo real
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAutoCheckUpdates(!autoCheckUpdates)}
+                        className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 cursor-pointer shrink-0 ${
+                          autoCheckUpdates ? 'bg-[#0B111E]' : 'bg-stone-300'
+                        }`}
+                      >
+                        <div
+                          className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                            autoCheckUpdates ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Estado: Idle */}
+                    {updateCheckState === 'idle' && (
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={handleCheckUpdates}
+                          className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 text-white font-bold text-xs shadow-xs hover:bg-slate-800 active:scale-98 transition-all"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 text-[#C5A059]" />
+                          <span>Buscar actualizaciones</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Estado: Comprobando */}
+                    {updateCheckState === 'checking' && (
+                      <div className="p-3.5 rounded-xl bg-white border border-stone-200 flex items-center gap-3">
+                        <Loader2 className="w-4 h-4 text-[#C5A059] animate-spin shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-slate-800 block">
+                            Comprobando compilación...
+                          </span>
+                          <span className="text-[11px] text-stone-500 font-medium">
+                            Conectando con Next Tools Core
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Estado: Al día */}
+                    {updateCheckState === 'up-to-date' && (
+                      <div className="space-y-2.5 pt-1">
+                        <div className="p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-200/80 flex items-start gap-3">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <div className="text-left">
+                            <span className="text-xs font-bold text-emerald-950 block">
+                              Ya está instalada la última versión (v{installedVersion})
+                            </span>
+                            <span className="text-[11px] text-emerald-800/90 font-medium mt-0.5 block leading-relaxed">
+                              Tu gestor de Ecuaplac cuenta con las últimas correcciones y optimizaciones activas.
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={handleCheckUpdates}
+                            className="text-xs font-bold text-stone-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-white transition-all active:scale-95"
+                          >
+                            Comprobar de nuevo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSimulatedUpdateAvailable(true);
+                              setUpdateCheckState('available');
+                            }}
+                            className="text-[11px] font-semibold text-[#C5A059] hover:underline"
+                            title="Simula que hay una nueva actualización lista para instalar"
+                          >
+                            Simular nueva v001
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Estado: Nueva versión disponible */}
+                    {updateCheckState === 'available' && (
+                      <div className="space-y-3 pt-1">
+                        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-[#0B111E] to-[#162E4D] border border-[#C5A059]/40 text-white shadow-sm space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#C5A059]/20 text-[#F6E27A] text-[10px] font-bold border border-[#C5A059]/40">
+                              <Sparkles className="w-3 h-3" />
+                              Nueva Versión Lista · v001
+                            </span>
+                            <span className="text-[10px] text-stone-300 font-mono">1.8 MB</span>
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-white block">
+                              Actualización del Gestor Ecuaplac
+                            </span>
+                            <ul className="text-[11px] text-stone-300 font-medium space-y-1 mt-1.5 list-disc list-inside">
+                              <li>Carrusel de obras optimizado para pantallas retina</li>
+                              <li>Compresión automática WebP en subida de fotos</li>
+                              <li>Notificaciones instantáneas para nuevos presupuestos</li>
+                            </ul>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleInstallUpdate}
+                          className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#C5A059] to-[#DFBA6F] text-slate-950 font-black text-xs shadow-md hover:brightness-105 active:scale-98 transition-all cursor-pointer"
+                        >
+                          <Download className="w-4 h-4 text-slate-950" />
+                          <span>Instalar ahora y reiniciar</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Estado: Instalando */}
+                    {updateCheckState === 'installing' && (
+                      <div className="p-4 rounded-2xl bg-white border border-stone-200 space-y-2.5">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                          <span className="flex items-center gap-2">
+                            <Loader2 className="w-3.5 h-3.5 text-[#C5A059] animate-spin" />
+                            Instalando actualización v001...
+                          </span>
+                          <span className="font-mono text-[#C5A059]">100%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-[#C5A059] to-[#0B111E] rounded-full animate-pulse w-full" />
+                        </div>
+                        <span className="text-[11px] text-stone-500 font-medium block">
+                          Aplicando paquetes y preparando recarga limpia...
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Estado: Instalada */}
+                    {updateCheckState === 'installed' && (
+                      <div className="p-3.5 rounded-2xl bg-emerald-600 text-white flex items-center gap-3 shadow-md animate-in zoom-in-95 duration-200">
+                        <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
+                        <div>
+                          <span className="text-xs font-black block">
+                            ¡Versión v001 instalada con éxito!
+                          </span>
+                          <span className="text-[11px] text-emerald-100 font-medium block">
+                            Reiniciando la aplicación en unos segundos...
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Item 3: Últimos Movimientos */}
+              <button
+                type="button"
+                onClick={() => setIsLogsModalOpen(true)}
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-xs shrink-0">
+                    <Activity className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                      Últimos Movimientos
+                    </span>
+                    <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
+                      Historial de fotografías y cambios en la web
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-mono text-[11px] font-bold">
+                    {logs.length}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-stone-400" />
+                </div>
+              </button>
+
+              {/* Item 4: Cerrar Sesión */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDeviceFeedback('Sesión cerrada en este dispositivo.');
+                  addAuditLog('Cierre de sesión manual', 'Ecuaplac App', 'info');
+                }}
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-rose-50/50 transition-colors active:bg-rose-50 select-none group"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shadow-xs shrink-0">
+                    <LogOut className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-rose-600 block group-hover:text-rose-700 font-display tracking-tight">
+                      Cerrar Sesión
+                    </span>
+                    <span className="text-[11.5px] text-rose-400 font-normal block mt-0.5 leading-snug font-sans">
+                      Salir del panel de control
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-rose-300 group-hover:text-rose-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* Pie de Marca Next Tools & Versión 000 (Ajustado para Scroll Óptimo) */}
+          <div className="pt-5 pb-2 flex flex-col items-center justify-center text-center select-none">
+            {/* Isotipo Elegante y Moderno de Next Tools */}
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#141C2B] via-[#0B111E] to-[#05080E] p-1 shadow-[0_4px_16px_rgba(0,0,0,0.22),inset_0_1px_1px_rgba(255,255,255,0.18)] border border-[#C5A059]/40 flex items-center justify-center mb-1.5 transition-transform hover:scale-105">
+              <svg
+                viewBox="0 0 32 32"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5"
+              >
+                <defs>
+                  <linearGradient id="ntGoldGrad" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#FDE68A" />
+                    <stop offset="50%" stopColor="#C5A059" />
+                    <stop offset="100%" stopColor="#927233" />
+                  </linearGradient>
+                  <linearGradient id="ntWhiteGrad" x1="12" y1="6" x2="26" y2="26" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#FFFFFF" />
+                    <stop offset="100%" stopColor="#E2E8F0" />
+                  </linearGradient>
+                </defs>
+                {/* Monograma NT Interconectado */}
+                <path
+                  d="M7 23V9L15 20.5V9"
+                  stroke="url(#ntGoldGrad)"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M17.5 9H25M21 9V23"
+                  stroke="url(#ntWhiteGrad)"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle cx="21" cy="6.2" r="1.1" fill="url(#ntGoldGrad)" />
+              </svg>
+            </div>
+
+            <span className="text-[11px] font-black tracking-[0.24em] text-slate-800 uppercase">
+              Next Tools
+            </span>
+
+            <span className="text-[10px] font-mono font-bold text-stone-400 mt-0.5 tracking-wider">
+              Versión {installedVersion}
+            </span>
+          </div>
+        </div>
+      )}
+      </main>
+
+      {/* 4. Modal de Añadir / Editar Obra (Blindado contra scroll de fondo y teclado móvil) */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={
+          editingItem
+            ? `Editar ${editingItem.type === 'carousel' ? 'Obra de Portada' : 'Proyecto de Galería'}`
+            : formTargetGallery === 'carousel'
+            ? 'Nueva Obra para Portada Web'
+            : 'Nuevo Proyecto para Más Reformas'
+        }
+        subtitle={
+          editingItem
+            ? 'Los cambios se guardarán y actualizarán de inmediato en ecuaplac.com'
+            : formTargetGallery === 'carousel'
+            ? 'Aparecerá en el carrusel principal de la página oficial'
+            : 'Aparecerá en el catálogo de «Ver más reformas» en la web'
+        }
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="md"
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              type="submit"
+              form="ecuaplac-work-form"
+              icon={<RefreshCw className="w-4 h-4 text-slate-950" />}
+            >
+              {editingItem ? 'Actualizar Web' : 'Guardar y Publicar en Web'}
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="ecuaplac-work-form"
+          onSubmit={handleSaveForm}
+          className="space-y-4 text-xs"
+        >
+          {/* Selector de Destino de la Fotografía (Portada vs Más Reformas) */}
+          <div className="space-y-1.5 pb-0.5">
+            <label className="font-black text-xs text-slate-900 block">
+              ¿Dónde quieres colocar esta foto? *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setFormTargetGallery('carousel')}
+                className={`p-3 rounded-2xl border text-left transition-all flex flex-col gap-1 active:scale-[0.98] ${
+                  formTargetGallery === 'carousel'
+                    ? 'bg-amber-500/10 border-[#C5A059] ring-2 ring-[#C5A059]/40 shadow-xs'
+                    : 'bg-white border-stone-200/90 hover:bg-stone-50 text-stone-600'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Star className={`w-4 h-4 ${formTargetGallery === 'carousel' ? 'text-[#B38E46]' : 'text-stone-400'}`} />
+                  <span className={`text-xs font-black ${formTargetGallery === 'carousel' ? 'text-slate-900' : 'text-stone-700'}`}>
+                    Portada (Galería 1)
+                  </span>
+                </div>
+                <span className="text-[10px] text-stone-500 leading-tight">
+                  Carrusel de portada de ecuaplac.com
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormTargetGallery('projects')}
+                className={`p-3 rounded-2xl border text-left transition-all flex flex-col gap-1 active:scale-[0.98] ${
+                  formTargetGallery === 'projects'
+                    ? 'bg-amber-500/10 border-[#C5A059] ring-2 ring-[#C5A059]/40 shadow-xs'
+                    : 'bg-white border-stone-200/90 hover:bg-stone-50 text-stone-600'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Layers className={`w-4 h-4 ${formTargetGallery === 'projects' ? 'text-[#B38E46]' : 'text-stone-400'}`} />
+                  <span className={`text-xs font-black ${formTargetGallery === 'projects' ? 'text-slate-900' : 'text-stone-700'}`}>
+                    Más Reformas (Galería 2)
+                  </span>
+                </div>
+                <span className="text-[10px] text-stone-500 leading-tight">
+                  Catálogo secundario de reformas
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Zona de Encuadre 4:3 con Previsualización (De la App Original) */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="font-black text-xs text-slate-800">Previsualización de Encuadre (4:3)</label>
+              <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-full border border-stone-200">
+                <button
+                  type="button"
+                  onClick={() => setFormFitMode('cover')}
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+                    formFitMode === 'cover' ? 'bg-[#C5A059] text-slate-950 font-black shadow-xs' : 'text-stone-600'
+                  }`}
+                >
+                  Llenar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormFitMode('contain')}
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+                    formFitMode === 'contain' ? 'bg-[#C5A059] text-slate-950 font-black shadow-xs' : 'text-stone-600'
+                  }`}
+                >
+                  Completa
+                </button>
+              </div>
+            </div>
+
+            {/* Input oculto para abrir selector nativo de fotos o cámara */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+
+            {/* Zona Táctil de Subida / Encuadre 4:3 */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-900 border-2 border-dashed border-[#C5A059]/50 hover:border-[#C5A059] cursor-pointer flex items-center justify-center group/dropzone transition-all shadow-inner"
+            >
+              {isCompressing ? (
+                <div className="text-center p-6 flex flex-col items-center">
+                  <div className="w-10 h-10 border-3 border-[#C5A059] border-t-transparent rounded-full animate-spin mb-3" />
+                  <span className="text-sm font-bold text-white">Optimizando a WebP...</span>
+                  <span className="text-[11px] text-stone-400 mt-0.5">Comprimiendo sin pérdida para carga rápida</span>
+                </div>
+              ) : formImageUrl ? (
+                <div className="w-full h-full relative">
+                  <img
+                    src={formImageUrl}
+                    alt="Vista previa"
+                    className={`w-full h-full ${
+                      formFitMode === 'cover' ? 'object-cover' : 'object-contain'
+                    }`}
+                  />
+                  {/* Overlay táctil al pasar el ratón o en móvil */}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/dropzone:opacity-100 flex items-center justify-center transition-opacity">
+                    <span className="px-3.5 py-1.5 rounded-full bg-white text-slate-950 font-extrabold text-xs shadow-lg flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-[#B38E46]" />
+                      <span>Toca para Cambiar Fotografía</span>
+                    </span>
+                  </div>
+
+                  {/* Badge de optimización WebP */}
+                  <div className="absolute bottom-2.5 right-2.5 pointer-events-none">
+                    <span className="px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-sm text-[#C5A059] text-[10px] font-bold border border-amber-400/30">
+                      {uploadStats ? `WebP · ${uploadStats.sizeKb} KB` : '4:3 Ajustado'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center p-6 flex flex-col items-center justify-center">
+                  <div className="w-14 h-14 rounded-2xl bg-[#C5A059]/15 border border-[#C5A059]/30 flex items-center justify-center text-[#C5A059] mb-3 group-hover/dropzone:scale-110 transition-transform shadow-md">
+                    <Camera className="w-7 h-7" />
+                  </div>
+                  <span className="text-sm font-black text-white block">
+                    Toca aquí para seleccionar o tomar foto
+                  </span>
+                  <span className="text-[11px] text-stone-300 mt-1 block">
+                    Abre la cámara o galería de tu teléfono móvil
+                  </span>
+                  <div className="mt-3.5 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-[#C5A059] text-slate-950 font-black text-xs shadow-md">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Subir desde Móvil / PC</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Controles rápidos bajo el encuadre */}
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-xs font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1.5 py-1"
+              >
+                <Camera className="w-3.5 h-3.5 text-[#B38E46]" />
+                <span>{formImageUrl ? 'Cambiar fotografía' : 'Abrir selector de fotos'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowUrlInput(!showUrlInput)}
+                className="text-[11px] text-stone-500 hover:text-stone-700 flex items-center gap-1 underline"
+              >
+                <LinkIcon className="w-3 h-3" />
+                <span>{showUrlInput ? 'Ocultar URL' : 'O pegar URL externa'}</span>
+              </button>
+            </div>
+
+            {/* Input de URL opcional */}
+            {showUrlInput && (
+              <div className="pt-1 animate-in fade-in duration-150">
+                <label className="font-bold text-stone-700 block mb-1">
+                  Enlace / URL directa de la imagen
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://..."
+                  value={formImageUrl}
+                  onChange={(e) => {
+                    setFormImageUrl(e.target.value);
+                    setUploadStats(null);
+                  }}
+                  className="w-full border border-stone-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-[#C5A059]/40"
+                />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="font-extrabold text-xs text-slate-800 block mb-1">
+              Título de la Obra / Proyecto *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="Ej. Reforma Integral de Baño con Bañera Exenta"
+              value={formTitleEs}
+              onChange={(e) => setFormTitleEs(e.target.value)}
+              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50"
+            />
+          </div>
+
+          <div>
+            <label className="font-extrabold text-xs text-slate-800 block mb-1">
+              Ubicación (Mallorca)
+            </label>
+            <input
+              type="text"
+              placeholder="Ej. Andratx, Palma, Calvià, Sóller..."
+              value={formLocation}
+              onChange={(e) => setFormLocation(e.target.value)}
+              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50"
+            />
+            {/* Chips rápidos de municipios de Mallorca */}
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              {['Mallorca', 'Andratx', 'Palma', 'Calvià', 'Sóller', 'Santanyí'].map((city) => (
+                <button
+                  key={city}
+                  type="button"
+                  onClick={() => setFormLocation(city)}
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                    formLocation === city
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-stone-100 text-stone-600 border-stone-200 hover:bg-stone-200'
+                  }`}
+                >
+                  {city}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Versión Multilingüe Inteligente (Inglés y Alemán) */}
+          <div className="bg-stone-50 rounded-2xl border border-stone-200/80 p-3 sm:p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-[#B38E46]" />
+                <span className="text-xs font-black text-slate-900">
+                  Versión Multilingüe (Web Internacional)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleAutoTranslate}
+                disabled={isTranslating}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-[#C5A059] text-slate-950 font-black text-[11px] shadow-xs hover:brightness-105 active:scale-95 transition-all disabled:opacity-50"
+                title="Autotraduce automáticamente a inglés y alemán"
+              >
+                {isTranslating ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Traduciendo...</span>
+                  </>
+                ) : translatedSuccess ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-slate-950 stroke-[3]" />
+                    <span>¡Traducido!</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                    <span>Autotraducir</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-stone-600 block mb-1">
+                Title (English)
+              </label>
+              <input
+                type="text"
+                placeholder="Se genera automático si se deja en blanco"
+                value={formTitleEn}
+                onChange={(e) => setFormTitleEn(e.target.value)}
+                className="w-full border border-stone-200 rounded-xl px-3.5 py-2 text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-stone-600 block mb-1">
+                Titel (Deutsch - Web Alemán)
+              </label>
+              <input
+                type="text"
+                placeholder="Wird automatisch generiert..."
+                value={formTitleDe}
+                onChange={(e) => setFormTitleDe(e.target.value)}
+                className="w-full border border-stone-200 rounded-xl px-3.5 py-2 text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40"
+              />
+            </div>
+          </div>
+
+          {/* Visibilidad en la Web */}
+          <div className="pt-1">
+            <Switch
+              checked={formActive}
+              onChange={setFormActive}
+              label="Visible en la Web"
+              description="Si se desmarca, se guardará en el panel pero no saldrá a los visitantes."
+            />
+          </div>
+        </form>
+      </Modal>
+
+      {/* 5. Modal Dedicado de Bandeja de Presupuestos (CRM Leads de ecuaplac.com) */}
+      <Modal
+        isOpen={isLeadsModalOpen}
+        onClose={() => setIsLeadsModalOpen(false)}
+        title="Bandeja de Presupuestos"
+        subtitle="Solicitudes de clientes recibidas desde ecuaplac.com"
+        footer={
+          <Button
+            variant="secondary"
+            size="md"
+            type="button"
+            onClick={() => setIsLeadsModalOpen(false)}
+          >
+            Cerrar
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          {/* Filtros rápidos con Conteo Dinámico */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            <button
+              type="button"
+              onClick={() => setLeadFilter('all')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 ${
+                leadFilter === 'all'
+                  ? 'bg-slate-900 text-white shadow-sm ring-1 ring-slate-900'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              Todos ({leads.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeadFilter('new')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                leadFilter === 'new'
+                  ? 'bg-rose-600 text-white shadow-sm ring-1 ring-rose-600'
+                  : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'new' ? 'bg-white' : 'bg-rose-500'}`} />
+              No contestados ({leads.filter((l) => l.status === 'new').length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeadFilter('contacted')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                leadFilter === 'contacted'
+                  ? 'bg-amber-600 text-white shadow-sm ring-1 ring-amber-600'
+                  : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'contacted' ? 'bg-white' : 'bg-amber-500'}`} />
+              En contacto ({leads.filter((l) => l.status === 'contacted').length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeadFilter('approved')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                leadFilter === 'approved'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-600'
+                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'approved' ? 'bg-white' : 'bg-emerald-500'}`} />
+              Aprobados ({leads.filter((l) => l.status === 'approved').length})
+            </button>
+          </div>
+
+          {/* Lista de Leads */}
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            {filteredLeads.map((lead) => (
+              <div
+                key={lead.id}
+                className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200/80 shadow-xs flex flex-col gap-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-black text-sm sm:text-base text-slate-900 tracking-tight">
+                      {lead.name}
+                    </h4>
+                    <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-medium mt-0.5">
+                      <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                      <span>Recibido: {lead.date}</span>
+                    </div>
+                  </div>
+
+                  {lead.status === 'new' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-black shrink-0">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                      No Contestado
+                    </span>
+                  ) : lead.status === 'contacted' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black shrink-0">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      En Contacto
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black shrink-0">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Obra Aceptada
+                    </span>
+                  )}
+                </div>
+
+                <div className="bg-white rounded-xl p-3 border border-stone-200/80 shadow-xs">
+                  <p className="text-xs sm:text-sm text-stone-700 leading-relaxed font-medium">
+                    «{lead.work_type}»
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {lead.budget_estimate && (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200/80 text-stone-700 text-xs font-semibold">
+                      <span className="text-[10px] text-stone-400 uppercase tracking-wider font-bold">
+                        Presupuesto aprox:
+                      </span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {lead.budget_estimate}
+                      </span>
+                    </div>
+                  )}
+                  {lead.email && (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-50 border border-stone-200/60 text-stone-500 text-xs font-mono">
+                      <Mail className="w-3 h-3 text-stone-400" />
+                      <span>{lead.email}</span>
+                    </div>
+                  )}
+                </div>
+
+                {lead.notes && (
+                  <div className="flex items-start gap-2 bg-amber-50/70 border border-amber-200/60 rounded-xl p-2.5 text-xs text-amber-900">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Nota:</strong> {lead.notes}
+                    </span>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-stone-200/60 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                        `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto.`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </a>
+                    <a
+                      href={`tel:${lead.phone}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all active:scale-95"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-[#C5A059]" />
+                      <span>{lead.phone}</span>
+                    </a>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {lead.status !== 'new' && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateLeadStatus(lead.id, 'new')}
+                        className="px-2.5 py-1 rounded-full text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-all active:scale-95"
+                      >
+                        No Contestado
+                      </button>
+                    )}
+                    {lead.status !== 'contacted' && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateLeadStatus(lead.id, 'contacted')}
+                        className="px-2.5 py-1 rounded-full text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-all active:scale-95"
+                      >
+                        En Contacto
+                      </button>
+                    )}
+                    {lead.status !== 'approved' && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateLeadStatus(lead.id, 'approved')}
+                        className="px-2.5 py-1 rounded-full text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-all active:scale-95"
+                      >
+                        Marcar Aprobado
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      {/* 6. Modal de Gestionar Perfil */}
+      <Modal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        title="Gestionar Perfil"
+        subtitle="Nombre del gestor y avatar visible en el portal de Ecuaplac"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="md"
+              type="button"
+              onClick={() => setIsProfileModalOpen(false)}
+            >
+              Cerrar
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              type="button"
+              onClick={() => {
+                handleSaveName();
+                setIsProfileModalOpen(false);
+              }}
+            >
+              Guardar Cambios
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 pt-1">
+          <div className="flex flex-col items-center gap-3">
+            <div
+              onClick={() => avatarInputRef.current?.click()}
+              className="relative group cursor-pointer"
+            >
+              <div className="w-24 h-24 rounded-full overflow-hidden bg-[#0B1523] border-2 border-stone-200 group-hover:border-[#C5A059] transition-colors flex items-center justify-center shadow-md relative">
+                {adminAvatar ? (
+                  <img
+                    src={adminAvatar}
+                    alt="Avatar Administrador"
+                    className="w-full h-full object-contain p-2"
+                  />
+                ) : (
+                  <span className="text-2xl font-black text-white">JR</span>
+                )}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-full">
+                  <Camera className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <span className="block text-center text-xs text-stone-500 font-bold mt-2 group-hover:text-[#C5A059] transition-colors">
+                Toca para cambiar fotografía
+              </span>
+            </div>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarSelect}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1">
+              Nombre en el Panel
+            </label>
+            <input
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Ej. José Rivadeneira"
+              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1">
+              {panelLang === 'es' ? 'Correo Electrónico' : 'Email Address'}
+            </label>
+            <input
+              type="email"
+              disabled
+              value="ecuaplacbyjyg@gmail.com"
+              className="w-full px-4 py-3 rounded-2xl bg-stone-100 border border-stone-200 text-stone-500 text-sm cursor-not-allowed font-mono"
+            />
+          </div>
+
+          {/* Atributos del Administrador & Dominio Oficial */}
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80">
+              <span className="block text-[10.5px] font-bold text-amber-900/70 uppercase tracking-wider">
+                {panelLang === 'es' ? 'Rol en el Sistema' : 'System Role'}
+              </span>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-extrabold text-slate-900">
+                  {panelLang === 'es' ? 'Administrador' : 'Administrator'}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-stone-100/80 border border-stone-200/80">
+              <span className="block text-[10.5px] font-bold text-stone-500 uppercase tracking-wider">
+                {panelLang === 'es' ? 'Sitio Web Oficial' : 'Official Website'}
+              </span>
+              <a
+                href="https://ecuaplac.com"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-extrabold text-sky-700 hover:text-sky-900 hover:underline mt-1.5"
+              >
+                <Globe className="w-3.5 h-3.5 text-sky-600" />
+                <span>ecuaplac.com</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 7. Modal de Seguridad y Clave */}
+      <Modal
+        isOpen={isSecurityModalOpen}
+        onClose={() => {
+          setIsSecurityModalOpen(false);
+          setPasswordFeedback(null);
+        }}
+        title="Seguridad y Clave de Acceso"
+        subtitle="Actualiza la contraseña del administrador para ecuaplacbyjyg@gmail.com"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="md"
+              type="button"
+              onClick={() => {
+                setIsSecurityModalOpen(false);
+                setPasswordFeedback(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              type="submit"
+              form="ecuaplac-security-form"
+            >
+              Guardar Contraseña
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="ecuaplac-security-form"
+          onSubmit={handleSavePassword}
+          className="flex flex-col gap-3.5 pt-1"
+        >
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1">
+              Contraseña Actual *
+            </label>
+            <input
+              type="password"
+              required
+              value={currPass}
+              onChange={(e) => setCurrPass(e.target.value)}
+              placeholder="Introduce la contraseña actual (ej. admin)"
+              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1">
+              Nueva Contraseña *
+            </label>
+            <input
+              type="password"
+              required
+              value={newPass}
+              onChange={(e) => setNewPass(e.target.value)}
+              placeholder="Mínimo 4 caracteres"
+              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1">
+              Confirmar Nueva Contraseña *
+            </label>
+            <input
+              type="password"
+              required
+              value={confirmPass}
+              onChange={(e) => setConfirmPass(e.target.value)}
+              placeholder="Repite la nueva contraseña"
+              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
+            />
+          </div>
+
+          {passwordFeedback && (
+            <div
+              className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                passwordFeedback.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-red-50 text-red-700 border border-red-200'
+              }`}
+            >
+              {passwordFeedback.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              ) : (
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              )}
+              <span>{passwordFeedback.msg}</span>
+            </div>
+          )}
+        </form>
+      </Modal>
+
+      {/* 8. Modal de Últimos Movimientos */}
+      <Modal
+        isOpen={isLogsModalOpen}
+        onClose={() => setIsLogsModalOpen(false)}
+        title="Últimos Movimientos"
+        subtitle="Registro de cambios, subidas de fotografías y actividad en la web"
+        footer={
+          <Button
+            variant="secondary"
+            size="md"
+            type="button"
+            onClick={() => setIsLogsModalOpen(false)}
+          >
+            Cerrar
+          </Button>
+        }
+      >
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-stone-500 font-medium">
+              Actividad en tiempo real ({logs.length})
+            </span>
+            <button
+              type="button"
+              onClick={handleRefreshLogs}
+              className="text-xs font-bold text-slate-900 hover:text-[#C5A059] flex items-center gap-1.5 bg-stone-100 active:scale-95 px-3 py-1.5 rounded-xl border border-stone-200 transition-all"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[#C5A059] ${isRefreshingLogs ? 'animate-spin' : ''}`} />
+              <span>Refrescar</span>
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto pr-1">
+            {logs.map((log) => (
+              <div
+                key={log.id}
+                className="flex items-center justify-between p-3 rounded-2xl bg-stone-50 border border-stone-200/80 hover:bg-stone-100/80 transition-colors"
+              >
+                <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                  <span className="text-xs font-bold text-slate-900 truncate">
+                    {log.action}
+                  </span>
+                </div>
+                <span className="text-[10px] text-stone-400 font-medium whitespace-nowrap shrink-0">
+                  {log.time}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Visor de Factura Real (PDF) */}
+      <Modal
+        isOpen={isInvoiceViewerOpen}
+        onClose={() => {
+          setIsInvoiceViewerOpen(false);
+          setSelectedInvoiceForView(null);
+        }}
+        title={selectedInvoiceForView?.number ? `${selectedInvoiceForView.number} • ${selectedInvoiceForView.name}` : selectedInvoiceForView?.name || 'Factura Oficial'}
+        subtitle="Documento tributario oficial emitido por Ecuaplac J&G S.L."
+        maxWidth="xl"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs text-stone-600 font-sans font-medium">
+                Estado: <span className="font-bold text-emerald-700 capitalize">{selectedInvoiceForView?.status || 'Oficial'}</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="md"
+                type="button"
+                onClick={() => {
+                  setIsInvoiceViewerOpen(false);
+                  setSelectedInvoiceForView(null);
+                }}
+              >
+                Cerrar
+              </Button>
+              {selectedInvoiceForView?.fileUrl ? (
+                <a
+                  href={selectedInvoiceForView.fileUrl}
+                  download={selectedInvoiceForView.name}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all font-sans"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#C5A059]" />
+                  <span>Descargar PDF</span>
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all font-sans cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#C5A059]" />
+                  <span>Imprimir / Descargar</span>
+                </button>
+              )}
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4 pt-1">
+          {selectedInvoiceForView?.fileUrl ? (
+            <div className="w-full h-[60vh] rounded-2xl overflow-hidden border border-stone-200 bg-stone-100 shadow-inner">
+              <iframe
+                src={selectedInvoiceForView.fileUrl}
+                title={selectedInvoiceForView.name}
+                className="w-full h-full border-none"
+              />
+            </div>
+          ) : (
+            /* Documento de Factura Oficial Estilo Papel A4 / PDF */
+            <div className="p-4 sm:p-7 rounded-2xl border border-stone-200/90 bg-white shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] space-y-5 font-sans select-text">
+              {/* Cabecera de la Factura: Emisor y Metadatos */}
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-stone-200 pb-5">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-[#0B111E] text-[#C5A059] flex items-center justify-center font-bold font-display border border-[#C5A059]/30 shadow-xs">
+                      EP
+                    </div>
+                    <div>
+                      <h4 className="text-base font-black text-slate-950 font-display tracking-tight">
+                        ECUAPLAC J&G S.L.
+                      </h4>
+                      <p className="text-[11px] text-stone-500 font-sans">
+                        Reformas Integrales Mallorca • NIF B-07982341
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2.5 text-xs text-stone-500 space-y-0.5">
+                    <p>Carrer Gremi de Teixidors, 24, Polígon Son Castelló</p>
+                    <p>07009 Palma de Mallorca, Illes Balears</p>
+                    <p>Tel: +34 642 12 34 56 • Email: ecuaplacbyjyg@gmail.com</p>
+                  </div>
+                </div>
+
+                {/* Bloque Factura Nº y Fecha */}
+                <div className="text-left sm:text-right bg-stone-50 sm:bg-transparent p-3 sm:p-0 rounded-xl sm:rounded-none border sm:border-none border-stone-100">
+                  <span className="text-[11px] font-bold tracking-widest text-[#C5A059] uppercase block font-display">
+                    FACTURA OFICIAL
+                  </span>
+                  <span className="text-xl sm:text-2xl font-black text-slate-950 font-mono block mt-0.5">
+                    {selectedInvoiceForView?.number || 'FAC-2026-001'}
+                  </span>
+                  <div className="mt-2 text-xs text-stone-600 space-y-0.5">
+                    <p><span className="text-stone-400">Fecha de emisión:</span> <span className="font-semibold text-slate-800">{selectedInvoiceForView?.issueDate || '03/11/2026'}</span></p>
+                    <p><span className="text-stone-400">Vencimiento:</span> <span className="font-semibold text-slate-800">{selectedInvoiceForView?.dueDate || 'Al contado'}</span></p>
+                    <p><span className="text-stone-400">Forma de pago:</span> <span className="font-semibold text-slate-800">Transferencia</span></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Datos del Cliente */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-stone-50/80 border border-stone-200/70 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
+                    Facturado a (Cliente)
+                  </span>
+                  <p className="font-black text-slate-900 text-sm font-display">
+                    {selectedInvoiceForView?.clientName || 'Ecuaplac J&G S.L.'}
+                  </p>
+                  <p className="text-stone-600 mt-0.5">NIF: {selectedInvoiceForView?.clientCif || 'B-07982341'}</p>
+                  <p className="text-stone-500">{selectedInvoiceForView?.clientAddress || 'Palma de Mallorca'}</p>
+                </div>
+                <div className="flex flex-col sm:items-end justify-center">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>DOCUMENTO CONTABILIZADO</span>
+                  </div>
+                  <span className="text-[10px] text-stone-400 mt-1 sm:text-right">
+                    Registro de IVA trimestral Mod. 303
+                  </span>
+                </div>
+              </div>
+
+              {/* Tabla de Conceptos */}
+              <div className="overflow-x-auto rounded-xl border border-stone-200">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-[#0B111E] text-white uppercase text-[10px] tracking-wider font-bold">
+                    <tr>
+                      <th className="py-2.5 px-3 sm:px-4">Descripción del Servicio</th>
+                      <th className="py-2.5 px-2 text-center w-16">Cant.</th>
+                      <th className="py-2.5 px-3 text-right w-24">Precio</th>
+                      <th className="py-2.5 px-3 sm:px-4 text-right w-24">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100 bg-white">
+                    {(selectedInvoiceForView?.items || [
+                      { description: 'Desarrollo web Nextool y despliegue Cloudflare Edge', qty: 1, unitPrice: 850, total: 850 },
+                    ]).map((item, idx) => (
+                      <tr key={idx} className="hover:bg-stone-50/50">
+                        <td className="py-2.5 px-3 sm:px-4 font-medium text-slate-900">
+                          {item.description}
+                        </td>
+                        <td className="py-2.5 px-2 text-center text-stone-600 font-mono">
+                          {item.qty}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-stone-600 font-mono">
+                          {item.unitPrice.toFixed(2)} €
+                        </td>
+                        <td className="py-2.5 px-3 sm:px-4 text-right font-bold text-slate-900 font-mono">
+                          {item.total.toFixed(2)} €
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Cuadro de Totales */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-1">
+                <div className="text-xs text-stone-500 max-w-xs space-y-1">
+                  <p className="font-semibold text-slate-800">Observaciones:</p>
+                  <p>{selectedInvoiceForView?.notes || 'Factura emitida y liquidada mediante transferencia.'}</p>
+                  <p className="text-[10px] text-stone-400 font-mono mt-1">IBAN: ES76 2100 0418 4502 0005 1234</p>
+                </div>
+
+                <div className="w-full sm:w-64 space-y-1.5 p-3.5 rounded-xl bg-stone-50 border border-stone-200/80 text-xs">
+                  <div className="flex justify-between text-stone-600">
+                    <span>Base Imponible:</span>
+                    <span className="font-mono font-semibold">
+                      {(selectedInvoiceForView?.subtotal || 850).toFixed(2)} €
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-stone-600">
+                    <span>IVA (21%):</span>
+                    <span className="font-mono font-semibold">
+                      {(selectedInvoiceForView?.vatAmount || 178.5).toFixed(2)} €
+                    </span>
+                  </div>
+                  <div className="border-t border-stone-200 pt-1.5 flex justify-between text-sm sm:text-base font-black text-slate-950 font-display">
+                    <span>TOTAL FACTURA:</span>
+                    <span className="font-mono text-[#9E782F]">
+                      {(selectedInvoiceForView?.totalAmount || 1028.5).toFixed(2)} €
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pie Legal */}
+              <div className="pt-3 border-t border-stone-100 text-[10px] text-stone-400 text-center sm:text-left">
+                Documento mercantil oficial de ECUAPLAC J&G S.L. • Inscrita en el Registro Mercantil de Palma de Mallorca, Tomo 2341, Folio 89, Hoja PM-45123.
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* 9. Barra de Navegación Completa Responsive (Full-Width Native Bar con FAB Central Elevado) */}
+      <div className={`fixed bottom-0 inset-x-0 w-full z-40 pointer-events-none transition-all duration-200 ${
+        isModalOpen || isLeadsModalOpen || isProfileModalOpen || isSecurityModalOpen || isLogsModalOpen || isInvoiceViewerOpen
+          ? 'hidden opacity-0 pointer-events-none'
+          : ''
+      }`}>
+        <div className="pointer-events-auto w-full bg-[#0E1726]/95 backdrop-blur-2xl border-t border-blue-500/20 shadow-[0_-8px_32px_rgba(14,23,38,0.5)]">
+          <nav className="max-w-md sm:max-w-lg mx-auto px-4 pt-2 pb-[max(12px,env(safe-area-inset-bottom))] flex items-center justify-between relative">
+            {/* Tab 1: Inicio */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('inicio')}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer ${
+                activeTab === 'inicio' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Home
+                className={`w-5 h-5 transition-transform duration-200 ${
+                  activeTab === 'inicio' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
+                }`}
+              />
+              <span
+                className={`text-[10.5px] font-sans tracking-wide leading-none ${
+                  activeTab === 'inicio' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                }`}
+              >
+                {panelLang === 'es' ? 'Inicio' : 'Home'}
+              </span>
+              {activeTab === 'inicio' && (
+                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+              )}
+            </button>
+
+            {/* Tab 2: Galería 1 */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('obras')}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer ${
+                activeTab === 'obras' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ImageIcon
+                className={`w-5 h-5 transition-transform duration-200 ${
+                  activeTab === 'obras' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
+                }`}
+              />
+              <span
+                className={`text-[10.5px] font-sans tracking-wide leading-none ${
+                  activeTab === 'obras' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                }`}
+              >
+                {panelLang === 'es' ? 'Galería 1' : 'Gallery 1'}
+              </span>
+              {activeTab === 'obras' && (
+                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+              )}
+            </button>
+
+            {/* CENTER FAB (+): Botón Circular Elevado para Subir Foto WebP */}
+            <div className="relative -top-5 px-1 shrink-0 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={handleOpenAdd}
+                style={{
+                  background: 'linear-gradient(135deg, #9E782F 0%, #D4AF37 50%, #F5DE98 100%)',
+                  boxShadow: '0 8px 24px -2px rgba(212,175,55,0.45)',
+                }}
+                className="w-14 h-14 rounded-full text-slate-950 flex items-center justify-center ring-4 ring-[#0E1726] active:scale-90 transition-all hover:brightness-110 group cursor-pointer"
+                title={panelLang === 'es' ? 'Añadir nueva fotografía / obra' : 'Add new project photo'}
+              >
+                <Plus className="w-6 h-6 text-slate-950 stroke-[2.5] group-hover:rotate-90 transition-transform duration-200" />
+              </button>
+            </div>
+
+            {/* Tab 3: Galería 2 (Mismo Icono Fotográfico que Galería 1) */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('more_projects')}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer ${
+                activeTab === 'more_projects' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ImageIcon
+                className={`w-5 h-5 transition-transform duration-200 ${
+                  activeTab === 'more_projects' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
+                }`}
+              />
+              <span
+                className={`text-[10.5px] font-sans tracking-wide leading-none ${
+                  activeTab === 'more_projects' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                }`}
+              >
+                {panelLang === 'es' ? 'Galería 2' : 'Gallery 2'}
+              </span>
+              {activeTab === 'more_projects' && (
+                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+              )}
+            </button>
+
+            {/* Tab 4: Ajustes */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('ajustes')}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 relative transition-all select-none active:scale-95 cursor-pointer ${
+                activeTab === 'ajustes' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Settings
+                className={`w-5 h-5 transition-transform duration-200 ${
+                  activeTab === 'ajustes' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
+                }`}
+              />
+              <span
+                className={`text-[10.5px] font-sans tracking-wide leading-none ${
+                  activeTab === 'ajustes' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                }`}
+              >
+                {panelLang === 'es' ? 'Ajustes' : 'Settings'}
+              </span>
+              {activeTab === 'ajustes' && (
+                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+              )}
+            </button>
+          </nav>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default EcuaplacPortal;
+

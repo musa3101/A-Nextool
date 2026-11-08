@@ -1,0 +1,14 @@
+{
+  "client": "ecuaplac",
+  "name": "Ecuaplac Reformas Integrales",
+  "owner": "Jose (José Rivadeneira)",
+  "version": "1.0.0",
+  "last_updated": "2026-11-08",
+  "status": "active",
+  "route": "/ecuaplac",
+  "modules": [
+    "galerias_obras",
+    "leads_presupuestos",
+    "ajustes_perfil"
+  ]
+}
