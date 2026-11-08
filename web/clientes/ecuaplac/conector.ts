@@ -359,9 +359,9 @@ export class EcuaplacConnector {
   getLeads(fallback: EcuaplacLeadItem[] = []): EcuaplacLeadItem[] {
     try {
       const cached = localStorage.getItem(this.storageKeyLeads);
-      if (cached) {
+      if (cached !== null) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed;
         }
       }
@@ -471,7 +471,33 @@ export class EcuaplacConnector {
         headers: this.getHeaders(),
         body: JSON.stringify({ status: dbStatus }),
       });
+      await insforge.database
+        .from('leads')
+        .update({ status: dbStatus })
+        .eq('id', leadId)
+        .eq('tenant_id', ECUAPLAC_TENANT_ID);
       await this.addAuditLog('status', `Estado de lead cambiado a "${status}" para ID ${leadId}`);
+    } catch {
+      // Silencioso
+    }
+    return true;
+  }
+
+  /**
+   * Elimina un lead (local + Supabase + InsForge)
+   */
+  async deleteLead(leadId: string): Promise<boolean> {
+    const leads = this.getLeads();
+    const filtered = leads.filter((l) => l.id !== leadId);
+    this.saveLeads(filtered);
+
+    try {
+      await fetch(`${this.url}/rest/v1/${this.tables.leads}?id=eq.${leadId}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      });
+      await insforge.database.from('leads').delete().eq('id', leadId).eq('tenant_id', ECUAPLAC_TENANT_ID);
+      await this.addAuditLog('delete', `Lead eliminado con éxito (ID ${leadId})`);
     } catch {
       // Silencioso
     }
@@ -535,7 +561,7 @@ export class EcuaplacConnector {
     // 2. Respaldo simultáneo a InsForge Storage (tenants-media)
     try {
       const insforgeFilename = `ecuaplac/${filename}`;
-      const { error } = await insforge.storage.from('tenants-media').upload(insforgeFilename, file, {
+      const { error } = await (insforge.storage.from('tenants-media') as any).upload(insforgeFilename, file, {
         contentType: 'image/webp',
         upsert: true,
       });

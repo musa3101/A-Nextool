@@ -38,6 +38,10 @@ import {
   ShieldCheck,
   Check,
   MessageSquare,
+  Copy,
+  RotateCcw,
+  Inbox,
+  Send,
   Home,
   LayoutDashboard,
   Grid2x2,
@@ -73,6 +77,7 @@ import { ECUAPLAC_CONFIG } from './config';
 import { ecuaplacConnector, EcuaplacLeadItem } from './conector';
 import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
 import { autoTranslateWork } from './traductor';
+import { insforge } from '@/lib/insforge';
 
 // Catálogo inicial auténtico de Ecuaplac (9 Obras Reales de Portada y 11 Proyectos de Galería)
 const INITIAL_WORKS = DEFAULT_WORKS;
@@ -366,6 +371,92 @@ export const EcuaplacPortal: React.FC = () => {
     }
   };
 
+  // Estados avanzados de Bandeja Ejecutiva de Leads (Estilo Gmail)
+  const [leadSearchQuery, setLeadSearchQuery] = useState('');
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [isSyncingLeads, setIsSyncingLeads] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const cleanPhoneForWhatsApp = (phone?: string) => {
+    if (!phone) return '';
+    const digits = phone.replace(/[^0-9]/g, '');
+    if (digits.length === 9 && (digits.startsWith('6') || digits.startsWith('7') || digits.startsWith('8') || digits.startsWith('9'))) {
+      return `34${digits}`;
+    }
+    return digits;
+  };
+
+  const handleCopyLeadInfo = (text: string, label: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {});
+      }
+    } catch {
+      // Ignorar fallo de permisos en webview o headless
+    }
+    setCopiedField(label);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleRefreshLeads = async () => {
+    setIsSyncingLeads(true);
+    showSyncToast(
+      panelLang === 'es' ? 'Consultando leads en Supabase (ecuaplac.com)...' : 'Checking leads in Supabase...',
+      'syncing'
+    );
+    try {
+      const liveLeads = await ecuaplacConnector.fetchLeadsOnline();
+      if (liveLeads && liveLeads.length > 0) {
+        setLeads(liveLeads);
+        showSyncToast(
+          panelLang === 'es'
+            ? `Sincronizados ${liveLeads.length} presupuestos desde Supabase`
+            : `${liveLeads.length} leads synced from Supabase`,
+          'success'
+        );
+      } else {
+        showSyncToast(
+          panelLang === 'es'
+            ? 'Backend Supabase conectado (0 solicitudes nuevas en la web)'
+            : 'Supabase connected (0 new inquiries)',
+          'success'
+        );
+      }
+    } catch {
+      showSyncToast(
+        panelLang === 'es' ? 'Error al contactar con Supabase' : 'Error contacting Supabase',
+        'error'
+      );
+    } finally {
+      setIsSyncingLeads(false);
+    }
+  };
+
+  const handleDeleteLead = async (leadId: string, leadName: string) => {
+    const confirmMsg =
+      panelLang === 'es'
+        ? `¿Seguro que deseas eliminar la solicitud de "${leadName}"?`
+        : `Are you sure you want to delete inquiry from "${leadName}"?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setLeads((prev) => prev.filter((l) => l.id !== leadId));
+    if (selectedLeadId === leadId) setSelectedLeadId(null);
+    await ecuaplacConnector.deleteLead(leadId);
+    showSyncToast(
+      panelLang === 'es' ? `Presupuesto de ${leadName} eliminado` : `Lead ${leadName} deleted`,
+      'success'
+    );
+  };
+
+  const handleRestoreDefaultLeads = () => {
+    setLeads(defaultLeads);
+    ecuaplacConnector.saveLeads(defaultLeads);
+    showSyncToast(
+      panelLang === 'es' ? 'Presupuestos de demostración restaurados' : 'Demo leads restored',
+      'success'
+    );
+  };
+
   const handleUpdateLeadStatus = (leadId: string, newStatus: EcuaplacLeadItem['status']) => {
     setLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l))
@@ -387,8 +478,18 @@ export const EcuaplacPortal: React.FC = () => {
   };
 
   const filteredLeads = leads.filter((l) => {
-    if (leadFilter === 'all') return true;
-    return l.status === leadFilter;
+    const matchesFilter = leadFilter === 'all' || l.status === leadFilter;
+    if (!matchesFilter) return false;
+    if (!leadSearchQuery.trim()) return true;
+    const q = leadSearchQuery.toLowerCase();
+    return (
+      l.name.toLowerCase().includes(q) ||
+      l.phone.toLowerCase().includes(q) ||
+      l.email.toLowerCase().includes(q) ||
+      l.work_type.toLowerCase().includes(q) ||
+      l.budget_estimate.toLowerCase().includes(q) ||
+      (l.notes && l.notes.toLowerCase().includes(q))
+    );
   });
 
   // Modal State
@@ -2929,203 +3030,401 @@ export const EcuaplacPortal: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 5. Modal Dedicado de Bandeja de Presupuestos (CRM Leads de ecuaplac.com) */}
+      {/* 5. Modal Dedicado de Bandeja de Presupuestos (CRM Leads de ecuaplac.com — Estilo Gmail Executive) */}
       <Modal
         isOpen={isLeadsModalOpen}
         onClose={() => setIsLeadsModalOpen(false)}
+        theme="dark"
+        maxWidth="3xl"
         title={panelLang === 'es' ? 'Bandeja de Presupuestos' : 'Inquiries & Quotes Inbox'}
         subtitle={
           panelLang === 'es'
             ? 'Solicitudes de clientes recibidas desde ecuaplac.com'
             : 'Customer inquiries received from ecuaplac.com'
         }
+        headerExtra={
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Supabase Live
+            </span>
+            <button
+              type="button"
+              onClick={handleRefreshLeads}
+              disabled={isSyncingLeads}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-white/10 hover:border-amber-400/40 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              title={panelLang === 'es' ? 'Sincronizar con Supabase' : 'Sync with Supabase'}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[#F0CF85] ${isSyncingLeads ? 'animate-spin' : ''}`} />
+              <span className="hidden md:inline">{panelLang === 'es' ? 'Sincronizar' : 'Sync'}</span>
+            </button>
+          </div>
+        }
         footer={
-          <Button
-            variant="secondary"
-            size="md"
-            type="button"
-            onClick={() => setIsLeadsModalOpen(false)}
-          >
-            {panelLang === 'es' ? 'Cerrar' : 'Close'}
-          </Button>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              {leads.length === 0 && (
+                <button
+                  type="button"
+                  onClick={handleRestoreDefaultLeads}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-xs font-bold transition-all active:scale-95"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-[#F0CF85]" />
+                  <span>{panelLang === 'es' ? 'Restaurar Ejemplos' : 'Restore Demo Leads'}</span>
+                </button>
+              )}
+              {copiedField && (
+                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 animate-in fade-in">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{copiedField} copiado</span>
+                </span>
+              )}
+            </div>
+            <Button
+              variant="secondary"
+              size="md"
+              type="button"
+              onClick={() => setIsLeadsModalOpen(false)}
+              className="bg-slate-900 hover:bg-slate-800 text-slate-200 border-white/10"
+            >
+              {panelLang === 'es' ? 'Cerrar' : 'Close'}
+            </Button>
+          </div>
         }
       >
         <div className="space-y-4">
-          {/* Filtros rápidos con Conteo Dinámico */}
+          {/* Barra de Búsqueda Inteligente (Estilo Gmail) */}
+          <div className="relative">
+            <div className="flex items-center bg-slate-900/90 border border-white/10 focus-within:border-amber-400/50 rounded-2xl px-3.5 py-2.5 transition-all shadow-inner">
+              <Search className="w-4 h-4 text-slate-400 shrink-0 mr-2.5" />
+              <input
+                type="search"
+                inputMode="search"
+                enterKeyHint="search"
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={leadSearchQuery}
+                onChange={(e) => setLeadSearchQuery(e.target.value)}
+                placeholder={
+                  panelLang === 'es'
+                    ? 'Buscar por cliente, teléfono, email, localidad o descripción...'
+                    : 'Search by client, phone, email, location or work...'
+                }
+                className="w-full bg-transparent text-base sm:text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none"
+              />
+              {leadSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setLeadSearchQuery('')}
+                  className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filtros rápidos con Conteo Dinámico estilo Pestañas de Correo */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
             <button
               type="button"
               onClick={() => setLeadFilter('all')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'all'
-                  ? 'bg-slate-900 text-white shadow-sm ring-1 ring-slate-900'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  ? 'bg-[#C5A059] text-slate-950 shadow-md font-extrabold ring-1 ring-[#C5A059]'
+                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-white/5'
               }`}
             >
-              {panelLang === 'es' ? 'Todos' : 'All'} ({leads.length})
+              <Inbox className="w-3.5 h-3.5" />
+              <span>{panelLang === 'es' ? 'Todos' : 'All'}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'all' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
+                {leads.length}
+              </span>
             </button>
+
             <button
               type="button"
               onClick={() => setLeadFilter('new')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'new'
-                  ? 'bg-rose-600 text-white shadow-sm ring-1 ring-rose-600'
-                  : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                  ? 'bg-rose-600 text-white shadow-md ring-1 ring-rose-500'
+                  : 'bg-rose-950/30 text-rose-300 border border-rose-500/20 hover:bg-rose-950/50'
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'new' ? 'bg-white' : 'bg-rose-500'}`} />
-              {panelLang === 'es' ? 'No contestados' : 'Unanswered'} ({leads.filter((l) => l.status === 'new').length})
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'new' ? 'bg-white' : 'bg-rose-500 animate-pulse'}`} />
+              <span>{panelLang === 'es' ? 'No contestados' : 'Unanswered'}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'new' ? 'bg-white/20 text-white' : 'bg-rose-900/40 text-rose-300'}`}>
+                {leads.filter((l) => l.status === 'new').length}
+              </span>
             </button>
+
             <button
               type="button"
               onClick={() => setLeadFilter('contacted')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'contacted'
-                  ? 'bg-amber-600 text-white shadow-sm ring-1 ring-amber-600'
-                  : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                  ? 'bg-amber-600 text-white shadow-md ring-1 ring-amber-500'
+                  : 'bg-amber-950/30 text-amber-300 border border-amber-500/20 hover:bg-amber-950/50'
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'contacted' ? 'bg-white' : 'bg-amber-500'}`} />
-              {panelLang === 'es' ? 'En contacto' : 'Contacted'} ({leads.filter((l) => l.status === 'contacted').length})
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'contacted' ? 'bg-white' : 'bg-amber-400'}`} />
+              <span>{panelLang === 'es' ? 'En contacto' : 'Contacted'}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'contacted' ? 'bg-white/20 text-white' : 'bg-amber-900/40 text-amber-300'}`}>
+                {leads.filter((l) => l.status === 'contacted').length}
+              </span>
             </button>
+
             <button
               type="button"
               onClick={() => setLeadFilter('approved')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'approved'
-                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-600'
-                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-500'
+                  : 'bg-emerald-950/30 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-950/50'
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'approved' ? 'bg-white' : 'bg-emerald-500'}`} />
-              {panelLang === 'es' ? 'Aprobados' : 'Accepted'} ({leads.filter((l) => l.status === 'approved').length})
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'approved' ? 'bg-white' : 'bg-emerald-400'}`} />
+              <span>{panelLang === 'es' ? 'Aprobados' : 'Accepted'}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'approved' ? 'bg-white/20 text-white' : 'bg-emerald-900/40 text-emerald-300'}`}>
+                {leads.filter((l) => l.status === 'approved').length}
+              </span>
             </button>
           </div>
 
-          {/* Lista de Leads */}
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-            {filteredLeads.map((lead) => (
-              <div
-                key={lead.id}
-                className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200/80 shadow-xs flex flex-col gap-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h4 className="font-black text-sm sm:text-base text-slate-900 tracking-tight">
-                      {lead.name}
-                    </h4>
-                    <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-medium mt-0.5">
-                      <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                      <span>{panelLang === 'es' ? 'Recibido:' : 'Received:'} {lead.date}</span>
-                    </div>
-                  </div>
-
-                  {lead.status === 'new' ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-black shrink-0">
-                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                      {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
-                    </span>
-                  ) : lead.status === 'contacted' ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black shrink-0">
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black shrink-0">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      {panelLang === 'es' ? 'Obra Aceptada' : 'Accepted'}
-                    </span>
-                  )}
+          {/* Lista de Leads (Estilo Bandeja Gmail) */}
+          <div className="space-y-3 max-h-[62vh] overflow-y-auto pr-1">
+            {filteredLeads.length === 0 ? (
+              <div className="py-12 px-4 text-center rounded-2xl bg-slate-900/50 border border-white/5 space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800/80 text-[#F0CF85] flex items-center justify-center mx-auto shadow-inner">
+                  <Inbox className="w-6 h-6" />
                 </div>
-
-                <div className="bg-white rounded-xl p-3 border border-stone-200/80 shadow-xs">
-                  <p className="text-xs sm:text-sm text-stone-700 leading-relaxed font-medium">
-                    «{lead.work_type}»
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {lead.budget_estimate && (
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200/80 text-stone-700 text-xs font-semibold">
-                      <span className="text-[10px] text-stone-400 uppercase tracking-wider font-bold">
-                        {panelLang === 'es' ? 'Presupuesto aprox:' : 'Estimated budget:'}
-                      </span>
-                      <span className="font-mono font-bold text-slate-900">
-                        {lead.budget_estimate}
-                      </span>
-                    </div>
-                  )}
-                  {lead.email && (
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-50 border border-stone-200/60 text-stone-500 text-xs font-mono">
-                      <Mail className="w-3 h-3 text-stone-400" />
-                      <span>{lead.email}</span>
-                    </div>
-                  )}
-                </div>
-
-                {lead.notes && (
-                  <div className="flex items-start gap-2 bg-amber-50/70 border border-amber-200/60 rounded-xl p-2.5 text-xs text-amber-900">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>{panelLang === 'es' ? 'Nota:' : 'Note:'}</strong> {lead.notes}
-                    </span>
-                  </div>
+                <h4 className="font-bold text-sm text-slate-200">
+                  {panelLang === 'es' ? 'No hay presupuestos en esta sección' : 'No inquiries found'}
+                </h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  {leadSearchQuery
+                    ? panelLang === 'es'
+                      ? `No hay resultados para "${leadSearchQuery}". Prueba con otro término.`
+                      : `No results for "${leadSearchQuery}".`
+                    : panelLang === 'es'
+                    ? 'Cuando un cliente solicite un presupuesto en ecuaplac.com, aparecerá aquí automáticamente.'
+                    : 'When a customer requests a quote on ecuaplac.com, it will appear here.'}
+                </p>
+                {leads.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={handleRestoreDefaultLeads}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[#F0CF85] text-xs font-bold border border-white/10 transition-all active:scale-95"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>{panelLang === 'es' ? 'Cargar ejemplos visuales' : 'Load visual examples'}</span>
+                  </button>
                 )}
-
-                <div className="pt-2 border-t border-stone-200/60 flex flex-wrap items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                        `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto.`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span>WhatsApp</span>
-                    </a>
-                    <a
-                      href={`tel:${lead.phone}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all active:scale-95"
-                    >
-                      <Phone className="w-3.5 h-3.5 text-[#C5A059]" />
-                      <span>{lead.phone}</span>
-                    </a>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {lead.status !== 'new' && (
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateLeadStatus(lead.id, 'new')}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-all active:scale-95"
-                      >
-                        {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
-                      </button>
-                    )}
-                    {lead.status !== 'contacted' && (
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateLeadStatus(lead.id, 'contacted')}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-all active:scale-95"
-                      >
-                        {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
-                      </button>
-                    )}
-                    {lead.status !== 'approved' && (
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateLeadStatus(lead.id, 'approved')}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-all active:scale-95"
-                      >
-                        {panelLang === 'es' ? 'Marcar Aprobado' : 'Mark Accepted'}
-                      </button>
-                    )}
-                  </div>
-                </div>
               </div>
-            ))}
+            ) : (
+              filteredLeads.map((lead) => {
+                const initials = lead.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase();
+
+                const isSelected = selectedLeadId === lead.id;
+
+                return (
+                  <div
+                    key={lead.id}
+                    onClick={() => setSelectedLeadId((prev) => (prev === lead.id ? null : lead.id))}
+                    className={`group relative rounded-2xl p-4 transition-all duration-200 border cursor-pointer ${
+                      isSelected
+                        ? 'bg-slate-800/95 border-amber-400/40 shadow-xl ring-1 ring-[#C5A059]/30'
+                        : 'bg-[#0F172A]/90 hover:bg-slate-800/80 border-white/5 hover:border-white/15 shadow-sm'
+                    } flex flex-col gap-3.5`}
+                  >
+                    {/* Fila Cabecera: Monograma, Nombre y Estado */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        {/* Avatar Iniciales */}
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-950 text-[#F0CF85] border border-white/10 flex items-center justify-center font-bold text-sm tracking-wider shadow-inner shrink-0 group-hover:scale-105 transition-transform">
+                          {initials || 'EC'}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                              {lead.name}
+                            </h4>
+                            <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                              #{String(lead.id || '').slice(0, 8)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                            <Clock className="w-3 h-3 text-slate-500 shrink-0" />
+                            <span>{lead.date}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Badge de Estado */}
+                      <div className="shrink-0">
+                        {lead.status === 'new' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-extrabold">
+                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                            {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
+                          </span>
+                        ) : lead.status === 'contacted' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-extrabold">
+                            <span className="w-2 h-2 rounded-full bg-amber-400" />
+                            {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-extrabold">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                            {panelLang === 'es' ? 'Obra Aceptada' : 'Accepted'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Mensaje / Tipo de Obra (Estilo Asunto de Gmail) */}
+                    <div className="bg-slate-950/70 rounded-xl p-3 border border-white/5 shadow-inner">
+                      <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
+                        «{lead.work_type}»
+                      </p>
+                    </div>
+
+                    {/* Fila de Datos: Presupuesto, Teléfono, Email */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {lead.budget_estimate && (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/80 border border-[#C5A059]/25 text-[#F0CF85] text-xs font-bold shadow-xs">
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                            {panelLang === 'es' ? 'Presupuesto:' : 'Budget:'}
+                          </span>
+                          <span className="font-mono">{lead.budget_estimate}</span>
+                        </div>
+                      )}
+
+                      {lead.phone && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyLeadInfo(lead.phone, 'Teléfono');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/50 border border-white/5 text-slate-300 hover:text-white hover:border-white/20 text-xs font-mono transition-colors"
+                          title="Clic para copiar teléfono"
+                        >
+                          <Phone className="w-3 h-3 text-[#F0CF85]" />
+                          <span>{lead.phone}</span>
+                          <Copy className="w-2.5 h-2.5 text-slate-500 ml-0.5" />
+                        </button>
+                      )}
+
+                      {lead.email && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyLeadInfo(lead.email, 'Email');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/50 border border-white/5 text-slate-400 hover:text-white hover:border-white/20 text-xs font-mono transition-colors truncate max-w-[220px]"
+                          title="Clic para copiar correo"
+                        >
+                          <Mail className="w-3 h-3 text-slate-400" />
+                          <span className="truncate">{lead.email}</span>
+                          <Copy className="w-2.5 h-2.5 text-slate-500 ml-0.5 shrink-0" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Nota interna si existe */}
+                    {lead.notes && (
+                      <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 text-xs text-amber-200/90">
+                        <Sparkles className="w-3.5 h-3.5 text-[#F0CF85] shrink-0 mt-0.5" />
+                        <span>
+                          <strong className="text-[#F0CF85]">{panelLang === 'es' ? 'Nota:' : 'Note:'}</strong> {lead.notes}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Barra de Acciones Ejecutivas 1-Tap */}
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="pt-2.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5"
+                    >
+                      {/* Botones de Contacto Directo */}
+                      <div className="flex items-center gap-2">
+                        {lead.phone && (
+                          <>
+                            <a
+                              href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone)}?text=${encodeURIComponent(
+                                `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto para: ${lead.work_type}.`
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-3.5 py-2 min-h-[40px] rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-md shadow-emerald-950/40 transition-all active:scale-95"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              <span>WhatsApp</span>
+                            </a>
+                            <a
+                              href={`tel:${lead.phone}`}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-white/10 shadow-xs transition-all active:scale-95"
+                            >
+                              <Phone className="w-3.5 h-3.5 text-[#F0CF85]" />
+                              <span>{panelLang === 'es' ? 'Llamar' : 'Call'}</span>
+                            </a>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Botones de Cambio de Estado y Borrado */}
+                      <div className="flex items-center gap-1.5 flex-wrap ml-auto">
+                        {lead.status !== 'new' && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLeadStatus(lead.id, 'new')}
+                            className="px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-bold text-rose-300 bg-rose-950/40 border border-rose-500/20 hover:bg-rose-900/40 transition-all active:scale-95"
+                          >
+                            {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
+                          </button>
+                        )}
+                        {lead.status !== 'contacted' && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLeadStatus(lead.id, 'contacted')}
+                            className="px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-bold text-amber-300 bg-amber-950/40 border border-amber-500/20 hover:bg-amber-900/40 transition-all active:scale-95"
+                          >
+                            {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
+                          </button>
+                        )}
+                        {lead.status !== 'approved' && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLeadStatus(lead.id, 'approved')}
+                            className="px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-bold text-emerald-300 bg-emerald-950/40 border border-emerald-500/20 hover:bg-emerald-900/40 transition-all active:scale-95"
+                          >
+                            {panelLang === 'es' ? 'Aprobado' : 'Accepted'}
+                          </button>
+                        )}
+
+                        {/* Botón de Borrar Lead (para limpiar los falsos fácilmente con tap target seguro) */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLead(lead.id, lead.name)}
+                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl text-rose-400 hover:text-rose-200 hover:bg-rose-950/50 border border-rose-500/20 transition-all active:scale-95 ml-1"
+                          title={panelLang === 'es' ? 'Eliminar solicitud' : 'Delete inquiry'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </Modal>
