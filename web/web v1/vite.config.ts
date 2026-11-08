@@ -9,7 +9,13 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@clientes': path.resolve(__dirname, '../clientes'),
+      'lucide-react': path.resolve(__dirname, './node_modules/lucide-react'),
+      'react': path.resolve(__dirname, './node_modules/react'),
+      'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
+      'react-router-dom': path.resolve(__dirname, './node_modules/react-router-dom'),
+      '@insforge/sdk': path.resolve(__dirname, './node_modules/@insforge/sdk'),
     },
+    dedupe: ['react', 'react-dom', 'lucide-react'],
   },
   server: {
     port: 5173,
