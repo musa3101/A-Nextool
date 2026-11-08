@@ -296,6 +296,24 @@ export const EcuaplacPortal: React.FC = () => {
   const [isForceSyncing, setIsForceSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState(false);
 
+  // Toast flotante de sincronización en tiempo real con ecuaplac.com
+  const [syncToast, setSyncToast] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'syncing';
+  } | null>(null);
+
+  const showSyncToast = (
+    message: string,
+    type: 'success' | 'error' | 'syncing' = 'success'
+  ) => {
+    setSyncToast({ message, type });
+    if (type !== 'syncing') {
+      setTimeout(() => {
+        setSyncToast(null);
+      }, 3500);
+    }
+  };
+
   const handleForceSync = async () => {
     if (isForceSyncing) return;
     setIsForceSyncing(true);
@@ -832,15 +850,53 @@ export const EcuaplacPortal: React.FC = () => {
     }
   };
 
-  const handleToggleActive = (item: EcuaplacWorkItem) => {
-    setCurrentCollection((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, active: !i.active } : i))
+  const handleToggleActive = async (item: EcuaplacWorkItem) => {
+    const newActive = !item.active;
+    const isCarousel = activeTab === 'obras';
+
+    // 1. Actualización reactiva inmediata en la interfaz
+    if (isCarousel) {
+      setWorks((prev) => prev.map((i) => (i.id === item.id ? { ...i, active: newActive } : i)));
+    } else {
+      setMoreProjects((prev) => prev.map((i) => (i.id === item.id ? { ...i, active: newActive } : i)));
+    }
+
+    showSyncToast(
+      panelLang === 'es' ? 'Sincronizando con ecuaplac.com...' : 'Syncing with ecuaplac.com...',
+      'syncing'
     );
-    addAuditLog(
-      `Foto «${item.title_es}» ${item.active ? 'ocultada' : 'publicada'}`,
-      'Ecuaplac Web',
-      'info'
-    );
+
+    try {
+      if (isCarousel) {
+        await ecuaplacConnector.saveWork({ id: item.id, active: newActive });
+      } else {
+        await ecuaplacConnector.saveProject({ id: item.id, active: newActive });
+      }
+
+      showSyncToast(
+        newActive
+          ? (panelLang === 'es' ? '¡Foto publicada en ecuaplac.com!' : 'Photo published on ecuaplac.com!')
+          : (panelLang === 'es' ? 'Foto ocultada de ecuaplac.com' : 'Photo hidden from ecuaplac.com'),
+        'success'
+      );
+      addAuditLog(
+        `Foto «${item.title_es}» ${newActive ? 'publicada' : 'ocultada'} en la web`,
+        'Ecuaplac Web',
+        'info'
+      );
+    } catch (err) {
+      console.error('Error al sincronizar visibilidad con Supabase:', err);
+      // Revertir estado local en caso de fallo
+      if (isCarousel) {
+        setWorks((prev) => prev.map((i) => (i.id === item.id ? { ...i, active: item.active } : i)));
+      } else {
+        setMoreProjects((prev) => prev.map((i) => (i.id === item.id ? { ...i, active: item.active } : i)));
+      }
+      showSyncToast(
+        panelLang === 'es' ? 'Error al actualizar en la web' : 'Error updating on website',
+        'error'
+      );
+    }
   };
 
   const handleMoveUp = async (item: EcuaplacWorkItem) => {
@@ -911,9 +967,35 @@ export const EcuaplacPortal: React.FC = () => {
     );
   };
 
-  const handleDelete = (item: EcuaplacWorkItem) => {
-    if (window.confirm(`¿Eliminar la obra "${item.title_es}"?`)) {
-      setCurrentCollection((prev) => prev.filter((i) => i.id !== item.id));
+  const handleDelete = async (item: EcuaplacWorkItem) => {
+    const isCarousel = activeTab === 'obras';
+    const confirmMsg =
+      panelLang === 'es'
+        ? `¿Eliminar definitivamente la obra "${item.title_es}" de ecuaplac.com?`
+        : `Permanently delete project "${item.title_en || item.title_es}" from ecuaplac.com?`;
+
+    if (window.confirm(confirmMsg)) {
+      if (isCarousel) {
+        setWorks((prev) => prev.filter((i) => i.id !== item.id));
+      } else {
+        setMoreProjects((prev) => prev.filter((i) => i.id !== item.id));
+      }
+
+      showSyncToast(
+        panelLang === 'es' ? 'Eliminando de ecuaplac.com...' : 'Deleting from ecuaplac.com...',
+        'syncing'
+      );
+
+      try {
+        await ecuaplacConnector.deleteItem(isCarousel ? 'works' : 'projects', item.id);
+        showSyncToast(
+          panelLang === 'es' ? '¡Obra eliminada de ecuaplac.com!' : 'Project deleted from ecuaplac.com!',
+          'success'
+        );
+      } catch (err) {
+        console.warn('Error al eliminar en Supabase:', err);
+      }
+
       addAuditLog(
         `Obra «${item.title_es}» eliminada de la web`,
         'Ecuaplac Web',
@@ -929,9 +1011,32 @@ export const EcuaplacPortal: React.FC = () => {
       return;
     }
 
-    const finalImage =
+    let finalImage =
       formImageUrl.trim() ||
       'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
+
+    const isCarousel = formTargetGallery === 'carousel';
+
+    // Si la imagen proviene de la cámara/galería (base64 DataURL), subirla a Supabase Storage
+    if (finalImage.startsWith('data:')) {
+      showSyncToast(
+        panelLang === 'es' ? 'Subiendo fotografía a la web...' : 'Uploading photo to website...',
+        'syncing'
+      );
+      try {
+        const resBlob = await fetch(finalImage);
+        const blob = await resBlob.blob();
+        const uploadedUrl = await ecuaplacConnector.uploadPhoto(
+          blob,
+          isCarousel ? 'carousel' : 'gallery'
+        );
+        if (uploadedUrl) {
+          finalImage = uploadedUrl;
+        }
+      } catch (err) {
+        console.warn('Fallo al subir a Storage, continuando con la imagen:', err);
+      }
+    }
 
     // Generación automática inteligente si se deja en blanco
     let finalTitleEn = formTitleEn.trim();
@@ -942,7 +1047,10 @@ export const EcuaplacPortal: React.FC = () => {
       if (!finalTitleDe) finalTitleDe = autoTr.titleDe;
     }
 
-    const isCarousel = formTargetGallery === 'carousel';
+    showSyncToast(
+      panelLang === 'es' ? 'Publicando en ecuaplac.com...' : 'Publishing to ecuaplac.com...',
+      'syncing'
+    );
 
     if (editingItem) {
       const updatedItem: EcuaplacWorkItem = {
@@ -958,10 +1066,26 @@ export const EcuaplacPortal: React.FC = () => {
 
       if (isCarousel) {
         setWorks((prev) => prev.map((i) => (i.id === editingItem.id ? updatedItem : i)));
-        ecuaplacConnector.saveWork(updatedItem);
+        try {
+          await ecuaplacConnector.saveWork(updatedItem);
+          showSyncToast(
+            panelLang === 'es' ? '¡Obra actualizada en ecuaplac.com!' : 'Project updated on ecuaplac.com!',
+            'success'
+          );
+        } catch (e) {
+          console.warn('Error al guardar en Supabase:', e);
+        }
       } else {
         setMoreProjects((prev) => prev.map((i) => (i.id === editingItem.id ? updatedItem : i)));
-        ecuaplacConnector.saveProject(updatedItem);
+        try {
+          await ecuaplacConnector.saveProject(updatedItem);
+          showSyncToast(
+            panelLang === 'es' ? '¡Proyecto actualizado en ecuaplac.com!' : 'Project updated on ecuaplac.com!',
+            'success'
+          );
+        } catch (e) {
+          console.warn('Error al guardar en Supabase:', e);
+        }
       }
 
       addAuditLog(`Obra editada: «${formTitleEs}»`, 'Ecuaplac Web', 'success');
@@ -980,11 +1104,27 @@ export const EcuaplacPortal: React.FC = () => {
 
       if (isCarousel) {
         setWorks((prev) => [newItem, ...prev]);
-        ecuaplacConnector.saveWork(newItem);
+        try {
+          await ecuaplacConnector.saveWork(newItem);
+          showSyncToast(
+            panelLang === 'es' ? '¡Foto publicada en ecuaplac.com!' : 'Photo published on ecuaplac.com!',
+            'success'
+          );
+        } catch (e) {
+          console.warn('Error al guardar en Supabase:', e);
+        }
         setActiveTab('obras');
       } else {
         setMoreProjects((prev) => [newItem, ...prev]);
-        ecuaplacConnector.saveProject(newItem);
+        try {
+          await ecuaplacConnector.saveProject(newItem);
+          showSyncToast(
+            panelLang === 'es' ? '¡Proyecto publicado en ecuaplac.com!' : 'Project published on ecuaplac.com!',
+            'success'
+          );
+        } catch (e) {
+          console.warn('Error al guardar en Supabase:', e);
+        }
         setActiveTab('more_projects');
       }
 
@@ -1000,6 +1140,20 @@ export const EcuaplacPortal: React.FC = () => {
 
   return (
     <div className="w-full max-w-full min-w-0 bg-[#F4F1EA] min-h-screen text-slate-900 pb-20 sm:pb-24">
+      {/* Toast Flotante de Sincronización en Tiempo Real */}
+      {syncToast && (
+        <div className="fixed top-3.5 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold font-sans border backdrop-blur-xl bg-[#0E1726]/95 text-white border-[#C5A059]/40 select-none pointer-events-none">
+          {syncToast.type === 'syncing' ? (
+            <RefreshCw className="w-3.5 h-3.5 text-[#F0CF85] animate-spin shrink-0" />
+          ) : syncToast.type === 'success' ? (
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+          )}
+          <span className="tracking-wide truncate">{syncToast.message}</span>
+        </div>
+      )}
+
       {/* 1. Header Oficial de Ecuaplac (Deep Sapphire Navy & Gold Trim) */}
       <header className="sticky top-0 z-30 bg-[#0E1726]/95 backdrop-blur-xl border-b border-blue-500/20 shadow-[0_4px_24px_rgba(14,23,38,0.35)] px-4 sm:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -1657,7 +1811,7 @@ export const EcuaplacPortal: React.FC = () => {
             <div className="px-3.5 pt-1 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
               <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider font-display">
-                Cuenta
+                {panelLang === 'es' ? 'Cuenta' : 'Account'}
               </h4>
             </div>
             <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
@@ -1665,7 +1819,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsProfileModalOpen(true)}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none"
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-xs shrink-0">
@@ -1673,10 +1827,10 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
-                      Gestionar Perfil
+                      {panelLang === 'es' ? 'Gestionar Perfil' : 'Manage Profile'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
-                      Nombre visible y foto de avatar
+                      {panelLang === 'es' ? 'Nombre visible y foto de avatar' : 'Visible name and avatar photo'}
                     </span>
                   </div>
                 </div>
@@ -1687,7 +1841,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsSecurityModalOpen(true)}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none"
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/70 flex items-center justify-center text-[#B38E46] shadow-xs shrink-0">
@@ -1695,10 +1849,10 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
-                      Seguridad y Clave
+                      {panelLang === 'es' ? 'Seguridad y Clave' : 'Security & Password'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
-                      Actualizar contraseña de acceso
+                      {panelLang === 'es' ? 'Actualizar contraseña de acceso' : 'Update access password'}
                     </span>
                   </div>
                 </div>
@@ -1713,10 +1867,10 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
-                      Notificaciones
+                      {panelLang === 'es' ? 'Notificaciones' : 'Notifications'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
-                      {notificationFeedback || 'Avisos de nuevos presupuestos'}
+                      {notificationFeedback || (panelLang === 'es' ? 'Avisos de nuevos presupuestos' : 'New quote request alerts')}
                     </span>
                   </div>
                 </div>
@@ -1774,7 +1928,7 @@ export const EcuaplacPortal: React.FC = () => {
             <div className="px-3.5 pt-1 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
               <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider font-display">
-                Sistema & Dispositivo
+                {panelLang === 'es' ? 'Sistema & Dispositivo' : 'System & Device'}
               </h4>
             </div>
             <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
@@ -1786,12 +1940,12 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
-                      Sesión en este Móvil
+                      {panelLang === 'es' ? 'Sesión en este Móvil' : 'Session on this Device'}
                     </span>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                       <span className="text-[11.5px] text-stone-500 font-normal truncate block font-sans">
-                        {deviceFeedback || 'Activa · Entrada automática segura'}
+                        {deviceFeedback || (panelLang === 'es' ? 'Activa · Entrada automática segura' : 'Active · Secure automatic sign-in')}
                       </span>
                     </div>
                   </div>
@@ -1800,13 +1954,21 @@ export const EcuaplacPortal: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setDeviceFeedback('Dispositivo olvidado. Pedirá clave en la próxima entrada.');
+                      setDeviceFeedback(
+                        panelLang === 'es'
+                          ? 'Dispositivo olvidado. Pedirá clave en la próxima entrada.'
+                          : 'Device forgotten. Password required next time.'
+                      );
+                      showSyncToast(
+                        panelLang === 'es' ? 'Sesión reiniciada en este móvil' : 'Session reset on this device',
+                        'success'
+                      );
                       addAuditLog('Preferencia de sesión actualizada: Olvidar este móvil', 'Ecuaplac App', 'info');
                     }}
-                    className="text-[11px] font-bold text-stone-600 hover:text-rose-600 bg-stone-100 hover:bg-rose-50 hover:border-rose-200 px-3 py-1.5 rounded-full border border-stone-200 transition-all active:scale-95 font-sans"
-                    title="Olvidar inicio automático en este móvil"
+                    className="text-[11px] font-bold text-stone-600 hover:text-rose-600 bg-stone-100 hover:bg-rose-50 hover:border-rose-200 px-3 py-1.5 rounded-full border border-stone-200 transition-all active:scale-95 font-sans cursor-pointer"
+                    title={panelLang === 'es' ? 'Olvidar inicio automático en este móvil' : 'Forget auto-login on this device'}
                   >
-                    Olvidar
+                    {panelLang === 'es' ? 'Olvidar' : 'Forget'}
                   </button>
                 </div>
               </div>
@@ -1816,7 +1978,7 @@ export const EcuaplacPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsUpdatesExpanded(!isUpdatesExpanded)}
-                  className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none"
+                  className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
                 >
                   <div className="flex items-center gap-3.5">
                     <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-700 shadow-xs shrink-0">
@@ -1825,21 +1987,23 @@ export const EcuaplacPortal: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
-                          Actualizaciones
+                          {panelLang === 'es' ? 'Actualizaciones' : 'Updates'}
                         </span>
                         {updateCheckState === 'available' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 font-sans">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                            <span>Nueva v001</span>
+                            <span>{panelLang === 'es' ? 'Nueva v001' : 'New v001'}</span>
                           </span>
                         ) : updateCheckState === 'up-to-date' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-sans">
-                            <span>Al día</span>
+                            <span>{panelLang === 'es' ? 'Al día' : 'Up to date'}</span>
                           </span>
                         ) : null}
                       </div>
                       <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
-                        Versión {installedVersion} · Sistema Next Tools
+                        {panelLang === 'es'
+                          ? `Versión ${installedVersion} · Sistema Next Tools`
+                          : `Version ${installedVersion} · Next Tools System`}
                       </span>
                     </div>
                   </div>
@@ -1862,10 +2026,10 @@ export const EcuaplacPortal: React.FC = () => {
                     <div className="flex items-center justify-between py-1">
                       <div>
                         <span className="text-xs font-bold text-slate-800 block">
-                          Buscar actualizaciones automáticamente
+                          {panelLang === 'es' ? 'Buscar actualizaciones automáticamente' : 'Check for updates automatically'}
                         </span>
                         <span className="text-[11px] text-stone-500 font-medium">
-                          Comprueba mejoras lanzadas en tiempo real
+                          {panelLang === 'es' ? 'Comprueba mejoras lanzadas en tiempo real' : 'Checks for live improvements in real time'}
                         </span>
                       </div>
                       <button
@@ -1889,10 +2053,10 @@ export const EcuaplacPortal: React.FC = () => {
                         <button
                           type="button"
                           onClick={handleCheckUpdates}
-                          className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 text-white font-bold text-xs shadow-xs hover:bg-slate-800 active:scale-98 transition-all"
+                          className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 text-white font-bold text-xs shadow-xs hover:bg-slate-800 active:scale-98 transition-all cursor-pointer font-sans"
                         >
                           <RefreshCw className="w-3.5 h-3.5 text-[#C5A059]" />
-                          <span>Buscar actualizaciones</span>
+                          <span>{panelLang === 'es' ? 'Buscar actualizaciones' : 'Check for updates'}</span>
                         </button>
                       </div>
                     )}
@@ -1903,10 +2067,10 @@ export const EcuaplacPortal: React.FC = () => {
                         <Loader2 className="w-4 h-4 text-[#C5A059] animate-spin shrink-0" />
                         <div className="min-w-0">
                           <span className="text-xs font-bold text-slate-800 block">
-                            Comprobando compilación...
+                            {panelLang === 'es' ? 'Comprobando compilación...' : 'Checking build...'}
                           </span>
                           <span className="text-[11px] text-stone-500 font-medium">
-                            Conectando con Next Tools Core
+                            {panelLang === 'es' ? 'Conectando con Next Tools Core' : 'Connecting to Next Tools Core'}
                           </span>
                         </div>
                       </div>
@@ -2025,7 +2189,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsLogsModalOpen(true)}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none"
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-xs shrink-0">
@@ -2033,10 +2197,12 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
-                      Últimos Movimientos
+                      {panelLang === 'es' ? 'Últimos Movimientos' : 'Recent Activity'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
-                      Historial de fotografías y cambios en la web
+                      {panelLang === 'es'
+                        ? 'Historial de fotografías y cambios en la web'
+                        : 'History of photos and website changes'}
                     </span>
                   </div>
                 </div>
@@ -2052,10 +2218,16 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setDeviceFeedback('Sesión cerrada en este dispositivo.');
+                  setDeviceFeedback(
+                    panelLang === 'es' ? 'Sesión cerrada en este dispositivo.' : 'Session signed out on this device.'
+                  );
+                  showSyncToast(
+                    panelLang === 'es' ? 'Sesión cerrada correctamente' : 'Signed out successfully',
+                    'success'
+                  );
                   addAuditLog('Cierre de sesión manual', 'Ecuaplac App', 'info');
                 }}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-rose-50/50 transition-colors active:bg-rose-50 select-none group"
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-rose-50/50 transition-colors active:bg-rose-50 select-none group cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shadow-xs shrink-0">
@@ -2063,10 +2235,10 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-sm font-black text-rose-600 block group-hover:text-rose-700 font-display tracking-tight">
-                      Cerrar Sesión
+                      {panelLang === 'es' ? 'Cerrar Sesión' : 'Sign Out'}
                     </span>
                     <span className="text-[11.5px] text-rose-400 font-normal block mt-0.5 leading-snug font-sans">
-                      Salir del panel de control
+                      {panelLang === 'es' ? 'Salir del panel de control' : 'Exit the control panel'}
                     </span>
                   </div>
                 </div>
@@ -2075,51 +2247,23 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Pie de Marca Next Tools & Versión 000 (Ajustado para Scroll Óptimo) */}
-          <div className="pt-5 pb-2 flex flex-col items-center justify-center text-center select-none">
-            {/* Isotipo Elegante y Moderno de Next Tools */}
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#141C2B] via-[#0B111E] to-[#05080E] p-1 shadow-[0_4px_16px_rgba(0,0,0,0.22),inset_0_1px_1px_rgba(255,255,255,0.18)] border border-[#C5A059]/40 flex items-center justify-center mb-1.5 transition-transform hover:scale-105">
-              <svg
-                viewBox="0 0 32 32"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-5 h-5"
-              >
-                <defs>
-                  <linearGradient id="ntGoldGrad" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#FDE68A" />
-                    <stop offset="50%" stopColor="#C5A059" />
-                    <stop offset="100%" stopColor="#927233" />
-                  </linearGradient>
-                  <linearGradient id="ntWhiteGrad" x1="12" y1="6" x2="26" y2="26" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#FFFFFF" />
-                    <stop offset="100%" stopColor="#E2E8F0" />
-                  </linearGradient>
-                </defs>
-                {/* Monograma NT Interconectado */}
-                <path
-                  d="M7 23V9L15 20.5V9"
-                  stroke="url(#ntGoldGrad)"
-                  strokeWidth="2.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M17.5 9H25M21 9V23"
-                  stroke="url(#ntWhiteGrad)"
-                  strokeWidth="2.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="21" cy="6.2" r="1.1" fill="url(#ntGoldGrad)" />
-              </svg>
+          {/* Pie de Marca NexTool & Versión Oficial (Fiel a la Captura de Referencia de Musa) */}
+          <div className="pt-6 pb-2 flex flex-col items-center justify-center text-center select-none">
+            {/* Squircle Badge con el Logotipo Oficial NexTool Sin Fondo */}
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[22px] bg-gradient-to-b from-[#141A28] to-[#0A0E18] p-2.5 shadow-[0_8px_20px_rgba(10,16,28,0.22),inset_0_1px_1px_rgba(255,255,255,0.15)] border border-stone-800/80 flex items-center justify-center mb-2.5 transition-transform hover:scale-105">
+              <img
+                src="/icons/nextool-sinfondo.png"
+                alt="NexTool"
+                className="w-full h-full object-contain filter drop-shadow-[0_2px_6px_rgba(235,94,85,0.25)]"
+                loading="lazy"
+              />
             </div>
 
-            <span className="text-[11px] font-black tracking-[0.24em] text-slate-800 uppercase">
-              Next Tools
+            <span className="text-[12.5px] sm:text-[13px] font-black tracking-[0.24em] text-[#0F172A] uppercase font-display">
+              NEXT TOOLS
             </span>
 
-            <span className="text-[10px] font-mono font-bold text-stone-400 mt-0.5 tracking-wider">
+            <span className="text-[11px] font-mono font-medium text-stone-400 mt-0.5 tracking-wider">
               Versión {installedVersion}
             </span>
           </div>
@@ -2472,8 +2616,12 @@ export const EcuaplacPortal: React.FC = () => {
       <Modal
         isOpen={isLeadsModalOpen}
         onClose={() => setIsLeadsModalOpen(false)}
-        title="Bandeja de Presupuestos"
-        subtitle="Solicitudes de clientes recibidas desde ecuaplac.com"
+        title={panelLang === 'es' ? 'Bandeja de Presupuestos' : 'Inquiries & Quotes Inbox'}
+        subtitle={
+          panelLang === 'es'
+            ? 'Solicitudes de clientes recibidas desde ecuaplac.com'
+            : 'Customer inquiries received from ecuaplac.com'
+        }
         footer={
           <Button
             variant="secondary"
@@ -2481,7 +2629,7 @@ export const EcuaplacPortal: React.FC = () => {
             type="button"
             onClick={() => setIsLeadsModalOpen(false)}
           >
-            Cerrar
+            {panelLang === 'es' ? 'Cerrar' : 'Close'}
           </Button>
         }
       >
@@ -2497,7 +2645,7 @@ export const EcuaplacPortal: React.FC = () => {
                   : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
               }`}
             >
-              Todos ({leads.length})
+              {panelLang === 'es' ? 'Todos' : 'All'} ({leads.length})
             </button>
             <button
               type="button"
@@ -2509,7 +2657,7 @@ export const EcuaplacPortal: React.FC = () => {
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'new' ? 'bg-white' : 'bg-rose-500'}`} />
-              No contestados ({leads.filter((l) => l.status === 'new').length})
+              {panelLang === 'es' ? 'No contestados' : 'Unanswered'} ({leads.filter((l) => l.status === 'new').length})
             </button>
             <button
               type="button"
@@ -2521,7 +2669,7 @@ export const EcuaplacPortal: React.FC = () => {
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'contacted' ? 'bg-white' : 'bg-amber-500'}`} />
-              En contacto ({leads.filter((l) => l.status === 'contacted').length})
+              {panelLang === 'es' ? 'En contacto' : 'Contacted'} ({leads.filter((l) => l.status === 'contacted').length})
             </button>
             <button
               type="button"
@@ -2533,7 +2681,7 @@ export const EcuaplacPortal: React.FC = () => {
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'approved' ? 'bg-white' : 'bg-emerald-500'}`} />
-              Aprobados ({leads.filter((l) => l.status === 'approved').length})
+              {panelLang === 'es' ? 'Aprobados' : 'Accepted'} ({leads.filter((l) => l.status === 'approved').length})
             </button>
           </div>
 
@@ -2551,24 +2699,24 @@ export const EcuaplacPortal: React.FC = () => {
                     </h4>
                     <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-medium mt-0.5">
                       <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                      <span>Recibido: {lead.date}</span>
+                      <span>{panelLang === 'es' ? 'Recibido:' : 'Received:'} {lead.date}</span>
                     </div>
                   </div>
 
                   {lead.status === 'new' ? (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-black shrink-0">
                       <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                      No Contestado
+                      {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
                     </span>
                   ) : lead.status === 'contacted' ? (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black shrink-0">
                       <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      En Contacto
+                      {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black shrink-0">
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      Obra Aceptada
+                      {panelLang === 'es' ? 'Obra Aceptada' : 'Accepted'}
                     </span>
                   )}
                 </div>
@@ -2583,7 +2731,7 @@ export const EcuaplacPortal: React.FC = () => {
                   {lead.budget_estimate && (
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200/80 text-stone-700 text-xs font-semibold">
                       <span className="text-[10px] text-stone-400 uppercase tracking-wider font-bold">
-                        Presupuesto aprox:
+                        {panelLang === 'es' ? 'Presupuesto aprox:' : 'Estimated budget:'}
                       </span>
                       <span className="font-mono font-bold text-slate-900">
                         {lead.budget_estimate}
@@ -2602,7 +2750,7 @@ export const EcuaplacPortal: React.FC = () => {
                   <div className="flex items-start gap-2 bg-amber-50/70 border border-amber-200/60 rounded-xl p-2.5 text-xs text-amber-900">
                     <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                     <span>
-                      <strong>Nota:</strong> {lead.notes}
+                      <strong>{panelLang === 'es' ? 'Nota:' : 'Note:'}</strong> {lead.notes}
                     </span>
                   </div>
                 )}
@@ -2636,7 +2784,7 @@ export const EcuaplacPortal: React.FC = () => {
                         onClick={() => handleUpdateLeadStatus(lead.id, 'new')}
                         className="px-2.5 py-1 rounded-full text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-all active:scale-95"
                       >
-                        No Contestado
+                        {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
                       </button>
                     )}
                     {lead.status !== 'contacted' && (
@@ -2645,7 +2793,7 @@ export const EcuaplacPortal: React.FC = () => {
                         onClick={() => handleUpdateLeadStatus(lead.id, 'contacted')}
                         className="px-2.5 py-1 rounded-full text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-all active:scale-95"
                       >
-                        En Contacto
+                        {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
                       </button>
                     )}
                     {lead.status !== 'approved' && (
@@ -2654,7 +2802,7 @@ export const EcuaplacPortal: React.FC = () => {
                         onClick={() => handleUpdateLeadStatus(lead.id, 'approved')}
                         className="px-2.5 py-1 rounded-full text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-all active:scale-95"
                       >
-                        Marcar Aprobado
+                        {panelLang === 'es' ? 'Marcar Aprobado' : 'Mark Accepted'}
                       </button>
                     )}
                   </div>
@@ -2669,8 +2817,12 @@ export const EcuaplacPortal: React.FC = () => {
       <Modal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        title="Gestionar Perfil"
-        subtitle="Nombre del gestor y avatar visible en el portal de Ecuaplac"
+        title={panelLang === 'es' ? 'Gestionar Perfil' : 'Manage Profile'}
+        subtitle={
+          panelLang === 'es'
+            ? 'Nombre del gestor y avatar visible en el portal de Ecuaplac'
+            : 'Manager name and visible avatar on the Ecuaplac portal'
+        }
         footer={
           <>
             <Button
@@ -2679,7 +2831,7 @@ export const EcuaplacPortal: React.FC = () => {
               type="button"
               onClick={() => setIsProfileModalOpen(false)}
             >
-              Cerrar
+              {panelLang === 'es' ? 'Cerrar' : 'Close'}
             </Button>
             <Button
               variant="primary"
@@ -2690,7 +2842,7 @@ export const EcuaplacPortal: React.FC = () => {
                 setIsProfileModalOpen(false);
               }}
             >
-              Guardar Cambios
+              {panelLang === 'es' ? 'Guardar Cambios' : 'Save Changes'}
             </Button>
           </>
         }
@@ -2716,7 +2868,7 @@ export const EcuaplacPortal: React.FC = () => {
                 </div>
               </div>
               <span className="block text-center text-xs text-stone-500 font-bold mt-2 group-hover:text-[#C5A059] transition-colors">
-                Toca para cambiar fotografía
+                {panelLang === 'es' ? 'Toca para cambiar fotografía' : 'Tap to change photo'}
               </span>
             </div>
             <input
@@ -2730,13 +2882,13 @@ export const EcuaplacPortal: React.FC = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-800 mb-1">
-              Nombre en el Panel
+              {panelLang === 'es' ? 'Nombre en el Panel' : 'Display Name'}
             </label>
             <input
               type="text"
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
-              placeholder="Ej. José Rivadeneira"
+              placeholder={panelLang === 'es' ? 'Ej. José Rivadeneira' : 'e.g. José Rivadeneira'}
               className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
             />
           </div>
@@ -2792,8 +2944,12 @@ export const EcuaplacPortal: React.FC = () => {
           setIsSecurityModalOpen(false);
           setPasswordFeedback(null);
         }}
-        title="Seguridad y Clave de Acceso"
-        subtitle="Actualiza la contraseña del administrador para ecuaplacbyjyg@gmail.com"
+        title={panelLang === 'es' ? 'Seguridad y Clave de Acceso' : 'Security & Access Password'}
+        subtitle={
+          panelLang === 'es'
+            ? 'Actualiza la contraseña del administrador para ecuaplacbyjyg@gmail.com'
+            : 'Update administrator password for ecuaplacbyjyg@gmail.com'
+        }
         footer={
           <>
             <Button
@@ -2805,7 +2961,7 @@ export const EcuaplacPortal: React.FC = () => {
                 setPasswordFeedback(null);
               }}
             >
-              Cancelar
+              {panelLang === 'es' ? 'Cancelar' : 'Cancel'}
             </Button>
             <Button
               variant="primary"
@@ -2813,7 +2969,7 @@ export const EcuaplacPortal: React.FC = () => {
               type="submit"
               form="ecuaplac-security-form"
             >
-              Guardar Contraseña
+              {panelLang === 'es' ? 'Guardar Contraseña' : 'Save Password'}
             </Button>
           </>
         }
@@ -2825,42 +2981,50 @@ export const EcuaplacPortal: React.FC = () => {
         >
           <div>
             <label className="block text-xs font-bold text-slate-800 mb-1">
-              Contraseña Actual *
+              {panelLang === 'es' ? 'Contraseña Actual *' : 'Current Password *'}
             </label>
             <input
               type="password"
               required
               value={currPass}
               onChange={(e) => setCurrPass(e.target.value)}
-              placeholder="Introduce la contraseña actual (ej. admin)"
+              placeholder={
+                panelLang === 'es'
+                  ? 'Introduce la contraseña actual (ej. admin)'
+                  : 'Enter current password (e.g. admin)'
+              }
               className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-800 mb-1">
-              Nueva Contraseña *
+              {panelLang === 'es' ? 'Nueva Contraseña *' : 'New Password *'}
             </label>
             <input
               type="password"
               required
               value={newPass}
               onChange={(e) => setNewPass(e.target.value)}
-              placeholder="Mínimo 4 caracteres"
+              placeholder={
+                panelLang === 'es' ? 'Mínimo 4 caracteres' : 'Minimum 4 characters'
+              }
               className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-800 mb-1">
-              Confirmar Nueva Contraseña *
+              {panelLang === 'es' ? 'Confirmar Nueva Contraseña *' : 'Confirm New Password *'}
             </label>
             <input
               type="password"
               required
               value={confirmPass}
               onChange={(e) => setConfirmPass(e.target.value)}
-              placeholder="Repite la nueva contraseña"
+              placeholder={
+                panelLang === 'es' ? 'Repite la nueva contraseña' : 'Repeat the new password'
+              }
               className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
             />
           </div>
@@ -2888,8 +3052,12 @@ export const EcuaplacPortal: React.FC = () => {
       <Modal
         isOpen={isLogsModalOpen}
         onClose={() => setIsLogsModalOpen(false)}
-        title="Últimos Movimientos"
-        subtitle="Registro de cambios, subidas de fotografías y actividad en la web"
+        title={panelLang === 'es' ? 'Últimos Movimientos' : 'Recent Activity'}
+        subtitle={
+          panelLang === 'es'
+            ? 'Registro de cambios, subidas de fotografías y actividad en la web'
+            : 'Log of changes, photo uploads, and web activity'
+        }
         footer={
           <Button
             variant="secondary"
@@ -2897,14 +3065,16 @@ export const EcuaplacPortal: React.FC = () => {
             type="button"
             onClick={() => setIsLogsModalOpen(false)}
           >
-            Cerrar
+            {panelLang === 'es' ? 'Cerrar' : 'Close'}
           </Button>
         }
       >
         <div className="space-y-3 pt-1">
           <div className="flex items-center justify-between">
             <span className="text-xs text-stone-500 font-medium">
-              Actividad en tiempo real ({logs.length})
+              {panelLang === 'es'
+                ? `Actividad en tiempo real (${logs.length})`
+                : `Real-time activity (${logs.length})`}
             </span>
             <button
               type="button"
@@ -2912,7 +3082,7 @@ export const EcuaplacPortal: React.FC = () => {
               className="text-xs font-bold text-slate-900 hover:text-[#C5A059] flex items-center gap-1.5 bg-stone-100 active:scale-95 px-3 py-1.5 rounded-xl border border-stone-200 transition-all"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[#C5A059] ${isRefreshingLogs ? 'animate-spin' : ''}`} />
-              <span>Refrescar</span>
+              <span>{panelLang === 'es' ? 'Refrescar' : 'Refresh'}</span>
             </button>
           </div>
 
@@ -2944,15 +3114,18 @@ export const EcuaplacPortal: React.FC = () => {
           setIsInvoiceViewerOpen(false);
           setSelectedInvoiceForView(null);
         }}
-        title={selectedInvoiceForView?.number ? `${selectedInvoiceForView.number} • ${selectedInvoiceForView.name}` : selectedInvoiceForView?.name || 'Factura Oficial'}
-        subtitle="Documento tributario oficial emitido por Ecuaplac J&G S.L."
-        maxWidth="xl"
+        title={selectedInvoiceForView?.number ? `${selectedInvoiceForView.number} • ${selectedInvoiceForView.name}` : selectedInvoiceForView?.name || (panelLang === 'es' ? 'Factura Oficial' : 'Official Invoice')}
+        subtitle={panelLang === 'es' ? 'Documento tributario oficial emitido por Ecuaplac J&G S.L.' : 'Official tax document issued by Ecuaplac J&G S.L.'}
+        maxWidth="2xl"
         footer={
-          <div className="flex items-center justify-between w-full">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between w-full gap-2.5">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs text-stone-600 font-sans font-medium">
-                Estado: <span className="font-bold text-emerald-700 capitalize">{selectedInvoiceForView?.status || 'Oficial'}</span>
+                {panelLang === 'es' ? 'Estado:' : 'Status:'}{' '}
+                <span className="font-bold text-emerald-700 capitalize">
+                  {selectedInvoiceForView?.status || (panelLang === 'es' ? 'Oficial' : 'Official')}
+                </span>
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -2964,40 +3137,62 @@ export const EcuaplacPortal: React.FC = () => {
                   setIsInvoiceViewerOpen(false);
                   setSelectedInvoiceForView(null);
                 }}
+                className="flex-1 sm:flex-none cursor-pointer"
               >
-                Cerrar
+                {panelLang === 'es' ? '← Volver atrás' : '← Go back'}
               </Button>
               {selectedInvoiceForView?.fileUrl ? (
                 <a
                   href={selectedInvoiceForView.fileUrl}
                   download={selectedInvoiceForView.name}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all font-sans"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all font-sans flex-1 sm:flex-none"
                 >
                   <Download className="w-3.5 h-3.5 text-[#C5A059]" />
-                  <span>Descargar PDF</span>
+                  <span>{panelLang === 'es' ? 'Descargar PDF' : 'Download PDF'}</span>
                 </a>
               ) : (
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all font-sans cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all font-sans cursor-pointer flex-1 sm:flex-none"
                 >
                   <Download className="w-3.5 h-3.5 text-[#C5A059]" />
-                  <span>Imprimir / Descargar</span>
+                  <span>{panelLang === 'es' ? 'Imprimir / Descargar' : 'Print / Download'}</span>
                 </button>
               )}
             </div>
           </div>
         }
       >
-        <div className="space-y-4 pt-1">
+        <div className="space-y-3 pt-1">
           {selectedInvoiceForView?.fileUrl ? (
-            <div className="w-full h-[60vh] rounded-2xl overflow-hidden border border-stone-200 bg-stone-100 shadow-inner">
-              <iframe
-                src={selectedInvoiceForView.fileUrl}
-                title={selectedInvoiceForView.name}
-                className="w-full h-full border-none"
-              />
+            <div className="space-y-3">
+              <a
+                href={selectedInvoiceForView.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-xs font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98"
+              >
+                <ExternalLink className="w-4 h-4 text-[#C5A059]" />
+                <span>{panelLang === 'es' ? 'Abrir Factura Completa en Pantalla Completa' : 'Open Full Invoice in Fullscreen'}</span>
+              </a>
+
+              <div className="w-full max-h-[60vh] overflow-y-auto rounded-2xl border border-stone-200 bg-stone-100/90 p-2 shadow-inner flex items-center justify-center">
+                {selectedInvoiceForView.fileUrl.startsWith('data:image') ||
+                selectedInvoiceForView.fileUrl.match(/\.(jpg|jpeg|png|webp|gif)$/i) ? (
+                  <img
+                    src={selectedInvoiceForView.fileUrl}
+                    alt={selectedInvoiceForView.name}
+                    className="w-full h-auto max-h-[55vh] object-contain rounded-xl shadow-xs"
+                  />
+                ) : (
+                  <iframe
+                    src={`${selectedInvoiceForView.fileUrl}#view=FitH`}
+                    title={selectedInvoiceForView.name}
+                    className="w-full h-[55vh] rounded-xl border border-stone-200 bg-white"
+                  />
+                )}
+              </div>
             </div>
           ) : (
             /* Documento de Factura Oficial Estilo Papel A4 / PDF */
