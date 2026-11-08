@@ -459,37 +459,69 @@ export const EcuaplacPortal: React.FC = () => {
   // Dispositivo
   const [deviceFeedback, setDeviceFeedback] = useState<string | null>(null);
 
-  // Actualizaciones de Sistema Next Tools
+  // Versión del Sistema Next Tools
+  const CURRENT_SYSTEM_VERSION = '001';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
-  const [installedVersion, setInstalledVersion] = useState(() => localStorage.getItem('nextool_app_version') || '001');
+  const [installedVersion, setInstalledVersion] = useState(() => {
+    const cached = localStorage.getItem('nextool_app_version');
+    // Si la caché tenía la versión '000' vieja, la actualizamos automáticamente a '001'
+    if (!cached || cached === '000') {
+      localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
+      return CURRENT_SYSTEM_VERSION;
+    }
+    return cached;
+  });
   const [simulatedUpdateAvailable, setSimulatedUpdateAvailable] = useState(false);
 
-  const handleCheckUpdates = () => {
+  // Sincronización proactiva de versión con InsForge Cloud
+  useEffect(() => {
+    let isMounted = true;
+    ecuaplacConnector.fetchTenantVersion().then((cloudVer) => {
+      if (!isMounted) return;
+      if (cloudVer && cloudVer !== '000') {
+        if (cloudVer !== installedVersion) {
+          setSimulatedUpdateAvailable(true);
+        }
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [installedVersion]);
+
+  const handleCheckUpdates = async () => {
     setUpdateCheckState('checking');
-    setTimeout(() => {
-      if (simulatedUpdateAvailable) {
+    try {
+      const cloudVer = await ecuaplacConnector.fetchTenantVersion();
+      if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion) {
+        setSimulatedUpdateAvailable(true);
+        setUpdateCheckState('available');
+      } else if (simulatedUpdateAvailable) {
         setUpdateCheckState('available');
       } else {
         setUpdateCheckState('up-to-date');
       }
-    }, 1100);
+    } catch {
+      setUpdateCheckState('up-to-date');
+    }
   };
 
-  const handleInstallUpdate = () => {
+  const handleInstallUpdate = async () => {
     setUpdateCheckState('installing');
-    const nextVer = '002';
+    const targetVer = simulatedUpdateAvailable ? '002' : CURRENT_SYSTEM_VERSION;
+    try {
+      await ecuaplacConnector.updateTenantVersion(targetVer);
+    } catch {}
     setTimeout(() => {
       setUpdateCheckState('installed');
-      setInstalledVersion(nextVer);
-      localStorage.setItem('nextool_app_version', nextVer);
+      setInstalledVersion(targetVer);
+      localStorage.setItem('nextool_app_version', targetVer);
       setSimulatedUpdateAvailable(false);
-      addAuditLog(`Actualización aplicada: Versión ${nextVer} instalada`, 'Next Tools Core', 'success');
+      addAuditLog(`Actualización aplicada: Versión ${targetVer} en producción`, 'Next Tools Core', 'success');
       setTimeout(() => {
         window.location.reload();
-      }, 1800);
-    }, 1600);
+      }, 1400);
+    }, 1200);
   };
 
   // Facturas y Documentos del Proyecto (Plegadas / Escondiditas por defecto)
@@ -659,11 +691,13 @@ export const EcuaplacPortal: React.FC = () => {
     setIsInvoiceViewerOpen(true);
   };
 
-  const handleOpenFullscreenInvoice = (fileUrl?: string) => {
+  const handleOpenFullscreenInvoice = (fileUrl?: string, fileName?: string) => {
     if (!fileUrl) {
       window.print();
       return;
     }
+    const targetName = fileName || selectedInvoiceForView?.name || 'Factura_Ecuaplac.pdf';
+
     if (fileUrl.startsWith('data:')) {
       try {
         const parts = fileUrl.split(',');
@@ -675,16 +709,25 @@ export const EcuaplacPortal: React.FC = () => {
         }
         const blob = new Blob([byteNumbers], { type: mime });
         const blobUrl = URL.createObjectURL(blob);
-        const win = window.open(blobUrl, '_blank');
-        if (!win) {
-          window.location.href = blobUrl;
-        }
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = targetName;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
         return;
       } catch (e) {
-        console.warn('Error al decodificar data URL para pantalla completa:', e);
+        console.warn('Error al decodificar data URL para descarga:', e);
       }
     }
-    window.open(fileUrl, '_blank');
+    const a = document.createElement('a');
+    a.href = fileUrl;
+    a.download = targetName;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handleUploadInvoice = handleUploadDoc;
@@ -743,30 +786,68 @@ export const EcuaplacPortal: React.FC = () => {
     addAuditLog(`Nombre de administrador cambiado a: "${trimmed}"`, 'Ecuaplac App', 'success');
   };
 
-  const handleSavePassword = (e: React.FormEvent) => {
+  const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (currPass !== 'admin' && currPass !== 'ecuaplac2024') {
-      setPasswordFeedback({ type: 'error', msg: 'La contraseña actual no es válida (usa "admin")' });
+    if (!currPass) {
+      setPasswordFeedback({
+        type: 'error',
+        msg: panelLang === 'es' ? 'Introduce la contraseña actual (inicial: admin)' : 'Enter current password (default: admin)',
+      });
       return;
     }
     if (newPass.length < 4) {
-      setPasswordFeedback({ type: 'error', msg: 'La nueva contraseña debe tener al menos 4 caracteres' });
+      setPasswordFeedback({
+        type: 'error',
+        msg: panelLang === 'es' ? 'La nueva contraseña debe tener al menos 4 caracteres' : 'New password must be at least 4 characters',
+      });
       return;
     }
     if (newPass !== confirmPass) {
-      setPasswordFeedback({ type: 'error', msg: 'Las contraseñas no coinciden' });
+      setPasswordFeedback({
+        type: 'error',
+        msg: panelLang === 'es' ? 'Las nuevas contraseñas no coinciden' : 'New passwords do not match',
+      });
       return;
     }
-    setPasswordFeedback({ type: 'success', msg: '¡Contraseña actualizada correctamente!' });
-    setCurrPass('');
-    setNewPass('');
-    setConfirmPass('');
-    setTimeout(() => setPasswordFeedback(null), 4000);
-    setLogs((prev) => [
-      { id: String(Date.now()), action: 'Contraseña de administrador actualizada', time: 'Ahora mismo', type: 'security' },
-      ...prev,
-    ]);
-    addAuditLog('Contraseña de administrador actualizada', 'Ecuaplac App', 'success');
+
+    try {
+      const emailToUpdate = session.email || 'ecuaplacbyjyg@gmail.com';
+      const { data, error } = await insforge.database.rpc('change_user_password', {
+        p_email: emailToUpdate,
+        p_current_password: currPass,
+        p_new_password: newPass,
+      });
+
+      if (error || !data?.success) {
+        setPasswordFeedback({
+          type: 'error',
+          msg: data?.error || error?.message || (panelLang === 'es' ? 'Error al actualizar contraseña' : 'Failed to update password'),
+        });
+        return;
+      }
+
+      setPasswordFeedback({
+        type: 'success',
+        msg: panelLang === 'es' ? '¡Contraseña actualizada en el servidor InsForge!' : 'Password updated on InsForge server!',
+      });
+      setCurrPass('');
+      setNewPass('');
+      setConfirmPass('');
+      setTimeout(() => {
+        setIsSecurityModalOpen(false);
+        setPasswordFeedback(null);
+      }, 2000);
+      showSyncToast(
+        panelLang === 'es' ? 'Contraseña sincronizada con InsForge' : 'Password synced with InsForge',
+        'success'
+      );
+      addAuditLog('Contraseña de administrador actualizada en InsForge', 'Ecuaplac App', 'success');
+    } catch (err: any) {
+      setPasswordFeedback({
+        type: 'error',
+        msg: err.message || (panelLang === 'es' ? 'Error de conexión con el servidor' : 'Server connection error'),
+      });
+    }
   };
 
   const handleToggleNotifications = async (checked: boolean) => {
@@ -1280,7 +1361,7 @@ export const EcuaplacPortal: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Introduce tu contraseña"
+                    placeholder="Introduce tu contraseña (inicial: admin)"
                     required
                     className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-stone-200 text-xs text-slate-900 bg-stone-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C5A059] transition-all font-sans"
                   />
@@ -1329,14 +1410,14 @@ export const EcuaplacPortal: React.FC = () => {
               {/* Botones de Rápido Relleno para Pruebas / Demostración */}
               <div className="pt-3 border-t border-stone-100">
                 <span className="text-[10px] text-stone-400 uppercase tracking-wider block font-bold mb-2 text-center">
-                  Cuentas Registradas
+                  Cuentas Registradas (Clave inicial: admin)
                 </span>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       setLoginEmail('ecuaplacbyjyg@gmail.com');
-                      setLoginPassword('ecuaplac2026');
+                      setLoginPassword('admin');
                     }}
                     className="p-2 rounded-xl bg-stone-50 hover:bg-stone-100 border border-stone-200 text-left text-[11px] transition-colors cursor-pointer"
                   >
@@ -1346,8 +1427,8 @@ export const EcuaplacPortal: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setLoginEmail('musaabdul3101@gmail.com');
-                      setLoginPassword('musa2026');
+                      setLoginEmail('mynextbymusa@gmail.com');
+                      setLoginPassword('admin');
                     }}
                     className="p-2 rounded-xl bg-amber-50/60 hover:bg-amber-100/60 border border-amber-200 text-left text-[11px] transition-colors cursor-pointer"
                   >
@@ -1397,7 +1478,7 @@ export const EcuaplacPortal: React.FC = () => {
       )}
 
       {/* 1. Header Oficial de Ecuaplac (Deep Sapphire Navy & Gold Trim - Safe Area Nítida) */}
-      <header className="sticky top-0 z-30 bg-[#0E1726] border-b border-blue-500/20 shadow-[0_4px_20px_rgba(0,0,0,0.35)] px-4 sm:px-6 pt-[max(12px,env(safe-area-inset-top))] pb-3 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-[#0E1726] border-b border-slate-800 shadow-sm px-4 sm:px-6 pt-[max(14px,env(safe-area-inset-top))] pb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10">
             <img
@@ -3359,9 +3440,9 @@ export const EcuaplacPortal: React.FC = () => {
         }}
         title={selectedInvoiceForView?.number ? `${selectedInvoiceForView.number} • ${selectedInvoiceForView.name}` : selectedInvoiceForView?.name || (panelLang === 'es' ? 'Factura Oficial' : 'Official Invoice')}
         subtitle={panelLang === 'es' ? 'Documento tributario oficial emitido por Ecuaplac J&G S.L.' : 'Official tax document issued by Ecuaplac J&G S.L.'}
-        maxWidth="2xl"
+        maxWidth="xl"
         footer={
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between w-full gap-2.5">
+          <div className="flex flex-row items-center justify-between w-full gap-2.5">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs text-stone-600 font-sans font-medium">
@@ -3380,69 +3461,94 @@ export const EcuaplacPortal: React.FC = () => {
                   setIsInvoiceViewerOpen(false);
                   setSelectedInvoiceForView(null);
                 }}
-                className="flex-1 sm:flex-none cursor-pointer"
+                className="cursor-pointer"
               >
                 {panelLang === 'es' ? '← Volver atrás' : '← Go back'}
               </Button>
-              {selectedInvoiceForView?.fileUrl ? (
-                <a
-                  href={selectedInvoiceForView.fileUrl}
-                  download={selectedInvoiceForView.name}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all font-sans flex-1 sm:flex-none"
-                >
-                  <Download className="w-3.5 h-3.5 text-[#C5A059]" />
-                  <span>{panelLang === 'es' ? 'Descargar PDF' : 'Download PDF'}</span>
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all font-sans cursor-pointer flex-1 sm:flex-none"
-                >
-                  <Download className="w-3.5 h-3.5 text-[#C5A059]" />
-                  <span>{panelLang === 'es' ? 'Imprimir / Descargar' : 'Print / Download'}</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => handleOpenFullscreenInvoice(selectedInvoiceForView?.fileUrl, selectedInvoiceForView?.name)}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all font-sans cursor-pointer active:scale-95"
+              >
+                <Download className="w-3.5 h-3.5 text-[#C5A059]" />
+                <span>{panelLang === 'es' ? 'Descargar' : 'Download'}</span>
+              </button>
             </div>
           </div>
         }
       >
-        <div className="space-y-3 pt-1">
-          {/* Botón Abrir Factura Completa en Pantalla Completa */}
-          <button
-            type="button"
-            onClick={() => handleOpenFullscreenInvoice(selectedInvoiceForView?.fileUrl)}
-            className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-xs font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
-          >
-            <ExternalLink className="w-4 h-4 text-[#C5A059]" />
-            <span>{panelLang === 'es' ? 'Abrir Factura Completa en Pantalla Completa' : 'Open Full Invoice in Fullscreen'}</span>
-          </button>
-
+        <div className="space-y-4 pt-1">
           {selectedInvoiceForView?.fileUrl ? (
-            <div className="space-y-2">
-              {/* Contenedor adaptativo con scroll horizontal y vertical táctil para no recortar la factura en móvil */}
-              <div className="w-full rounded-2xl border border-stone-200 bg-stone-100/90 shadow-inner overflow-hidden">
-                {selectedInvoiceForView.fileUrl.startsWith('data:image') ||
-                selectedInvoiceForView.fileUrl.match(/\.(jpg|jpeg|png|webp|gif)$/i) ? (
-                  <div className="p-2 flex items-center justify-center max-h-[50vh] overflow-y-auto">
-                    <img
-                      src={selectedInvoiceForView.fileUrl}
-                      alt={selectedInvoiceForView.name}
-                      className="w-full h-auto max-h-[48vh] object-contain rounded-xl shadow-xs"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-full overflow-x-auto overflow-y-auto max-h-[48vh] sm:max-h-[55vh] p-1 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    <div className="text-[10.5px] text-stone-500 font-bold px-2 py-1 text-center bg-stone-200/70 rounded-lg mb-1 flex items-center justify-center gap-1.5">
-                      <span>↔ {panelLang === 'es' ? 'Desliza hacia los lados para ver todas las columnas' : 'Swipe horizontally to view all columns'}</span>
-                    </div>
-                    <iframe
-                      src={`${selectedInvoiceForView.fileUrl}#view=FitH`}
-                      title={selectedInvoiceForView.name}
-                      className="w-full min-w-[550px] sm:min-w-[650px] h-[44vh] sm:h-[50vh] rounded-xl border border-stone-200 bg-white"
-                    />
-                  </div>
-                )}
+            /* Ficha de Documento PDF Oficial (Sin iframe que se recorte en iOS) */
+            <div className="rounded-3xl border border-stone-200 bg-stone-50/80 p-5 sm:p-7 text-center space-y-4">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-[#0B111E] border border-[#C5A059]/40 flex items-center justify-center text-[#C5A059] shadow-md">
+                <FileText className="w-8 h-8" />
+              </div>
+
+              <div>
+                <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold uppercase tracking-wider mb-2">
+                  ✓ {panelLang === 'es' ? 'Documento Oficial Contabilizado' : 'Official Accounting Document'}
+                </span>
+                <h4 className="text-base sm:text-lg font-black text-slate-900 font-display tracking-tight break-all">
+                  {selectedInvoiceForView.name}
+                </h4>
+                <p className="text-xs text-stone-500 font-mono mt-1">
+                  {selectedInvoiceForView.number || 'FAC-2026-001'} · {selectedInvoiceForView.fileSize || '320 KB'}
+                </p>
+              </div>
+
+              {/* Ficha Resumida */}
+              <div className="grid grid-cols-2 gap-2.5 max-w-sm mx-auto text-left text-xs bg-white p-3.5 rounded-2xl border border-stone-200/80 shadow-2xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
+                    {panelLang === 'es' ? 'Emisor' : 'Issuer'}
+                  </span>
+                  <span className="font-extrabold text-slate-800 block text-xs mt-0.5 truncate">
+                    ECUAPLAC J&G S.L.
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
+                    {panelLang === 'es' ? 'Fecha' : 'Date'}
+                  </span>
+                  <span className="font-semibold text-slate-700 block text-xs mt-0.5">
+                    {selectedInvoiceForView.issueDate || selectedInvoiceForView.uploadDate || '03/11/2026'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
+                    {panelLang === 'es' ? 'Nº Factura' : 'Invoice Nº'}
+                  </span>
+                  <span className="font-mono font-bold text-slate-900 block text-xs mt-0.5">
+                    {selectedInvoiceForView.number || 'FAC-2026-001'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
+                    {panelLang === 'es' ? 'Estado' : 'Status'}
+                  </span>
+                  <span className="font-bold text-emerald-700 block text-xs mt-0.5 capitalize">
+                    {selectedInvoiceForView.status || (panelLang === 'es' ? 'Oficial' : 'Official')}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-stone-500 max-w-md mx-auto leading-relaxed">
+                {panelLang === 'es'
+                  ? 'Descarga el documento oficial en formato PDF para visualizarlo en pantalla completa con zoom táctil y guardarlo en tu móvil.'
+                  : 'Download the official PDF document to view in fullscreen with pinch-to-zoom and save to your mobile device.'}
+              </p>
+
+              {/* Botón Principal Prominente */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenFullscreenInvoice(selectedInvoiceForView.fileUrl, selectedInvoiceForView.name)}
+                  className="w-full inline-flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-sm font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-[#C5A059]" />
+                  <span>{panelLang === 'es' ? 'Descargar Factura Oficial (PDF)' : 'Download Official Invoice (PDF)'}</span>
+                </button>
               </div>
             </div>
           ) : (
@@ -3589,7 +3695,7 @@ export const EcuaplacPortal: React.FC = () => {
           ? 'hidden opacity-0 pointer-events-none'
           : ''
       }`}>
-        <div className="pointer-events-auto w-full bg-[#0E1726] border-t border-blue-500/20 shadow-[0_-6px_24px_rgba(0,0,0,0.45)]">
+        <div className="pointer-events-auto w-full bg-[#0E1726] border-t border-slate-800 shadow-md">
           <nav className="max-w-md sm:max-w-lg mx-auto px-4 pt-2 pb-[max(12px,env(safe-area-inset-bottom))] flex items-center justify-between relative">
             {/* Tab 1: Inicio */}
             <button
