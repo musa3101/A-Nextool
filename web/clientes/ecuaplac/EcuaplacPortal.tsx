@@ -169,8 +169,36 @@ const AnimatedCounter: React.FC<{ value: number; duration?: number; suffix?: str
 };
 
 export const EcuaplacPortal: React.FC = () => {
-  const { session, stopImpersonation } = useAuth();
+  const { session, isAuthenticated, signInWithEmail, signOut, stopImpersonation } = useAuth();
   const { addAuditLog } = useTenant();
+
+  // Estados para Login con Gmail + Contraseña
+  const [loginEmail, setLoginEmail] = useState('ecuaplacbyjyg@gmail.com');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginRemember, setLoginRemember] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    if (!loginEmail || !loginPassword) {
+      setLoginError(panelLang === 'es' ? 'Introduce tu correo y contraseña' : 'Enter your email and password');
+      return;
+    }
+    setLoginLoading(true);
+    const res = await signInWithEmail(loginEmail, loginPassword, loginRemember);
+    setLoginLoading(false);
+    if (!res.success) {
+      setLoginError(res.error || (panelLang === 'es' ? 'Error al iniciar sesión' : 'Sign in failed'));
+    } else {
+      showSyncToast(
+        panelLang === 'es' ? 'Bienvenido a tu panel' : 'Welcome to your portal',
+        'success'
+      );
+    }
+  };
 
   // Tab: 'inicio' | 'obras' (Galería 1) | 'more_projects' (Galería 2) | 'ajustes'
   const [activeTab, setActiveTab] = useState<'inicio' | 'obras' | 'more_projects' | 'ajustes'>('inicio');
@@ -435,7 +463,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
-  const [installedVersion, setInstalledVersion] = useState('000');
+  const [installedVersion, setInstalledVersion] = useState(() => localStorage.getItem('nextool_app_version') || '001');
   const [simulatedUpdateAvailable, setSimulatedUpdateAvailable] = useState(false);
 
   const handleCheckUpdates = () => {
@@ -451,11 +479,13 @@ export const EcuaplacPortal: React.FC = () => {
 
   const handleInstallUpdate = () => {
     setUpdateCheckState('installing');
+    const nextVer = '002';
     setTimeout(() => {
       setUpdateCheckState('installed');
-      setInstalledVersion('001');
+      setInstalledVersion(nextVer);
+      localStorage.setItem('nextool_app_version', nextVer);
       setSimulatedUpdateAvailable(false);
-      addAuditLog('Actualización aplicada: Versión 001 instalada', 'Next Tools Core', 'success');
+      addAuditLog(`Actualización aplicada: Versión ${nextVer} instalada`, 'Next Tools Core', 'success');
       setTimeout(() => {
         window.location.reload();
       }, 1800);
@@ -1160,6 +1190,167 @@ export const EcuaplacPortal: React.FC = () => {
 
     setIsModalOpen(false);
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="w-full min-h-screen bg-[#F4F1EA] flex flex-col justify-between items-center p-4 sm:p-6 text-slate-900 select-none animate-in fade-in duration-300">
+        <div className="w-full max-w-sm my-auto pt-6 pb-8">
+          {/* Header Card */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-[#0B1523] border-2 border-stone-800 shadow-xl p-3.5 mb-4 relative">
+              <img
+                src="/ecuaplac/fav-sin-fondo.svg"
+                alt="Ecuaplac"
+                className="w-full h-full object-contain"
+              />
+              <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#C5A059] border-2 border-[#0B1523] flex items-center justify-center text-slate-950 font-black text-[9px] shadow-sm">
+                NT
+              </span>
+            </div>
+            <h1 className="text-2xl font-black text-slate-950 tracking-tight font-display">
+              Gestor de Ecuaplac
+            </h1>
+            <p className="text-xs text-stone-500 mt-1 font-sans">
+              Introduce tu correo Gmail y contraseña para acceder
+            </p>
+          </div>
+
+          {/* Login Form Card */}
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 border border-stone-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {loginError && (
+                <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5 font-display">
+                  Correo Electrónico / Gmail
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="ejemplo@gmail.com"
+                    required
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-stone-200 text-xs text-slate-900 bg-stone-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C5A059] transition-all font-sans"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5 font-display">
+                  Contraseña de Acceso
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Introduce tu contraseña"
+                    required
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-stone-200 text-xs text-slate-900 bg-stone-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C5A059] transition-all font-sans"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={loginRemember}
+                    onChange={(e) => setLoginRemember(e.target.checked)}
+                    className="w-4 h-4 rounded border-stone-300 text-slate-900 focus:ring-[#C5A059]"
+                  />
+                  <span className="text-[11.5px] text-stone-600 font-sans">
+                    Recordar en este móvil
+                  </span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-slate-900 to-[#162E4D] text-white font-bold text-xs shadow-md hover:brightness-110 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {loginLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-[#C5A059]" />
+                    <span>Verificando acceso...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 text-[#C5A059]" />
+                    <span>Entrar al Panel</span>
+                  </>
+                )}
+              </button>
+
+              {/* Botones de Rápido Relleno para Pruebas / Demostración */}
+              <div className="pt-3 border-t border-stone-100">
+                <span className="text-[10px] text-stone-400 uppercase tracking-wider block font-bold mb-2 text-center">
+                  Cuentas Registradas
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail('ecuaplacbyjyg@gmail.com');
+                      setLoginPassword('ecuaplac2026');
+                    }}
+                    className="p-2 rounded-xl bg-stone-50 hover:bg-stone-100 border border-stone-200 text-left text-[11px] transition-colors cursor-pointer"
+                  >
+                    <span className="font-bold text-slate-900 block truncate">José (Ecuaplac)</span>
+                    <span className="text-[9.5px] text-stone-400 block truncate">Dueño Negocio</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail('musaabdul3101@gmail.com');
+                      setLoginPassword('musa2026');
+                    }}
+                    className="p-2 rounded-xl bg-amber-50/60 hover:bg-amber-100/60 border border-amber-200 text-left text-[11px] transition-colors cursor-pointer"
+                  >
+                    <span className="font-bold text-amber-950 block truncate">👑 Musa</span>
+                    <span className="text-[9.5px] text-amber-700 block truncate">Superadmin</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {/* Footer Marca NexTool */}
+        <div className="pt-2 pb-4 flex flex-col items-center justify-center text-center">
+          <div className="w-12 h-12 rounded-[18px] bg-gradient-to-b from-[#141A28] to-[#0A0E18] p-2 shadow-md border border-stone-800/80 flex items-center justify-center mb-1.5">
+            <img
+              src="/icons/nextool-sinfondo.png"
+              alt="NexTool"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="text-[11px] font-black tracking-[0.24em] text-slate-800 uppercase font-display">
+            NEXT TOOLS
+          </span>
+          <span className="text-[10px] font-mono text-stone-400 mt-0.5">
+            Versión {installedVersion} · InsForge Cloud
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-full min-w-0 bg-[#F4F1EA] min-h-screen text-slate-900 pb-20 sm:pb-24">
@@ -2131,7 +2322,7 @@ export const EcuaplacPortal: React.FC = () => {
                             className="text-[11px] font-semibold text-[#C5A059] hover:underline"
                             title="Simula que hay una nueva actualización lista para instalar"
                           >
-                            Simular nueva v001
+                            {panelLang === 'es' ? 'Simular nueva v002' : 'Simulate new v002'}
                           </button>
                         </div>
                       </div>
@@ -2144,7 +2335,7 @@ export const EcuaplacPortal: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#C5A059]/20 text-[#F6E27A] text-[10px] font-bold border border-[#C5A059]/40">
                               <Sparkles className="w-3 h-3" />
-                              Nueva Versión Lista · v001
+                              {panelLang === 'es' ? 'Nueva Versión Lista · v002' : 'New Version Ready · v002'}
                             </span>
                             <span className="text-[10px] text-stone-300 font-mono">1.8 MB</span>
                           </div>
@@ -2177,7 +2368,7 @@ export const EcuaplacPortal: React.FC = () => {
                         <div className="flex items-center justify-between text-xs font-bold text-slate-800">
                           <span className="flex items-center gap-2">
                             <Loader2 className="w-3.5 h-3.5 text-[#C5A059] animate-spin" />
-                            Instalando actualización v001...
+                            {panelLang === 'es' ? 'Instalando actualización v002...' : 'Installing update v002...'}
                           </span>
                           <span className="font-mono text-[#C5A059]">100%</span>
                         </div>
@@ -2185,7 +2376,7 @@ export const EcuaplacPortal: React.FC = () => {
                           <div className="h-full bg-gradient-to-r from-[#C5A059] to-[#0B111E] rounded-full animate-pulse w-full" />
                         </div>
                         <span className="text-[11px] text-stone-500 font-medium block">
-                          Aplicando paquetes y preparando recarga limpia...
+                          {panelLang === 'es' ? 'Aplicando paquetes y preparando recarga limpia...' : 'Applying bundles and preparing clean reload...'}
                         </span>
                       </div>
                     )}
@@ -2196,10 +2387,10 @@ export const EcuaplacPortal: React.FC = () => {
                         <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
                         <div>
                           <span className="text-xs font-black block">
-                            ¡Versión v001 instalada con éxito!
+                            {panelLang === 'es' ? '¡Versión v002 instalada con éxito!' : 'Version v002 installed successfully!'}
                           </span>
                           <span className="text-[11px] text-emerald-100 font-medium block">
-                            Reiniciando la aplicación en unos segundos...
+                            {panelLang === 'es' ? 'Reiniciando la aplicación en unos segundos...' : 'Restarting app in a few seconds...'}
                           </span>
                         </div>
                       </div>
@@ -2240,7 +2431,8 @@ export const EcuaplacPortal: React.FC = () => {
               {/* Item 4: Cerrar Sesión */}
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
+                  await signOut();
                   setDeviceFeedback(
                     panelLang === 'es' ? 'Sesión cerrada en este dispositivo.' : 'Session signed out on this device.'
                   );
