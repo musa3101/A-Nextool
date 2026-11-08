@@ -68,6 +68,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Switch } from '@/components/ui/Switch';
+import { SpaceLogin } from '@/components/ui/space-login';
 import { ECUAPLAC_CONFIG } from './config';
 import { ecuaplacConnector, EcuaplacLeadItem } from './conector';
 import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
@@ -745,6 +746,35 @@ export const EcuaplacPortal: React.FC = () => {
     setIsInvoiceViewerOpen(true);
   };
 
+  const handleViewInvoicePdf = (fileUrl?: string, fileName?: string) => {
+    if (!fileUrl) {
+      window.print();
+      return;
+    }
+
+    if (fileUrl.startsWith('data:')) {
+      try {
+        const parts = fileUrl.split(',');
+        const mime = parts[0].split(':')[1]?.split(';')[0] || 'application/pdf';
+        const byteCharacters = atob(parts[1]);
+        const byteNumbers = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const blob = new Blob([byteNumbers], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        const win = window.open(blobUrl, '_blank');
+        if (!win) {
+          window.location.href = blobUrl;
+        }
+        return;
+      } catch (e) {
+        console.warn('Error al abrir PDF:', e);
+      }
+    }
+    window.open(fileUrl, '_blank');
+  };
+
   const handleOpenFullscreenInvoice = (fileUrl?: string, fileName?: string) => {
     const targetName = fileName || selectedInvoiceForView?.name || 'Factura_Ecuaplac.pdf';
 
@@ -1357,162 +1387,26 @@ export const EcuaplacPortal: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="w-full min-h-screen bg-[#F4F1EA] flex flex-col justify-between items-center p-4 sm:p-6 text-slate-900 select-none animate-in fade-in duration-300">
-        <div className="w-full max-w-sm my-auto pt-6 pb-8">
-          {/* Header Card */}
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-[#0B1523] border-2 border-stone-800 shadow-xl p-3.5 mb-4 relative">
-              <img
-                src="/ecuaplac/fav-sin-fondo.svg"
-                alt="Ecuaplac"
-                className="w-full h-full object-contain"
-              />
-              <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#C5A059] border-2 border-[#0B1523] flex items-center justify-center text-slate-950 font-black text-[9px] shadow-sm">
-                NT
-              </span>
-            </div>
-            <h1 className="text-2xl font-black text-slate-950 tracking-tight font-display">
-              Gestor de Ecuaplac
-            </h1>
-            <p className="text-xs text-stone-500 mt-1 font-sans">
-              Introduce tu correo Gmail y contraseña para acceder
-            </p>
-          </div>
-
-          {/* Login Form Card */}
-          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 border border-stone-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              {loginError && (
-                <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                  <span>{loginError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5 font-display">
-                  Correo Electrónico / Gmail
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="ejemplo@gmail.com"
-                    required
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-stone-200 text-xs text-slate-900 bg-stone-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C5A059] transition-all font-sans"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5 font-display">
-                  Contraseña de Acceso
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Introduce tu contraseña (inicial: admin)"
-                    required
-                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-stone-200 text-xs text-slate-900 bg-stone-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C5A059] transition-all font-sans"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={loginRemember}
-                    onChange={(e) => setLoginRemember(e.target.checked)}
-                    className="w-4 h-4 rounded border-stone-300 text-slate-900 focus:ring-[#C5A059]"
-                  />
-                  <span className="text-[11.5px] text-stone-600 font-sans">
-                    Recordar en este móvil
-                  </span>
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loginLoading}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-slate-900 to-[#162E4D] text-white font-bold text-xs shadow-md hover:brightness-110 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {loginLoading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-[#C5A059]" />
-                    <span>Verificando acceso...</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4 text-[#C5A059]" />
-                    <span>Entrar al Panel</span>
-                  </>
-                )}
-              </button>
-
-              {/* Botones de Rápido Relleno para Pruebas / Demostración */}
-              <div className="pt-3 border-t border-stone-100">
-                <span className="text-[10px] text-stone-400 uppercase tracking-wider block font-bold mb-2 text-center">
-                  Cuentas Registradas (Clave inicial: admin)
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('ecuaplacbyjyg@gmail.com');
-                      setLoginPassword('admin');
-                    }}
-                    className="p-2 rounded-xl bg-stone-50 hover:bg-stone-100 border border-stone-200 text-left text-[11px] transition-colors cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-900 block truncate">José (Ecuaplac)</span>
-                    <span className="text-[9.5px] text-stone-400 block truncate">Dueño Negocio</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('mynextbymusa@gmail.com');
-                      setLoginPassword('admin');
-                    }}
-                    className="p-2 rounded-xl bg-amber-50/60 hover:bg-amber-100/60 border border-amber-200 text-left text-[11px] transition-colors cursor-pointer"
-                  >
-                    <span className="font-bold text-amber-950 block truncate">👑 Musa</span>
-                    <span className="text-[9.5px] text-amber-700 block truncate">Superadmin</span>
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        {/* Footer Marca NexTool */}
-        <div className="pt-2 pb-4 flex flex-col items-center justify-center text-center">
-          <div className="w-12 h-12 rounded-[18px] bg-gradient-to-b from-[#141A28] to-[#0A0E18] p-2 shadow-md border border-stone-800/80 flex items-center justify-center mb-1.5">
-            <img
-              src="/icons/nextool-sinfondo.png"
-              alt="NexTool"
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <span className="text-[11px] font-black tracking-[0.24em] text-slate-800 uppercase font-display">
-            NEXT TOOLS
-          </span>
-          <span className="text-[10px] font-mono text-stone-400 mt-0.5">
-            Versión {installedVersion} · InsForge Cloud
-          </span>
-        </div>
-      </div>
+      <SpaceLogin
+        title="Sign In"
+        brandBadge="ECUAPLAC REFORMAS"
+        buttonLabel="Acceder a Ecuaplac"
+        defaultEmail="ecuaplacbyjyg@gmail.com"
+        errorMessage={loginError}
+        onSubmit={async (data) => {
+          setLoginError(null);
+          const res = await signInWithEmail(data.email, data.password, data.rememberMe);
+          if (!res.success) {
+            setLoginError(res.error || (panelLang === 'es' ? 'Error al iniciar sesión' : 'Sign in failed'));
+            throw new Error(res.error || 'Login failed');
+          } else {
+            showSyncToast(
+              panelLang === 'es' ? 'Bienvenido a tu panel de Ecuaplac' : 'Welcome to your Ecuaplac portal',
+              'success'
+            );
+          }
+        }}
+      />
     );
   }
 
@@ -3580,14 +3474,16 @@ export const EcuaplacPortal: React.FC = () => {
               </p>
             </div>
 
-            {/* Ficha Resumida */}
+            {/* Ficha Resumida Sin Datos Falsos */}
             <div className="grid grid-cols-2 gap-2.5 max-w-sm mx-auto text-left text-xs bg-white p-3.5 rounded-2xl border border-stone-200/80 shadow-2xs">
               <div>
                 <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
-                  {panelLang === 'es' ? 'Emisor' : 'Issuer'}
+                  {panelLang === 'es' ? 'Emisor / Tipo' : 'Issuer / Type'}
                 </span>
                 <span className="font-extrabold text-slate-800 block text-xs mt-0.5 truncate">
-                  ECUAPLAC J&G S.L.
+                  {selectedInvoiceForView?.isCustomUpload
+                    ? (panelLang === 'es' ? 'Documento adjunto' : 'Attached document')
+                    : (selectedInvoiceForView?.clientName || 'ECUAPLAC J&G S.L.')}
                 </span>
               </div>
               <div>
@@ -3595,15 +3491,15 @@ export const EcuaplacPortal: React.FC = () => {
                   {panelLang === 'es' ? 'Fecha' : 'Date'}
                 </span>
                 <span className="font-semibold text-slate-700 block text-xs mt-0.5">
-                  {selectedInvoiceForView?.issueDate || selectedInvoiceForView?.uploadDate || '03/11/2026'}
+                  {selectedInvoiceForView?.issueDate || selectedInvoiceForView?.uploadDate || 'Hoy'}
                 </span>
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
-                  {panelLang === 'es' ? 'Nº Factura' : 'Invoice Nº'}
+                  {panelLang === 'es' ? 'Identificador' : 'Identifier'}
                 </span>
-                <span className="font-mono font-bold text-slate-900 block text-xs mt-0.5">
-                  {selectedInvoiceForView?.number || 'FAC-2026-001'}
+                <span className="font-mono font-bold text-slate-900 block text-xs mt-0.5 truncate">
+                  {selectedInvoiceForView?.number || 'FAC-PDF'}
                 </span>
               </div>
               <div>
@@ -3611,26 +3507,36 @@ export const EcuaplacPortal: React.FC = () => {
                   {panelLang === 'es' ? 'Importe' : 'Amount'}
                 </span>
                 <span className="font-mono font-black text-[#9E782F] block text-xs mt-0.5">
-                  {(selectedInvoiceForView?.totalAmount || 1028.5).toFixed(2)} €
+                  {selectedInvoiceForView?.totalAmount && selectedInvoiceForView.totalAmount > 0
+                    ? `${selectedInvoiceForView.totalAmount.toFixed(2)} €`
+                    : (panelLang === 'es' ? 'Ver en el PDF' : 'See in PDF')}
                 </span>
               </div>
             </div>
 
             <p className="text-xs text-stone-500 max-w-md mx-auto leading-relaxed">
               {panelLang === 'es'
-                ? 'Descarga el documento oficial en formato PDF para visualizarlo en pantalla completa con zoom táctil y guardarlo en tu móvil.'
-                : 'Download the official PDF document to view in fullscreen with pinch-to-zoom and save to your mobile device.'}
+                ? 'Puedes abrir la factura directamente en pantalla completa para revisarla al detalle con zoom táctil o descargarla en tu dispositivo.'
+                : 'You can open the invoice in full screen to inspect details with pinch-to-zoom or download it to your device.'}
             </p>
 
-            {/* Botón Principal Prominente */}
-            <div className="pt-2">
+            {/* Acciones de Visualización y Descarga */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-2 max-w-sm mx-auto">
+              <button
+                type="button"
+                onClick={() => handleViewInvoicePdf(selectedInvoiceForView?.fileUrl, selectedInvoiceForView?.name)}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-xs sm:text-sm font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
+              >
+                <Eye className="w-4 h-4 text-[#C5A059]" />
+                <span>{panelLang === 'es' ? 'Abrir Factura Completa' : 'Open Full Invoice'}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => handleOpenFullscreenInvoice(selectedInvoiceForView?.fileUrl, selectedInvoiceForView?.name)}
-                className="w-full inline-flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-2xl bg-[#0B111E] hover:bg-[#162E4D] text-white text-sm font-bold shadow-md transition-all border border-[#C5A059]/40 active:scale-98 cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 py-3 px-4 rounded-2xl bg-stone-100 hover:bg-stone-200 text-slate-800 text-xs sm:text-sm font-bold transition-all border border-stone-200 active:scale-98 cursor-pointer"
               >
-                <Download className="w-4 h-4 text-[#C5A059]" />
-                <span>{panelLang === 'es' ? 'Descargar Factura Oficial (PDF)' : 'Download Official Invoice (PDF)'}</span>
+                <Download className="w-4 h-4 text-stone-600" />
+                <span>{panelLang === 'es' ? 'Descargar' : 'Download'}</span>
               </button>
             </div>
           </div>
