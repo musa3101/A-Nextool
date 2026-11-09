@@ -340,9 +340,7 @@ export class EcuaplacConnector {
         }
       }
     } catch (e) {
-    } catch (e) {
       console.warn('Supabase ecuaplac_galeria_2 no disponible, consultando respaldo:', e);
-    }
     }
 
     // Respaldo en InsForge Cloud (obras con type = 'gallery')
