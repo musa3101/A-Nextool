@@ -128,45 +128,45 @@ export const DEFAULT_WORKS: EcuaplacWorkItem[] = [
 ];
 
 /**
- * Catálogo Auténtico de MÁS PROYECTOS (+ Proj / reformas.html - 11 Proyectos Reales)
+ * Catálogo Auténtico de MÁS PROYECTOS (+ Proj / reformas.html#gallery-section - 11 Proyectos Reales de la Galería)
  */
 export const DEFAULT_MORE_PROJECTS: EcuaplacWorkItem[] = [
   {
-    id: '8b4a5520-23ab-4473-8354-396c27654abc',
+    id: 'more-1',
     type: 'more_projects',
-    title_es: 'Reforma Integral de Baño',
-    title_en: 'Complete Bathroom Remodel',
-    image_url: '/ecuaplac/portfolio/galeria/bano-despues-collage.webp',
+    title_es: 'Reforma integral de baño — Fase de obra',
+    title_en: 'Full bathroom renovation — Construction phase',
+    image_url: '/ecuaplac/portfolio/galeria/bano-antes-collage.webp',
     sort_order: 10,
     active: true,
     fit_mode: 'cover',
   },
   {
-    id: 'c5adde72-92e0-4454-bba1-2a7226858e6c',
+    id: 'more-2',
     type: 'more_projects',
-    title_es: 'Lavabo Flotante a Medida',
-    title_en: 'Custom Floating Sink',
-    image_url: '/ecuaplac/portfolio/galeria/bano-piedra-espejos.webp',
+    title_es: 'Reforma integral de baño — Resultado final',
+    title_en: 'Full bathroom renovation — Final result',
+    image_url: '/ecuaplac/portfolio/galeria/bano-despues-collage.webp',
     sort_order: 20,
     active: true,
     fit_mode: 'cover',
   },
   {
-    id: 'ec905cf9-09ac-448b-bfcf-c5364ccaf707',
+    id: 'more-3',
     type: 'more_projects',
-    title_es: 'Vestidor de Pladur y Roble',
-    title_en: 'Drywall and Oak Walk-in Closet',
-    image_url: '/ecuaplac/portfolio/galeria/cerramiento-cristal-1.webp',
+    title_es: 'Baño en piedra natural con espejos retroiluminados',
+    title_en: 'Natural stone bathroom with backlit mirrors',
+    image_url: '/ecuaplac/portfolio/galeria/bano-piedra-espejos.webp',
     sort_order: 30,
     active: true,
     fit_mode: 'cover',
   },
   {
-    id: '29f1042b-ff7d-450e-8cb0-61bc1b340f63',
+    id: 'more-4',
     type: 'more_projects',
-    title_es: 'Escalera y Distribuidor de Roble',
-    title_en: 'Oak Staircase and Hallway',
-    image_url: '/ecuaplac/portfolio/galeria/cerramiento-cristal-frontal.webp',
+    title_es: 'Cerramiento de cristal con ventanales panorámicos',
+    title_en: 'Glass enclosure with panoramic windows',
+    image_url: '/ecuaplac/portfolio/galeria/cerramiento-cristal-1.webp',
     sort_order: 40,
     active: true,
     fit_mode: 'cover',
