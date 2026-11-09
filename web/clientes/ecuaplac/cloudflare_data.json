@@ -12,14 +12,14 @@
     "trendPercentage": "+15.4%",
     "isPositiveTrend": true,
     "status": "optimal",
-    "updatedAt": "2026-11-08T15:29:59.772Z"
+    "updatedAt": "2026-11-09T20:45:34.800Z"
   },
   "3m": {
     "period": "3m",
     "periodLabel": "Últimos 3 meses",
-    "totalVisits": 310,
-    "uniqueVisitors": 310,
-    "pageViews": 380,
+    "totalVisits": 280,
+    "uniqueVisitors": 280,
+    "pageViews": 350,
     "avgLoadTime": "0.68s",
     "uptime": "99.99%",
     "edgeHitRatio": "97.5%",
@@ -27,6 +27,6 @@
     "trendPercentage": "+28.6%",
     "isPositiveTrend": true,
     "status": "optimal",
-    "updatedAt": "2026-11-08T15:29:59.772Z"
+    "updatedAt": "2026-11-09T20:45:34.801Z"
   }
 }

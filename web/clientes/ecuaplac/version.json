@@ -2,8 +2,8 @@
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
   "owner": "Jose (José Rivadeneira)",
-  "version": "2.0.0",
-  "last_updated": "2026-11-08",
+  "version": "2.0.1",
+  "last_updated": "2026-11-09",
   "status": "active",
   "route": "/ecuaplac",
   "modules": [

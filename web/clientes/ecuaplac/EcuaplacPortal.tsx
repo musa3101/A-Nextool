@@ -38,6 +38,7 @@ import {
   ShieldCheck,
   Check,
   MessageSquare,
+  MessageSquarePlus,
   Copy,
   RotateCcw,
   Inbox,
@@ -74,7 +75,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Switch } from '@/components/ui/Switch';
 import { SpaceLogin } from '@/components/ui/space-login';
 import { ECUAPLAC_CONFIG } from './config';
-import { ecuaplacConnector, EcuaplacLeadItem } from './conector';
+import { ecuaplacConnector, EcuaplacLeadItem, EcuaplacAuditLog, CloudflareMetrics, formatLogTime } from './conector';
 import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
 import { autoTranslateWork } from './traductor';
 import { insforge } from '@/lib/insforge';
@@ -176,7 +177,46 @@ const AnimatedCounter: React.FC<{ value: number; duration?: number; suffix?: str
 
 export const EcuaplacPortal: React.FC = () => {
   const { session, isAuthenticated, signInWithEmail, signOut, stopImpersonation } = useAuth();
-  const { addAuditLog } = useTenant();
+  const { addAuditLog: addTenantContextAuditLog } = useTenant();
+
+  // Idioma del Panel ('es' | 'en') persistido en localStorage
+  const [panelLang, setPanelLang] = useState<'es' | 'en'>(() => {
+    try {
+      return (localStorage.getItem('ecuaplac_panel_lang') as 'es' | 'en') || 'es';
+    } catch {
+      return 'es';
+    }
+  });
+
+  // Auditoría & Logs en vivo desde InsForge Cloud
+  const [logs, setLogs] = useState<EcuaplacAuditLog[]>([]);
+  const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
+
+  const addAuditLog = (
+    action: string,
+    target = 'Ecuaplac App',
+    status: 'success' | 'warning' | 'info' = 'info',
+    entity = 'general',
+    details: Record<string, any> = {}
+  ) => {
+    const tempLog: EcuaplacAuditLog = {
+      id: `local-${Date.now()}`,
+      action,
+      entity: entity !== 'general' ? entity : (status === 'warning' ? 'delete' : status === 'success' ? 'edit' : 'general'),
+      time: panelLang === 'es' ? 'Ahora mismo' : 'Just now',
+      created_at: new Date().toISOString(),
+      details: { target, ...details },
+    };
+    setLogs((prev) => [tempLog, ...prev]);
+
+    ecuaplacConnector.addAuditLog(tempLog.entity, action, details).then((saved) => {
+      if (saved && saved.id) {
+        setLogs((prev) => prev.map((l) => (l.id === tempLog.id ? saved : l)));
+      }
+    });
+
+    addTenantContextAuditLog(action, target, status);
+  };
 
   // Estados para Login con Gmail + Contraseña
   const [loginEmail, setLoginEmail] = useState('ecuaplacbyjyg@gmail.com');
@@ -203,6 +243,7 @@ export const EcuaplacPortal: React.FC = () => {
         panelLang === 'es' ? 'Bienvenido a tu panel' : 'Welcome to your portal',
         'success'
       );
+      addAuditLog('Sesión iniciada con éxito en el panel', 'Autenticación', 'success', 'auth');
     }
   };
 
@@ -216,15 +257,6 @@ export const EcuaplacPortal: React.FC = () => {
     }
   }, [isAuthenticated]);
 
-  // Idioma del Panel ('es' | 'en') persistido en localStorage
-  const [panelLang, setPanelLang] = useState<'es' | 'en'>(() => {
-    try {
-      return (localStorage.getItem('ecuaplac_panel_lang') as 'es' | 'en') || 'es';
-    } catch {
-      return 'es';
-    }
-  });
-
   const handleToggleLang = (lang: 'es' | 'en') => {
     setPanelLang(lang);
     try {
@@ -237,9 +269,45 @@ export const EcuaplacPortal: React.FC = () => {
     );
   };
 
+  // Saludo contextual según la hora oficial de España / Baleares (Europe/Madrid)
+  const getGreeting = (name = 'José') => {
+    try {
+      const hourStr = new Intl.DateTimeFormat('es-ES', {
+        timeZone: 'Europe/Madrid',
+        hour: 'numeric',
+        hour12: false,
+      }).format(new Date());
+      const hour = parseInt(hourStr, 10);
+
+      // 06:00 a 13:59 -> Buenos días (mañana)
+      // 14:00 a 20:59 -> Buenas tardes (tarde)
+      // 21:00 a 05:59 -> Buenas noches (noche y madrugada completa)
+      if (hour >= 6 && hour < 14) {
+        return panelLang === 'es' ? `Buenos días, ${name} 👋` : `Good morning, ${name} 👋`;
+      }
+      if (hour >= 14 && hour < 21) {
+        return panelLang === 'es' ? `Buenas tardes, ${name} 👋` : `Good afternoon, ${name} 👋`;
+      }
+      return panelLang === 'es' ? `Buenas noches, ${name} 👋` : `Good evening, ${name} 👋`;
+    } catch {
+      const hour = new Date().getHours();
+      if (hour >= 6 && hour < 14) {
+        return panelLang === 'es' ? `Buenos días, ${name} 👋` : `Good morning, ${name} 👋`;
+      }
+      if (hour >= 14 && hour < 21) {
+        return panelLang === 'es' ? `Buenas tardes, ${name} 👋` : `Good afternoon, ${name} 👋`;
+      }
+      return panelLang === 'es' ? `Buenas noches, ${name} 👋` : `Good evening, ${name} 👋`;
+    }
+  };
+
   // Cloudflare Analytics Timeframe: '30d' | '3m'
   const [cfPeriod, setCfPeriod] = useState<'30d' | '3m'>('30d');
-  const cfMetrics = ecuaplacConnector.getCloudflareMetrics(cfPeriod);
+  const [liveCfMetrics, setLiveCfMetrics] = useState<Record<'30d' | '3m', CloudflareMetrics>>(() => ({
+    '30d': ecuaplacConnector.getCloudflareMetrics('30d'),
+    '3m': ecuaplacConnector.getCloudflareMetrics('3m'),
+  }));
+  const cfMetrics = liveCfMetrics[cfPeriod] || ecuaplacConnector.getCloudflareMetrics(cfPeriod);
 
   // Filter state
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'active' | 'hidden'>('all');
@@ -253,7 +321,7 @@ export const EcuaplacPortal: React.FC = () => {
     ecuaplacConnector.getMoreProjects(INITIAL_MORE_PROJECTS)
   );
 
-  // Carga inicial en vivo desde Supabase (sincroniza fotos reales de Mallorca)
+  // Carga inicial en vivo desde Supabase e InsForge (sincroniza fotos y actividad real)
   useEffect(() => {
     ecuaplacConnector.fetchWorksOnline().then((liveWorks) => {
       if (liveWorks && liveWorks.length > 0) {
@@ -264,6 +332,18 @@ export const EcuaplacPortal: React.FC = () => {
     ecuaplacConnector.fetchProjectsOnline().then((liveProjects) => {
       if (liveProjects && liveProjects.length > 0) {
         setMoreProjects(liveProjects);
+      }
+    });
+
+    ecuaplacConnector.fetchAuditLogsOnline().then((liveLogs) => {
+      if (liveLogs && liveLogs.length > 0) {
+        setLogs(liveLogs);
+      }
+    });
+
+    ecuaplacConnector.fetchCloudflareMetricsOnline().then((onlineMetrics) => {
+      if (onlineMetrics) {
+        setLiveCfMetrics(onlineMetrics);
       }
     });
   }, []);
@@ -449,6 +529,7 @@ export const EcuaplacPortal: React.FC = () => {
     setLeads((prev) => prev.filter((l) => l.id !== leadId));
     if (selectedLeadId === leadId) setSelectedLeadId(null);
     await ecuaplacConnector.deleteLead(leadId);
+    addAuditLog(`Solicitud de presupuesto eliminada: «${leadName}»`, 'Ecuaplac Leads', 'warning', 'delete');
     showSyncToast(
       panelLang === 'es' ? `Presupuesto de ${leadName} eliminado` : `Lead ${leadName} deleted`,
       'success'
@@ -458,6 +539,7 @@ export const EcuaplacPortal: React.FC = () => {
   const handleRestoreDefaultLeads = () => {
     setLeads(defaultLeads);
     ecuaplacConnector.saveLeads(defaultLeads);
+    addAuditLog('Presupuestos de demostración restaurados', 'Ecuaplac Leads', 'info', 'status');
     showSyncToast(
       panelLang === 'es' ? 'Presupuestos de demostración restaurados' : 'Demo leads restored',
       'success'
@@ -477,9 +559,10 @@ export const EcuaplacPortal: React.FC = () => {
         approved: 'Obra Aceptada',
       };
       addAuditLog(
-        `Lead «${targetLead.name}» cambiado a ${statusLabels[newStatus] || newStatus}`,
+        `Lead «${targetLead.name}» marcado como: ${statusLabels[newStatus] || newStatus}`,
         'Ecuaplac Leads',
-        'info'
+        'info',
+        'status'
       );
     }
   };
@@ -565,36 +648,141 @@ export const EcuaplacPortal: React.FC = () => {
   const [confirmPass, setConfirmPass] = useState('');
   const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  // Dispositivo
-  const [deviceFeedback, setDeviceFeedback] = useState<string | null>(null);
+  // Feedback & Soporte para el cliente (Envío directo a Musa)
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState<'bug' | 'idea' | 'question'>('bug');
+  const [feedbackSubject, setFeedbackSubject] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+  const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '2.0.0';
+  const CURRENT_SYSTEM_VERSION = '2.0.1';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // Normalizar a versión 2.0.0 si la caché tenía versiones legacy (000, 001, 1.0, 200, etc.)
-    if (!cached || cached === '000' || cached === '001' || cached === '1.0' || cached === '200' || cached === 'v2.0.0') {
-      localStorage.setItem('nextool_app_version', '2.0.0');
-      return '2.0.0';
+    // Normalizar a versión 2.0.1 si la caché tenía versiones legacy (000, 001, 1.0, 200, 2.0.0, etc.)
+    if (!cached || cached === '000' || cached === '001' || cached === '1.0' || cached === '200' || cached === '2.0.0' || cached === 'v2.0.0') {
+      localStorage.setItem('nextool_app_version', '2.0.1');
+      return '2.0.1';
     }
     return cached;
   });
   const [simulatedUpdateAvailable, setSimulatedUpdateAvailable] = useState(false);
   const [newVersionNotice, setNewVersionNotice] = useState<string | null>(null);
 
-  // Sincronización proactiva de versión y auto-actualizaciones con InsForge Cloud
+  const handleSendFeedback = async (channel: 'whatsapp' | 'email' | 'system') => {
+    if (!feedbackMessage.trim()) {
+      alert(panelLang === 'es' ? 'Por favor escribe tu mensaje o duda antes de enviar.' : 'Please write your message before sending.');
+      return;
+    }
+
+    setIsSendingFeedback(true);
+    const categoryLabels = {
+      bug: panelLang === 'es' ? '🐛 Incidencia / Problema' : '🐛 Issue / Bug',
+      idea: panelLang === 'es' ? '💡 Sugerencia / Idea' : '💡 Feature / Idea',
+      question: panelLang === 'es' ? '💬 Consulta Técnica' : '💬 Technical Question',
+    };
+
+    const subjectText = feedbackSubject.trim() || (panelLang === 'es' ? 'Sin asunto' : 'No subject');
+    const deviceDetails = `${navigator.userAgent.includes('Mobile') ? 'Móvil' : 'Escritorio'} · v${installedVersion} · Ecuaplac`;
+
+    // 1. Guardar en backend InsForge (tabla audit_logs con entity 'feedback')
+    try {
+      await ecuaplacConnector.addAuditLog(
+        'feedback',
+        `Feedback enviado: [${categoryLabels[feedbackCategory]}] «${subjectText}»`,
+        {
+          category: feedbackCategory,
+          subject: subjectText,
+          message: feedbackMessage.trim(),
+          sender: adminName,
+          tenant: 'ecuaplac',
+          version: installedVersion,
+        }
+      );
+      addAuditLog(
+        `Feedback registrado: «${subjectText}»`,
+        'Soporte NexTool',
+        'info',
+        'profile'
+      );
+    } catch (e) {
+      console.warn('Error al guardar feedback en InsForge:', e);
+    }
+
+    // 2. Notificación y canal directo
+    if (channel === 'whatsapp') {
+      const waText = `*NexTool Feedback — Ecuaplac*\n\n` +
+        `*Tipo:* ${categoryLabels[feedbackCategory]}\n` +
+        `*De:* ${adminName}\n` +
+        `*Asunto:* ${subjectText}\n\n` +
+        `*Mensaje:*\n${feedbackMessage.trim()}\n\n` +
+        `_Dispositivo: ${deviceDetails}_`;
+
+      window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
+    } else if (channel === 'email') {
+      const mailtoUrl = `mailto:musaabdul3101@gmail.com?subject=${encodeURIComponent(
+        `[NexTool Feedback] ${categoryLabels[feedbackCategory]} - ${subjectText} (Ecuaplac)`
+      )}&body=${encodeURIComponent(
+        `Hola Musa,\n\nTe envío este mensaje desde el panel de control de Ecuaplac:\n\n` +
+        `Tipo: ${categoryLabels[feedbackCategory]}\n` +
+        `De: ${adminName}\n` +
+        `Asunto: ${subjectText}\n\n` +
+        `Mensaje:\n${feedbackMessage.trim()}\n\n` +
+        `--------------------\n` +
+        `Versión de la app: v${installedVersion}\n` +
+        `Cliente: Ecuaplac Reformas Integrales\n` +
+        `Fecha: ${new Date().toLocaleString('es-ES')}`
+      )}`;
+      window.open(mailtoUrl, '_blank');
+    }
+
+    setIsSendingFeedback(false);
+    setFeedbackSentSuccess(true);
+    showSyncToast(
+      panelLang === 'es' ? 'Mensaje registrado y enviado a Musa' : 'Feedback logged and sent to Musa',
+      'success'
+    );
+
+    setTimeout(() => {
+      setFeedbackSentSuccess(false);
+      setFeedbackSubject('');
+      setFeedbackMessage('');
+      setIsFeedbackModalOpen(false);
+    }, 1800);
+  };
+
+  // Sincronización proactiva de versión y auto-actualizaciones con PWA Bypass y InsForge Cloud
   useEffect(() => {
     let isMounted = true;
     const checkVersion = async () => {
       try {
+        // 1. Chequeo directo a /version.json con cache: 'no-store' (burlar caché en móvil / PWA)
+        const res = await fetch(`/version.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!isMounted) return;
+          if (data?.version && data.version !== installedVersion && data.version !== CURRENT_SYSTEM_VERSION) {
+            setNewVersionNotice(data.version);
+            setSimulatedUpdateAvailable(true);
+            setUpdateCheckState('available');
+            return;
+          }
+        }
+
+        // 2. Comprobación de respaldo contra InsForge Cloud
         const cloudVer = await ecuaplacConnector.fetchTenantVersion();
         if (!isMounted) return;
-        if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion) {
+        if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion && cloudVer !== CURRENT_SYSTEM_VERSION) {
           setNewVersionNotice(cloudVer);
           setSimulatedUpdateAvailable(true);
+          setUpdateCheckState('available');
         } else {
           setNewVersionNotice(null);
         }
@@ -602,23 +790,52 @@ export const EcuaplacPortal: React.FC = () => {
     };
 
     checkVersion();
+
+    // Detección automática al volver a la app tras bloquear/desbloquear el móvil
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkVersion();
+      }
+    };
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', checkVersion);
+
+    // Intervalo de comprobación en segundo plano cada 30 segundos
     const interval = setInterval(() => {
       if (autoCheckUpdates) {
         checkVersion();
       }
-    }, 25000);
+    }, 30000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', checkVersion);
     };
   }, [installedVersion, autoCheckUpdates]);
 
   const handleCheckUpdates = async () => {
     setUpdateCheckState('checking');
     try {
+      // 1. Comprobar /version.json en servidor
+      const res = await fetch(`/version.json?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.version && data.version !== installedVersion && data.version !== CURRENT_SYSTEM_VERSION) {
+          setNewVersionNotice(data.version);
+          setSimulatedUpdateAvailable(true);
+          setUpdateCheckState('available');
+          return;
+        }
+      }
+
+      // 2. Comprobar InsForge Cloud
       const cloudVer = await ecuaplacConnector.fetchTenantVersion();
-      if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion) {
+      if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion && cloudVer !== CURRENT_SYSTEM_VERSION) {
         setNewVersionNotice(cloudVer);
         setSimulatedUpdateAvailable(true);
         setUpdateCheckState('available');
@@ -635,10 +852,19 @@ export const EcuaplacPortal: React.FC = () => {
 
   const handleInstallUpdate = async () => {
     setUpdateCheckState('installing');
-    const targetVer = newVersionNotice || (simulatedUpdateAvailable ? '2.0.1' : CURRENT_SYSTEM_VERSION);
+    const targetVer = newVersionNotice || '2.0.1';
     try {
       await ecuaplacConnector.updateTenantVersion(targetVer);
     } catch {}
+
+    // Limpieza profunda de Service Worker y CacheStorage en móvil
+    try {
+      if ('caches' in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map((k) => caches.delete(k)));
+      }
+    } catch {}
+
     setTimeout(() => {
       setUpdateCheckState('installed');
       setInstalledVersion(targetVer);
@@ -647,8 +873,9 @@ export const EcuaplacPortal: React.FC = () => {
       setNewVersionNotice(null);
       addAuditLog(`Actualización aplicada: Versión ${targetVer} en producción`, 'Next Tools Core', 'success');
       setTimeout(() => {
+        // Recargar saltando caché
         window.location.reload();
-      }, 1400);
+      }, 800);
     }, 1200);
   };
 
@@ -944,17 +1171,6 @@ export const EcuaplacPortal: React.FC = () => {
   const invoices = projectDocs;
   const setInvoices = setProjectDocs;
 
-  // Auditoría & Logs
-  const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
-  const [logs, setLogs] = useState([
-    { id: '1', action: 'Obra editada y web actualizada: "Baño de Diseño con Bañera Exenta"', time: 'Hoy, 20:45', type: 'edit' },
-    { id: '2', action: 'Fotografía optimizada en WebP (184 KB)', time: 'Hoy, 20:12', type: 'upload' },
-    { id: '3', action: 'Nombre de administrador confirmado: "José Rivadeneira"', time: 'Hoy, 19:30', type: 'profile' },
-    { id: '4', action: 'Sesión iniciada desde dispositivo móvil', time: 'Hoy, 19:15', type: 'auth' },
-    { id: '5', action: 'Proyecto fijado como Portada Principal en carrusel', time: 'Ayer, 18:20', type: 'status' },
-    { id: '6', action: 'Presupuesto #LEAD-104 marcado como Gestionado', time: 'Ayer, 16:50', type: 'lead' },
-  ]);
-
   // Acordeón activo: 'leads' | 'profile' | 'security' | 'device' | 'logs' | null
   const [openAccordion, setOpenAccordion] = useState<'leads' | 'profile' | 'security' | 'device' | 'logs' | null>('leads');
 
@@ -971,11 +1187,7 @@ export const EcuaplacPortal: React.FC = () => {
       setAdminAvatar(dataUrl);
       setAvatarSuccess(true);
       setTimeout(() => setAvatarSuccess(false), 3000);
-      setLogs((prev) => [
-        { id: String(Date.now()), action: 'Avatar de administrador actualizado', time: 'Ahora mismo', type: 'profile' },
-        ...prev,
-      ]);
-      addAuditLog('Avatar de administrador actualizado', 'Ecuaplac App', 'success');
+      addAuditLog('Avatar de administrador actualizado', 'Ecuaplac App', 'success', 'profile');
     } catch (err) {
       console.warn('Error al procesar avatar:', err);
     }
@@ -987,11 +1199,7 @@ export const EcuaplacPortal: React.FC = () => {
     setAdminName(trimmed);
     setNameSuccess(true);
     setTimeout(() => setNameSuccess(false), 3000);
-    setLogs((prev) => [
-      { id: String(Date.now()), action: `Nombre de administrador cambiado a: "${trimmed}"`, time: 'Ahora mismo', type: 'profile' },
-      ...prev,
-    ]);
-    addAuditLog(`Nombre de administrador cambiado a: "${trimmed}"`, 'Ecuaplac App', 'success');
+    addAuditLog(`Nombre de administrador cambiado a: "${trimmed}"`, 'Ecuaplac App', 'success', 'profile');
   };
 
   const handleSavePassword = async (e: React.FormEvent) => {
@@ -1106,15 +1314,23 @@ export const EcuaplacPortal: React.FC = () => {
     }
   };
 
-  const handleRefreshLogs = () => {
+  const handleRefreshLogs = async () => {
     setIsRefreshingLogs(true);
-    setTimeout(() => {
+    try {
+      const liveLogs = await ecuaplacConnector.fetchAuditLogsOnline(50);
+      setLogs(liveLogs);
+      showSyncToast(
+        panelLang === 'es' ? 'Historial sincronizado con InsForge' : 'Logs synced with InsForge',
+        'success'
+      );
+    } catch {
+      showSyncToast(
+        panelLang === 'es' ? 'Error al consultar logs en InsForge' : 'Error querying logs in InsForge',
+        'error'
+      );
+    } finally {
       setIsRefreshingLogs(false);
-      setLogs((prev) => [
-        { id: String(Date.now()), action: 'Historial sincronizado con Supabase / Servidor', time: 'Ahora mismo', type: 'sync' },
-        ...prev,
-      ]);
-    }, 600);
+    }
   };
 
   // Current collection being viewed
@@ -1181,12 +1397,15 @@ export const EcuaplacPortal: React.FC = () => {
       const { dataUrl, sizeKb, mime } = await compressImageUniversal(file, 1400, 0.82);
       setFormImageUrl(dataUrl);
       setUploadStats({ sizeKb, mime });
+      addAuditLog(`Fotografía optimizada en WebP (${sizeKb} KB): «${file.name}»`, 'Ecuaplac Web', 'success', 'upload');
     } catch (err) {
       console.warn('Fallo compresión en canvas, usando DataURL directa:', err);
       const reader = new FileReader();
       reader.onload = () => {
         setFormImageUrl(reader.result as string);
-        setUploadStats({ sizeKb: Math.round(file.size / 1024), mime: file.type });
+        const kbs = Math.round(file.size / 1024);
+        setUploadStats({ sizeKb: kbs, mime: file.type });
+        addAuditLog(`Fotografía cargada (${kbs} KB): «${file.name}»`, 'Ecuaplac Web', 'info', 'upload');
       };
       reader.readAsDataURL(file);
     } finally {
@@ -1635,7 +1854,7 @@ export const EcuaplacPortal: React.FC = () => {
                 <span className="text-[11px] font-mono text-stone-500 font-semibold">ecuaplac.com</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight font-display">
-                {new Date().getHours() < 13 ? 'Buenos días' : new Date().getHours() < 20 ? 'Buenas tardes' : 'Buenas noches'}, José 👋
+                {getGreeting('José')}
               </h1>
               <p className="text-xs sm:text-sm text-stone-500 mt-1 leading-relaxed font-normal font-sans">
                 Panel de rendimiento, tráfico web y presupuestos de reformas en Mallorca.
@@ -1680,16 +1899,27 @@ export const EcuaplacPortal: React.FC = () => {
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(14,165,233,0.35)] group-hover:scale-105 transition-transform">
                   <Users className="w-6 h-6" />
                 </div>
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-xs font-black shadow-xs">
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{cfMetrics.trendPercentage}</span>
-                </span>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-[11px] font-black shadow-xs">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Real (sin bots)</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-800 text-[11px] font-black shadow-xs">
+                    <TrendingUp className="w-3.5 h-3.5 text-sky-600" />
+                    <span>{cfMetrics.trendPercentage}</span>
+                  </span>
+                </div>
               </div>
 
               <div className="relative z-10">
-                <span className="text-[11px] font-black text-stone-400 uppercase tracking-wider block">
-                  Visitantes Únicos ({cfMetrics.periodLabel})
-                </span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-black text-stone-400 uppercase tracking-wider block">
+                    Visitantes Únicos ({cfMetrics.periodLabel})
+                  </span>
+                  <span className="text-[10px] font-bold text-sky-700 bg-sky-100/80 px-2 py-0.5 rounded-full shrink-0">
+                    Cloudflare RUM
+                  </span>
+                </div>
                 <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight block mt-1 font-mono">
                   <AnimatedCounter value={cfMetrics.uniqueVisitors} />
                 </span>
@@ -1701,18 +1931,29 @@ export const EcuaplacPortal: React.FC = () => {
                 </span>
               </div>
 
-              {/* Visualización de Actividad Semanal */}
-              <div className="pt-2 border-t border-sky-100/80 flex items-end justify-between gap-1.5 h-7 relative z-10">
-                {[35, 60, 50, 75, 65, 90, 100].map((height, i) => (
-                  <div
-                    key={i}
-                    className={`flex-1 rounded-t-sm transition-all duration-300 ${
-                      i === 6 ? 'bg-sky-500 shadow-xs' : 'bg-sky-200/60 hover:bg-sky-300'
-                    }`}
-                    style={{ height: `${height}%` }}
-                    title={`Pico de tráfico día ${i + 1}`}
-                  />
-                ))}
+              {/* Visualización de Actividad y Sello de Auditoría */}
+              <div className="pt-2 border-t border-sky-100/80 space-y-2 relative z-10">
+                <div className="flex items-end justify-between gap-1.5 h-6">
+                  {[35, 60, 50, 75, 65, 90, 100].map((height, i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 rounded-t-sm transition-all duration-300 ${
+                        i === 6 ? 'bg-sky-500 shadow-xs' : 'bg-sky-200/60 hover:bg-sky-300'
+                      }`}
+                      style={{ height: `${height}%` }}
+                      title={`Pico de tráfico día ${i + 1}`}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center justify-between text-[10.5px] text-stone-400 font-medium pt-1 border-t border-sky-50">
+                  <span className="flex items-center gap-1 text-slate-600">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Humanos en ecuaplac.com</span>
+                  </span>
+                  <span className="font-mono text-[10px] text-stone-400">
+                    {cfMetrics.updatedAt ? formatLogTime(cfMetrics.updatedAt) : 'Verificado hoy'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -2311,46 +2552,34 @@ export const EcuaplacPortal: React.FC = () => {
               </h4>
             </div>
             <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
-              {/* Item 1: Sesión en este Dispositivo */}
-              <div className="p-4 flex items-center justify-between gap-3">
+              {/* Item 1: Enviar Feedback o Reportar Problema a Musa */}
+              <button
+                type="button"
+                onClick={() => setIsFeedbackModalOpen(true)}
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
+              >
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="w-10 h-10 rounded-2xl bg-zinc-100 border border-zinc-200/80 flex items-center justify-center text-zinc-700 shadow-xs shrink-0">
-                    <Smartphone className="w-5 h-5" />
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-800 shadow-xs shrink-0">
+                    <MessageSquarePlus className="w-5 h-5 text-[#C5A059]" />
                   </div>
                   <div className="min-w-0">
                     <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
-                      {panelLang === 'es' ? 'Sesión en este Móvil' : 'Session on this Device'}
+                      {panelLang === 'es' ? 'Enviar Feedback o Problema' : 'Send Feedback or Issue'}
                     </span>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                      <span className="text-[11.5px] text-stone-500 font-normal truncate block font-sans">
-                        {deviceFeedback || (panelLang === 'es' ? 'Activa · Entrada automática segura' : 'Active · Secure automatic sign-in')}
-                      </span>
-                    </div>
+                    <span className="text-[11.5px] text-stone-500 font-normal truncate block font-sans mt-0.5">
+                      {panelLang === 'es'
+                        ? 'Avisa a Musa si algo no funciona o propon mejoras'
+                        : 'Notify Musa if something fails or suggest new features'}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDeviceFeedback(
-                        panelLang === 'es'
-                          ? 'Dispositivo olvidado. Pedirá clave en la próxima entrada.'
-                          : 'Device forgotten. Password required next time.'
-                      );
-                      showSyncToast(
-                        panelLang === 'es' ? 'Sesión reiniciada en este móvil' : 'Session reset on this device',
-                        'success'
-                      );
-                      addAuditLog('Preferencia de sesión actualizada: Olvidar este móvil', 'Ecuaplac App', 'info');
-                    }}
-                    className="text-[11px] font-bold text-stone-600 hover:text-rose-600 bg-stone-100 hover:bg-rose-50 hover:border-rose-200 px-3 py-1.5 rounded-full border border-stone-200 transition-all active:scale-95 font-sans cursor-pointer"
-                    title={panelLang === 'es' ? 'Olvidar inicio automático en este móvil' : 'Forget auto-login on this device'}
-                  >
-                    {panelLang === 'es' ? 'Olvidar' : 'Forget'}
-                  </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[11px] font-bold text-[#C5A059] bg-amber-50/80 border border-amber-200/70 px-2.5 py-1 rounded-full hidden sm:inline-block">
+                    {panelLang === 'es' ? 'Soporte' : 'Support'}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-stone-400" />
                 </div>
-              </div>
+              </button>
 
               {/* Item 2: Actualizaciones (Desplegable y Gestión de Versión) */}
               <div className="transition-colors">
@@ -2573,7 +2802,10 @@ export const EcuaplacPortal: React.FC = () => {
               {/* Item 3: Últimos Movimientos */}
               <button
                 type="button"
-                onClick={() => setIsLogsModalOpen(true)}
+                onClick={() => {
+                  setIsLogsModalOpen(true);
+                  handleRefreshLogs();
+                }}
                 className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
@@ -2605,9 +2837,6 @@ export const EcuaplacPortal: React.FC = () => {
                 onClick={async () => {
                   setActiveTab('inicio');
                   await signOut();
-                  setDeviceFeedback(
-                    panelLang === 'es' ? 'Sesión cerrada en este dispositivo.' : 'Session signed out on this device.'
-                  );
                   showSyncToast(
                     panelLang === 'es' ? 'Sesión cerrada correctamente' : 'Signed out successfully',
                     'success'
@@ -2634,14 +2863,14 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Pie de Marca NexTool & Versión Oficial (Fiel a la Captura de Referencia de Musa) */}
+          {/* Pie de Marca NexTool & Versión Oficial */}
           <div className="pt-6 pb-2 flex flex-col items-center justify-center text-center select-none">
-            {/* Squircle Badge con el Logotipo Oficial NexTool Sin Fondo */}
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[22px] bg-gradient-to-b from-[#141A28] to-[#0A0E18] p-2.5 shadow-[0_8px_20px_rgba(10,16,28,0.22),inset_0_1px_1px_rgba(255,255,255,0.15)] border border-stone-800/80 flex items-center justify-center mb-2.5 transition-transform hover:scale-105">
+            {/* Logotipo Oficial NexTool 100% Sin Fondo */}
+            <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center mb-2 transition-transform hover:scale-105 active:scale-95 cursor-pointer">
               <img
                 src="/icons/nextool-sinfondo.png"
                 alt="NexTool"
-                className="w-full h-full object-contain filter drop-shadow-[0_2px_6px_rgba(235,94,85,0.25)]"
+                className="w-full h-full object-contain filter drop-shadow-[0_6px_16px_rgba(235,94,85,0.20)]"
                 loading="lazy"
               />
             </div>
@@ -3332,6 +3561,9 @@ export const EcuaplacPortal: React.FC = () => {
                             )}`}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={() => {
+                              addAuditLog(`Contacto vía WhatsApp con «${lead.name}» (${lead.phone})`, 'Ecuaplac Leads', 'success', 'contact');
+                            }}
                             className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 min-h-[42px] rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white font-bold text-xs shadow-xs transition-all active:scale-98"
                           >
                             <MessageSquare className="w-4 h-4" />
@@ -3339,6 +3571,9 @@ export const EcuaplacPortal: React.FC = () => {
                           </a>
                           <a
                             href={`tel:${lead.phone}`}
+                            onClick={() => {
+                              addAuditLog(`Llamada telefónica a «${lead.name}» (${lead.phone})`, 'Ecuaplac Leads', 'info', 'contact');
+                            }}
                             className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 min-h-[42px] rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all active:scale-98"
                           >
                             <Phone className="w-3.5 h-3.5 text-[#C5A059]" />
@@ -3679,22 +3914,219 @@ export const EcuaplacPortal: React.FC = () => {
           </div>
 
           <div className="flex flex-col gap-2 max-h-[50vh] overflow-y-auto pr-1">
-            {logs.map((log) => (
-              <div
-                key={log.id}
-                className="flex items-center justify-between p-3 rounded-2xl bg-stone-50 border border-stone-200/80 hover:bg-stone-100/80 transition-colors"
-              >
-                <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                  <span className="text-xs font-bold text-slate-900 truncate">
-                    {log.action}
-                  </span>
-                </div>
-                <span className="text-[10px] text-stone-400 font-medium whitespace-nowrap shrink-0">
-                  {log.time}
-                </span>
+            {logs.length === 0 ? (
+              <div className="text-center py-10 px-4 rounded-2xl bg-stone-50 border border-stone-200/60">
+                <Activity className="w-8 h-8 text-stone-300 mx-auto mb-2" />
+                <p className="text-xs font-bold text-stone-600">
+                  {panelLang === 'es'
+                    ? 'No hay movimientos registrados en InsForge todavía'
+                    : 'No activity recorded in InsForge yet'}
+                </p>
+                <p className="text-[11px] text-stone-400 mt-0.5">
+                  {panelLang === 'es'
+                    ? 'Cualquier cambio, subida de foto o lead que gestiones aparecerá aquí en tiempo real.'
+                    : 'Any changes, uploads or leads managed will show up here in real time.'}
+                </p>
               </div>
-            ))}
+            ) : (
+              logs.map((log) => {
+                const isDelete = log.entity === 'delete' || log.entity === 'delete_doc';
+                const isUpload = log.entity === 'upload' || log.entity === 'upload_doc';
+                const isContact = log.entity === 'contact';
+                const isStatus = log.entity === 'status';
+                const isProfile = log.entity === 'profile' || log.entity === 'security';
+
+                const dotColor = isDelete
+                  ? 'bg-rose-500'
+                  : isUpload
+                  ? 'bg-emerald-500'
+                  : isContact
+                  ? 'bg-green-600'
+                  : isStatus
+                  ? 'bg-amber-500'
+                  : isProfile
+                  ? 'bg-purple-500'
+                  : 'bg-blue-500';
+
+                return (
+                  <div
+                    key={log.id}
+                    className="flex items-center justify-between p-3 rounded-2xl bg-stone-50 border border-stone-200/80 hover:bg-stone-100/80 transition-colors gap-3"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${dotColor} shrink-0 shadow-2xs`} />
+                      <span className="text-xs font-bold text-slate-900 truncate">
+                        {log.action}
+                      </span>
+                    </div>
+                    <span className="text-[10.5px] text-stone-500 font-semibold whitespace-nowrap shrink-0 font-mono">
+                      {log.time}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* 9. Modal de Feedback y Soporte a Musa */}
+      <Modal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        title={panelLang === 'es' ? 'Enviar Feedback o Problema' : 'Feedback & Support Box'}
+        subtitle={
+          panelLang === 'es'
+            ? 'Envía una consulta, reporte de error o idea de mejora directamente a Musa'
+            : 'Send an inquiry, bug report, or feature request directly to Musa'
+        }
+        footer={
+          <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-2.5">
+            <span className="text-[11px] text-stone-500 font-mono text-center sm:text-left">
+              v{installedVersion} • Ecuaplac Reformas
+            </span>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button
+                variant="secondary"
+                size="md"
+                type="button"
+                onClick={() => setIsFeedbackModalOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                {panelLang === 'es' ? 'Cerrar' : 'Close'}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4 pt-1">
+          {/* Selector de Categoría (Pills) */}
+          <div>
+            <label className="text-xs font-bold text-slate-800 block mb-2 font-display">
+              {panelLang === 'es' ? '¿De qué se trata tu mensaje?' : 'What is your message about?'}
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setFeedbackCategory('bug')}
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border text-center flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                  feedbackCategory === 'bug'
+                    ? 'bg-rose-50 border-rose-300 text-rose-800 shadow-xs ring-1 ring-rose-200'
+                    : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                <span>🐛</span>
+                <span>{panelLang === 'es' ? 'Problema' : 'Bug / Issue'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFeedbackCategory('idea')}
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border text-center flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                  feedbackCategory === 'idea'
+                    ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-xs ring-1 ring-amber-200'
+                    : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                <span>💡</span>
+                <span>{panelLang === 'es' ? 'Sugerencia' : 'Suggestion'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFeedbackCategory('question')}
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border text-center flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                  feedbackCategory === 'question'
+                    ? 'bg-blue-50 border-blue-300 text-blue-800 shadow-xs ring-1 ring-blue-200'
+                    : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                <span>💬</span>
+                <span>{panelLang === 'es' ? 'Duda Técnica' : 'Question'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Asunto Breve */}
+          <div>
+            <label className="text-xs font-bold text-slate-800 block mb-1 font-display">
+              {panelLang === 'es' ? 'Título o Asunto' : 'Subject'}
+            </label>
+            <input
+              type="text"
+              value={feedbackSubject}
+              onChange={(e) => setFeedbackSubject(e.target.value)}
+              placeholder={
+                feedbackCategory === 'bug'
+                  ? (panelLang === 'es' ? 'Ej: No carga una foto en Galería 2' : 'e.g. Cannot upload photo in Gallery 2')
+                  : feedbackCategory === 'idea'
+                  ? (panelLang === 'es' ? 'Ej: Me gustaría un botón para descargar presupuestos' : 'e.g. Would love a button to export leads')
+                  : (panelLang === 'es' ? 'Ej: ¿Cómo cambio el número de teléfono de la web?' : 'e.g. How do I change phone number?')
+              }
+              className="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 border border-stone-200 text-slate-900 text-xs focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all font-medium font-sans"
+            />
+          </div>
+
+          {/* Mensaje Detallado */}
+          <div>
+            <label className="text-xs font-bold text-slate-800 block mb-1 font-display">
+              {panelLang === 'es' ? 'Mensaje o Explicación' : 'Message Details'}
+            </label>
+            <textarea
+              rows={4}
+              value={feedbackMessage}
+              onChange={(e) => setFeedbackMessage(e.target.value)}
+              placeholder={
+                panelLang === 'es'
+                  ? 'Explica aquí con claridad qué ha sucedido o qué te gustaría añadir a la app...'
+                  : 'Write here what went wrong or what you would like to improve...'
+              }
+              className="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 border border-stone-200 text-slate-900 text-xs focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all resize-none font-medium leading-relaxed font-sans"
+            />
+          </div>
+
+          {/* Contexto técnico sutil */}
+          <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/70 flex items-center justify-between text-[11px] text-amber-900">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-[#C5A059] shrink-0" />
+              <span className="font-semibold truncate">
+                {panelLang === 'es' ? 'Destinatario: Musa (Desarrollador / MYNEXT)' : 'Recipient: Musa (Lead Developer / MYNEXT)'}
+              </span>
+            </div>
+            <span className="font-mono text-[10px] text-amber-800 font-bold shrink-0 ml-2">musaabdul3101@gmail.com</span>
+          </div>
+
+          {/* Botones de Envío: WhatsApp Directo + Email + Solo Registro */}
+          <div className="space-y-2 pt-1">
+            <button
+              type="button"
+              disabled={isSendingFeedback || !feedbackMessage.trim()}
+              onClick={() => handleSendFeedback('whatsapp')}
+              className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>{panelLang === 'es' ? 'Enviar por WhatsApp a Musa' : 'Send via WhatsApp to Musa'}</span>
+            </button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={isSendingFeedback || !feedbackMessage.trim()}
+                onClick={() => handleSendFeedback('email')}
+                className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
+              >
+                <Mail className="w-3.5 h-3.5 text-[#C5A059]" />
+                <span>{panelLang === 'es' ? 'Enviar por Correo' : 'Send by Email'}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isSendingFeedback || !feedbackMessage.trim()}
+                onClick={() => handleSendFeedback('system')}
+                className="py-2.5 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 disabled:opacity-50 disabled:cursor-not-allowed text-stone-800 font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-98 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5 text-stone-600" />
+                <span>{panelLang === 'es' ? 'Solo en el Sistema' : 'Log Only'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </Modal>
