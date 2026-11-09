@@ -519,7 +519,7 @@ export const GlassInput = forwardRef<HTMLInputElement, GlassInputProps>(
           <input
             ref={ref}
             className={cn(
-              "w-full h-full bg-transparent text-neutral-100 placeholder:text-neutral-400/70 border-none outline-none text-[15px] font-medium leading-none",
+              "w-full h-full bg-transparent text-white placeholder:text-slate-400/80 border-none outline-none text-[15px] sm:text-[16px] font-semibold leading-none tracking-wide",
               rightElement ? "pr-10" : "pr-0",
               className
             )}
@@ -777,13 +777,13 @@ export function SpaceLogin({
   titleStyle = "floating-wave",
   errorMessage,
 }: SpaceLoginProps) {
-  // Functional Remember Me state stored in localStorage
+  // Functional Remember Me state stored in localStorage (default false para máxima seguridad)
   const [rememberMe, setRememberMe] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("nextool_remember_me");
-      return saved !== null ? saved === "true" : true;
+      return saved === "true";
     }
-    return true;
+    return false;
   });
 
   const [email, setEmail] = useState<string>(() => {
@@ -916,7 +916,7 @@ export function SpaceLogin({
     <div
       onMouseMove={handleGlobalMouseMove}
       className={cn(
-        "relative min-h-screen min-h-[100dvh] w-full bg-[#03060f] text-white flex flex-col items-center justify-center overflow-x-hidden pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] px-4 select-none",
+        "relative min-h-screen min-h-[100dvh] w-full bg-[#03060f] text-white flex flex-col items-center justify-between overflow-x-hidden pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] px-4 select-none",
         className
       )}
     >
@@ -943,8 +943,13 @@ export function SpaceLogin({
         />
       </div>
 
-      {/* Central Container with Parallax Astronaut on larger screens */}
-      <div className="relative z-10 w-full max-w-5xl flex items-center justify-center py-10">
+      {/* 1. Capa Superior: Sign - In centrado arriba con buen tamaño */}
+      <header className="relative z-10 w-full flex items-center justify-center pt-3 sm:pt-6 select-none">
+        <SignInTitle styleId={titleStyle} />
+      </header>
+
+      {/* 2. Capa Central: Datos (Email, Contraseña, Recordarme y Acceder) Centrado en la Mitad */}
+      <div className="relative z-10 w-full max-w-5xl flex-1 flex items-center justify-center py-3 my-auto">
         {showAstronaut && (
           <motion.div
             animate={{
@@ -999,18 +1004,13 @@ export function SpaceLogin({
 
         {/* Central Sign In Form Container */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
           className="relative z-10 w-full max-w-[420px] mx-auto flex flex-col items-center"
         >
-          {/* Main Title Style Variant */}
-          <div className="mb-7 sm:mb-8 flex items-center justify-center">
-            <SignInTitle styleId={titleStyle} />
-          </div>
-
           {/* Form with spacious inputs */}
-          <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5">
+          <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4 sm:gap-4.5">
             {errorMessage && (
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
@@ -1026,9 +1026,10 @@ export function SpaceLogin({
             <div className="flex flex-col gap-2">
               <label
                 htmlFor="space-email"
-                className="text-sm sm:text-base font-semibold text-neutral-200 tracking-wide select-none"
+                className="text-xs sm:text-[13px] font-bold tracking-wider text-slate-100 uppercase select-none flex items-center gap-2 drop-shadow-[0_1px_4px_rgba(255,255,255,0.25)]"
               >
-                Email
+                <span className="w-1.5 h-1.5 rounded-full bg-[#ff7236] shadow-[0_0_8px_#ff7236]" />
+                <span>Email</span>
               </label>
               <GlassInput
                 id="space-email"
@@ -1048,9 +1049,10 @@ export function SpaceLogin({
             <div className="flex flex-col gap-2">
               <label
                 htmlFor="space-password"
-                className="text-sm sm:text-base font-semibold text-neutral-200 tracking-wide select-none"
+                className="text-xs sm:text-[13px] font-bold tracking-wider text-slate-100 uppercase select-none flex items-center gap-2 drop-shadow-[0_1px_4px_rgba(255,255,255,0.25)]"
               >
-                Contraseña
+                <span className="w-1.5 h-1.5 rounded-full bg-[#22d3ee] shadow-[0_0_8px_#22d3ee]" />
+                <span>Contraseña</span>
               </label>
               <GlassInput
                 id="space-password"
@@ -1068,12 +1070,12 @@ export function SpaceLogin({
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
-                    className="p-1 text-neutral-400 hover:text-neutral-200 focus:outline-none transition-colors"
+                    className="p-1 text-slate-300 hover:text-white focus:outline-none transition-all hover:scale-110 active:scale-95"
                   >
                     {showPassword ? (
-                      <EyeOff className="w-5 h-5 transition-transform active:scale-90" />
+                      <EyeOff className="w-5 h-5 text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
                     ) : (
-                      <Eye className="w-5 h-5 transition-transform active:scale-90" />
+                      <Eye className="w-5 h-5" />
                     )}
                   </button>
                 }
@@ -1088,15 +1090,15 @@ export function SpaceLogin({
               >
                 <div
                   className={cn(
-                    "w-4 h-4 rounded-[4px] border transition-all duration-150 flex items-center justify-center",
+                    "w-4.5 h-4.5 rounded-[5px] border transition-all duration-200 flex items-center justify-center shadow-xs",
                     rememberMe
-                      ? "bg-neutral-200 border-neutral-200 text-black shadow-sm"
-                      : "border-neutral-600 bg-white/5 group-hover:border-neutral-400"
+                      ? "bg-gradient-to-tr from-[#ff7236] to-[#ec4899] border-transparent text-white shadow-[0_0_10px_rgba(236,72,153,0.5)]"
+                      : "border-slate-500/70 bg-white/5 group-hover:border-sky-400/80 group-hover:bg-white/10"
                   )}
                 >
-                  {rememberMe && <Check className="w-3 h-3 stroke-[3]" />}
+                  {rememberMe && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                 </div>
-                <span className="text-neutral-300 group-hover:text-white transition-colors">
+                <span className="text-slate-200 group-hover:text-white font-medium tracking-wide transition-colors">
                   Recordarme
                 </span>
               </div>
@@ -1104,18 +1106,18 @@ export function SpaceLogin({
               <button
                 type="button"
                 onClick={handleOpenForgot}
-                className="text-neutral-300 hover:text-white font-medium transition-colors hover:underline underline-offset-4 select-none cursor-pointer"
+                className="text-sky-400 hover:text-sky-300 font-bold transition-all hover:underline underline-offset-4 select-none cursor-pointer tracking-wide drop-shadow-[0_0_10px_rgba(34,211,238,0.4)]"
               >
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
 
-            {/* Submit: 21st.dev Liquid Glass Button (Full Width Pill) */}
-            <div className="w-full pt-1">
+            {/* Submit: 21st.dev Liquid Glass Button (Full Width Pill - Gordito y Táctil) */}
+            <div className="w-full pt-1.5">
               <LiquidButton
                 type="submit"
                 disabled={isLoading || isSuccess}
-                className="w-full h-12 rounded-full font-bold text-sm sm:text-base tracking-wide shadow-xl cursor-pointer"
+                className="w-full !h-[54px] !min-h-[54px] sm:!h-[58px] sm:!min-h-[58px] rounded-full font-bold text-[15px] sm:text-base tracking-wide shadow-xl cursor-pointer"
               >
                 <AnimatePresence mode="wait">
                   {isLoading ? (
@@ -1124,9 +1126,9 @@ export function SpaceLogin({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="flex items-center gap-2 text-neutral-200"
+                      className="flex items-center gap-2 text-neutral-200 font-semibold"
                     >
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
                       <span>Iniciando sesión...</span>
                     </motion.div>
                   ) : isSuccess ? (
@@ -1135,7 +1137,7 @@ export function SpaceLogin({
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0 }}
-                      className="flex items-center gap-2 text-emerald-300"
+                      className="flex items-center gap-2 text-emerald-300 font-bold"
                     >
                       <Check className="w-4 h-4 stroke-[3]" />
                       <span>¡Acceso autorizado!</span>
@@ -1146,7 +1148,7 @@ export function SpaceLogin({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="text-white"
+                      className="text-white font-bold"
                     >
                       {buttonLabel}
                     </motion.span>
@@ -1155,21 +1157,37 @@ export function SpaceLogin({
               </LiquidButton>
             </div>
           </form>
-
-          {/* NexTool Footer Branding: Bathed right in the glowing planetary light horizon */}
-          <div className="mt-20 sm:mt-28 mb-6 flex flex-col items-center justify-center gap-3 select-none group">
-            <img
-              src="/nextool-logo.png"
-              alt="NexTool"
-              className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-[0_14px_45px_rgba(236,72,153,0.75)] group-hover:scale-105 transition-transform duration-300"
-              draggable={false}
-            />
-            <span className="text-sm sm:text-base font-black tracking-[0.35em] uppercase bg-gradient-to-r from-[#ff7236] via-[#ec4899] to-[#22d3ee] bg-clip-text text-transparent drop-shadow-[0_2px_18px_rgba(236,72,153,0.85)] font-sans">
-              NexTool
-            </span>
-          </div>
         </motion.div>
       </div>
+
+      {/* NexTool Footer Branding: Centrado abajo, sin hueco excesivo, calibrado exacto a la captura 2 */}
+      <footer className="relative z-10 w-full flex flex-col items-center justify-center pt-2 pb-1.5 sm:pb-3 select-none group">
+        <div className="relative flex flex-col items-center justify-center gap-2 sm:gap-2.5">
+          {/* Halo ambiental vivo detrás del logo para potenciar sus colores y eliminar la palidez */}
+          <div
+            className="absolute -inset-3 rounded-full opacity-75 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none blur-2xl"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(255, 107, 53, 0.45) 0%, rgba(236, 72, 153, 0.5) 45%, rgba(34, 211, 238, 0.3) 75%, transparent 100%)",
+            }}
+          />
+
+          <img
+            src="/nextool-logo.png"
+            alt="NexTool"
+            className="relative z-10 w-22 h-22 sm:w-26 sm:h-26 w-[88px] h-[88px] sm:w-[104px] sm:h-[104px] object-contain transition-transform duration-300 group-hover:scale-105"
+            style={{
+              filter:
+                "saturate(1.4) contrast(1.15) brightness(1.08) drop-shadow(0 10px 28px rgba(236,72,153,0.75)) drop-shadow(0 2px 14px rgba(34,211,238,0.5))",
+            }}
+            draggable={false}
+          />
+
+          <span className="relative z-10 text-[12.5px] sm:text-[13.5px] font-extrabold tracking-[0.28em] uppercase font-display bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent drop-shadow-[0_1px_10px_rgba(255,255,255,0.4)] select-none">
+            NEXTOOL
+          </span>
+        </div>
+      </footer>
 
       {/* Liquid Glass Modal de Recuperación de Contraseña */}
       <AnimatePresence>

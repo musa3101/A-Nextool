@@ -192,11 +192,26 @@ export class EcuaplacConnector {
       const cached = localStorage.getItem(this.storageKeyMoreProjects);
       if (cached) {
         const parsed = JSON.parse(cached);
+        // Verificar si la caché contiene los 4 proyectos viejos de Antes y Después (error de enlace anterior)
+        const isOldBeforeAfterData =
+          Array.isArray(parsed) &&
+          parsed.some(
+            (it: any) =>
+              it.image_before ||
+              it.image_after ||
+              it.title_es === 'Vestidor de Pladur y Roble' ||
+              it.title_es === 'Lavabo Flotante a Medida' ||
+              it.title_es === 'Escalera y Distribuidor de Roble'
+          );
+        if (isOldBeforeAfterData) {
+          localStorage.removeItem(this.storageKeyMoreProjects);
+          return DEFAULT_MORE_PROJECTS;
+        }
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((item: any) => ({
             ...item,
             type: 'more_projects' as const,
-            image_url: this.resolveImageUrl(item.image_after || item.image_url || item.image_before),
+            image_url: this.resolveImageUrl(item.image_url),
           }));
         }
       }
@@ -295,32 +310,40 @@ export class EcuaplacConnector {
   }
 
   /**
-   * Carga asíncrona de Proyectos (Más Reformas):
-   * 1. Consulta Supabase (ecuaplac_projects)
-   * 2. Respaldo en InsForge Cloud
+   * Carga asíncrona de Proyectos (Galería 2 - Más Reformas Realizadas):
+   * 1. Consulta Supabase (ecuaplac_more_projects)
+   * 2. Respaldo en InsForge Cloud (obras type: gallery)
+   * 3. Catálogo local auténtico de los 11 proyectos
    */
   async fetchProjectsOnline(): Promise<any[]> {
     try {
-      const res = await fetch(`${this.url}/rest/v1/${this.tables.projects}?select=*&order=sort_order.asc`, {
+      const res = await fetch(`${this.url}/rest/v1/${this.tables.moreProjects}?select=*&order=sort_order.asc`, {
         headers: this.getHeaders(),
       });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           const processed = data.map((item: any) => ({
-            ...item,
+            id: item.id,
             type: 'more_projects' as const,
-            image_url: this.resolveImageUrl(item.image_after || item.image_url || item.image_before, true),
+            title_es: item.title_es,
+            title_en: item.title_en || item.title_es,
+            location_es: item.location_es || 'Mallorca',
+            location_en: item.location_en || item.location_es || 'Mallorca',
+            image_url: this.resolveImageUrl(item.image_url, true),
+            sort_order: item.sort_order ?? 10,
+            active: item.active !== false,
+            fit_mode: item.fit_mode || 'cover',
           }));
           localStorage.setItem(this.storageKeyMoreProjects, JSON.stringify(processed));
           return processed;
         }
       }
     } catch (e) {
-      console.warn('Fallo de red al consultar Supabase (proyectos):', e);
+      console.warn('Supabase ecuaplac_more_projects no disponible, consultando respaldo:', e);
     }
 
-    // Respaldo en InsForge Cloud
+    // Respaldo en InsForge Cloud (obras con type = 'gallery')
     try {
       const { data, error } = await insforge.database
         .from('obras')
@@ -336,8 +359,8 @@ export class EcuaplacConnector {
           type: 'more_projects' as const,
           title_es: item.title_es,
           title_en: item.title_en || item.title_es,
-          location_es: item.location_es,
-          location_en: item.location_en,
+          location_es: item.location_es || 'Mallorca',
+          location_en: item.location_en || item.location_es || 'Mallorca',
           image_url: this.resolveImageUrl(item.image_url, true),
           sort_order: item.sort_order ?? 10,
           active: item.is_active !== false,
@@ -399,7 +422,7 @@ export class EcuaplacConnector {
             name: d.name || d.client_name || 'Cliente sin nombre',
             phone: d.phone || d.client_phone || '',
             email: d.email || d.client_email || '',
-            work_type: d.work_type || d.service_type || 'Reforma general',
+            work_type: d.message || d.work_type || d.service_type || 'Solicitud de presupuesto',
             budget_estimate: d.budget_estimate || (d.budget_estimated ? `${d.budget_estimated} €` : ''),
             status: d.status === 'aprobado' || d.status === 'approved' ? 'approved' : d.status === 'contactado' || d.status === 'contacted' ? 'contacted' : 'new',
             date: d.created_at
@@ -663,20 +686,17 @@ export class EcuaplacConnector {
     const isNew = !project.id || !this.isUUID(project.id);
     let savedProject = { ...project } as EcuaplacWorkItem;
 
-    // 1. Guardar en Supabase (ecuaplac_projects) -> La web viva ecuaplac.com se actualiza
+    // 1. Guardar en Supabase (ecuaplac_more_projects) -> La web viva ecuaplac.com se actualiza
     try {
       const endpoint = isNew
-        ? `${this.url}/rest/v1/${this.tables.projects}`
-        : `${this.url}/rest/v1/${this.tables.projects}?id=eq.${project.id}`;
+        ? `${this.url}/rest/v1/${this.tables.moreProjects}`
+        : `${this.url}/rest/v1/${this.tables.moreProjects}?id=eq.${project.id}`;
 
       const method = isNew ? 'POST' : 'PATCH';
       const supabasePayload: Record<string, any> = {
         title_es: project.title_es,
         title_en: project.title_en || project.title_es,
-        category_es: project.location_es || 'Proyecto',
-        category_en: project.location_en || project.location_es || 'Project',
-        image_before: project.image_url,
-        image_after: project.image_url,
+        image_url: project.image_url,
         sort_order: project.sort_order ?? 10,
         active: project.active !== false,
       };
@@ -730,7 +750,7 @@ export class EcuaplacConnector {
    * Elimina una obra o proyecto (Dual: Supabase + InsForge)
    */
   async deleteItem(type: 'works' | 'projects', id: string): Promise<boolean> {
-    const table = type === 'works' ? this.tables.carousel : this.tables.projects;
+    const table = type === 'works' ? this.tables.carousel : this.tables.moreProjects;
 
     // 1. Eliminar de Supabase (web ecuaplac.com)
     try {
@@ -837,7 +857,7 @@ export class EcuaplacConnector {
     } catch (e) {
       console.warn('Error consultando versión en InsForge:', e);
     }
-    return '001';
+    return '2.0.0';
   }
 
   /**

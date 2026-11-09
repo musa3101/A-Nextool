@@ -39,9 +39,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<UserSession>(() => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_SESSION_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
+      // 1. Verificar si hay sesión recordada en localStorage
+      const localSaved = localStorage.getItem(LOCAL_STORAGE_SESSION_KEY);
+      if (localSaved) {
+        const parsed = JSON.parse(localSaved);
+        if (parsed?.userId && parsed?.email) return parsed;
+      }
+      // 2. Verificar si hay sesión volátil de la pestaña activa en sessionStorage
+      const sessionSaved = sessionStorage.getItem(LOCAL_STORAGE_SESSION_KEY);
+      if (sessionSaved) {
+        const parsed = JSON.parse(sessionSaved);
         if (parsed?.userId && parsed?.email) return parsed;
       }
     } catch {
@@ -53,15 +60,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const isAuthenticated = Boolean(session.userId && session.email);
-
-  // Sincronizar estado con localStorage
-  useEffect(() => {
-    if (session.userId && session.email) {
-      localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(session));
-    } else {
-      localStorage.removeItem(LOCAL_STORAGE_SESSION_KEY);
-    }
-  }, [session]);
 
   const signInWithEmail = async (
     email: string,
@@ -117,7 +115,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           isImpersonating: false,
         };
         setSession(newSession);
-        if (remember) localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(newSession));
+        if (remember) {
+          localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(newSession));
+          sessionStorage.removeItem(LOCAL_STORAGE_SESSION_KEY);
+        } else {
+          sessionStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(newSession));
+          localStorage.removeItem(LOCAL_STORAGE_SESSION_KEY);
+        }
         return { success: true };
       }
 
@@ -132,7 +136,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
 
       setSession(newSession);
-      if (remember) localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(newSession));
+      if (remember) {
+        localStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(newSession));
+        sessionStorage.removeItem(LOCAL_STORAGE_SESSION_KEY);
+      } else {
+        sessionStorage.setItem(LOCAL_STORAGE_SESSION_KEY, JSON.stringify(newSession));
+        localStorage.removeItem(LOCAL_STORAGE_SESSION_KEY);
+      }
       return { success: true };
     } catch (err: any) {
       console.error('Error en autenticación InsForge:', err);
@@ -150,6 +160,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     setSession(GUEST_SESSION);
     localStorage.removeItem(LOCAL_STORAGE_SESSION_KEY);
+    sessionStorage.removeItem(LOCAL_STORAGE_SESSION_KEY);
+    localStorage.removeItem('nextool_saved_email');
+    localStorage.setItem('nextool_remember_me', 'false');
   };
 
   const loginAsSuperadmin = () => {

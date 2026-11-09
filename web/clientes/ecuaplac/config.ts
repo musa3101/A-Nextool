@@ -14,10 +14,12 @@ export interface EcuaplacClientConfig {
     bucket: string;
     tables: {
       carousel: string;
-      projects: string;
+      moreProjects: string;
+      beforeAfter: string;
       adminProfile: string;
       adminLogs: string;
       leads: string;
+      contact?: string;
     };
   };
   cloudflare?: {
@@ -40,11 +42,13 @@ export const ECUAPLAC_CONFIG: EcuaplacClientConfig = {
     anonKey: 'sb_publishable_ym3HAoFGlToeBAQu1yMd3A_m7Gx4GNI',
     bucket: 'ecuaplac-media',
     tables: {
-      carousel: 'ecuaplac_carousel',
-      projects: 'ecuaplac_projects',
+      carousel: 'ecuaplac_galeria_1',
+      moreProjects: 'ecuaplac_galeria_2',
+      beforeAfter: 'ecuaplac_projects',
       adminProfile: 'ecuaplac_admin_profile',
       adminLogs: 'ecuaplac_admin_logs',
       leads: 'ecuaplac_leads',
+      contact: 'ecuaplac_contact',
     },
   },
   cloudflare: {

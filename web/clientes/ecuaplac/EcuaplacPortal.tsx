@@ -182,7 +182,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [loginEmail, setLoginEmail] = useState('ecuaplacbyjyg@gmail.com');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loginRemember, setLoginRemember] = useState(true);
+  const [loginRemember, setLoginRemember] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -208,6 +208,13 @@ export const EcuaplacPortal: React.FC = () => {
 
   // Tab: 'inicio' | 'obras' (Galería 1) | 'more_projects' (Galería 2) | 'ajustes'
   const [activeTab, setActiveTab] = useState<'inicio' | 'obras' | 'more_projects' | 'ajustes'>('inicio');
+
+  // Garantizar que al iniciar sesión o acceder al portal la pestaña activa sea siempre 'inicio'
+  useEffect(() => {
+    if (isAuthenticated) {
+      setActiveTab('inicio');
+    }
+  }, [isAuthenticated]);
 
   // Idioma del Panel ('es' | 'en') persistido en localStorage
   const [panelLang, setPanelLang] = useState<'es' | 'en'>(() => {
@@ -562,16 +569,16 @@ export const EcuaplacPortal: React.FC = () => {
   const [deviceFeedback, setDeviceFeedback] = useState<string | null>(null);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '001';
+  const CURRENT_SYSTEM_VERSION = '2.0.0';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // Si la caché tenía la versión '000' vieja, la actualizamos automáticamente a '001'
-    if (!cached || cached === '000') {
-      localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
-      return CURRENT_SYSTEM_VERSION;
+    // Normalizar a versión 2.0.0 si la caché tenía versiones legacy (000, 001, 1.0, 200, etc.)
+    if (!cached || cached === '000' || cached === '001' || cached === '1.0' || cached === '200' || cached === 'v2.0.0') {
+      localStorage.setItem('nextool_app_version', '2.0.0');
+      return '2.0.0';
     }
     return cached;
   });
@@ -628,7 +635,7 @@ export const EcuaplacPortal: React.FC = () => {
 
   const handleInstallUpdate = async () => {
     setUpdateCheckState('installing');
-    const targetVer = newVersionNotice || (simulatedUpdateAvailable ? '002' : CURRENT_SYSTEM_VERSION);
+    const targetVer = newVersionNotice || (simulatedUpdateAvailable ? '2.0.1' : CURRENT_SYSTEM_VERSION);
     try {
       await ecuaplacConnector.updateTenantVersion(targetVer);
     } catch {}
@@ -1516,6 +1523,7 @@ export const EcuaplacPortal: React.FC = () => {
             setLoginError(res.error || (panelLang === 'es' ? 'Error al iniciar sesión' : 'Sign in failed'));
             throw new Error(res.error || 'Login failed');
           } else {
+            setActiveTab('inicio');
             showSyncToast(
               panelLang === 'es' ? 'Bienvenido a tu panel de Ecuaplac' : 'Welcome to your Ecuaplac portal',
               'success'
@@ -1570,7 +1578,7 @@ export const EcuaplacPortal: React.FC = () => {
           href="https://ecuaplac.com"
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-md shadow-xs text-white hover:text-[#C5A059] transition-all text-xs font-semibold"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[38px] sm:min-h-0 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-md shadow-xs text-white hover:text-[#C5A059] transition-all text-xs font-semibold"
           title={panelLang === 'es' ? 'Ver ecuaplac.com en directo' : 'View ecuaplac.com live'}
         >
           <ExternalLink className="w-3.5 h-3.5 text-[#C5A059]" />
@@ -1639,7 +1647,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCfPeriod('30d')}
-                className={`px-4 py-1.5 rounded-full text-xs font-black transition-all active:scale-95 ${
+                className={`px-4 py-2 min-h-[36px] sm:min-h-0 rounded-full text-xs font-black transition-all active:scale-95 ${
                   cfPeriod === '30d'
                     ? 'bg-slate-900 text-[#F0CF85] shadow-md'
                     : 'text-stone-600 hover:text-slate-900'
@@ -1650,7 +1658,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCfPeriod('3m')}
-                className={`px-4 py-1.5 rounded-full text-xs font-black transition-all active:scale-95 ${
+                className={`px-4 py-2 min-h-[36px] sm:min-h-0 rounded-full text-xs font-black transition-all active:scale-95 ${
                   cfPeriod === '3m'
                     ? 'bg-slate-900 text-[#F0CF85] shadow-md'
                     : 'text-stone-600 hover:text-slate-900'
@@ -1661,8 +1669,8 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Bloque 1: Métricas Maestras con Estética de Lujo & Animación de Cifras */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          {/* Bloque 1: Métricas Maestras (Visitantes y Presupuestos Reales de Ecuaplac) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             {/* KPI 1: Audiencia & Visitantes Reales */}
             <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-5 sm:p-6 border border-sky-100 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-4">
               {/* Resplandor suave */}
@@ -1708,54 +1716,8 @@ export const EcuaplacPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* KPI 2: Rendimiento & Velocidad Cloudflare Edge */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FFFDF8] to-[#FEF9EC] rounded-3xl p-5 sm:p-6 border border-amber-200/60 shadow-[0_10px_30px_-8px_rgba(212,175,55,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(212,175,55,0.18)] transition-all group flex flex-col justify-between gap-4">
-              {/* Resplandor suave */}
-              <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
-
-              <div className="flex items-center justify-between relative z-10">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 via-[#C5A059] to-[#9E782F] text-slate-950 flex items-center justify-center shadow-[0_6px_18px_rgba(212,175,55,0.35)] group-hover:scale-105 transition-transform">
-                  <Zap className="w-6 h-6 fill-slate-950" />
-                </div>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-xs font-mono font-bold shadow-xs">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                  </span>
-                  <span>{cfMetrics.uptime} online</span>
-                </span>
-              </div>
-
-              <div className="relative z-10">
-                <span className="text-[11px] font-black text-stone-400 uppercase tracking-wider block">
-                  Velocidad de Carga Media
-                </span>
-                <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight block mt-1 font-mono">
-                  {cfMetrics.avgLoadTime}
-                </span>
-                <span className="text-xs text-stone-500 mt-1.5 flex items-center gap-1.5 font-medium">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                  <span>{cfMetrics.edgeHitRatio} en caché ultra-rápida (Edge)</span>
-                </span>
-              </div>
-
-              {/* Barra de progreso de caché */}
-              <div className="pt-2 border-t border-amber-200/50 relative z-10 space-y-1">
-                <div className="flex justify-between text-[10px] font-bold text-stone-500">
-                  <span>Caché Servidor Mallorca</span>
-                  <span className="text-amber-800 font-mono">{cfMetrics.edgeHitRatio}</span>
-                </div>
-                <div className="w-full bg-stone-200/60 rounded-full h-2 overflow-hidden shadow-inner">
-                  <div
-                    className="bg-gradient-to-r from-amber-400 to-[#C5A059] h-full rounded-full transition-all duration-1000"
-                    style={{ width: cfMetrics.edgeHitRatio }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* KPI 3: Solicitudes de Presupuesto (Leads) */}
-            <div className="sm:col-span-2 lg:col-span-1 relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-emerald-100 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
+            {/* KPI 2: Solicitudes de Presupuesto (Leads de reformas de Ecuaplac) */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-emerald-100 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -1797,7 +1759,7 @@ export const EcuaplacPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsLeadsModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold shadow-xs active:scale-95 transition-all group/btn font-sans cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold shadow-xs active:scale-95 transition-all group/btn font-sans cursor-pointer"
                   title="Abrir bandeja de presupuestos"
                 >
                   <span>Ver Bandeja</span>
@@ -1836,7 +1798,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleToggleFacturas}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold active:scale-95 transition-all shadow-xs font-sans group cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold active:scale-95 transition-all shadow-xs font-sans group cursor-pointer shrink-0"
                 title={isFacturasOpen ? 'Ocultar panel de facturas' : 'Abrir facturas'}
               >
                 <span>{isFacturasOpen ? 'Ocultar Facturas' : 'Abrir Facturas'}</span>
@@ -2409,7 +2371,7 @@ export const EcuaplacPortal: React.FC = () => {
                         {updateCheckState === 'available' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 font-sans">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                            <span>{panelLang === 'es' ? 'Nueva v001' : 'New v001'}</span>
+                            <span>{panelLang === 'es' ? `Nueva v${newVersionNotice || '2.0.1'}` : `New v${newVersionNotice || '2.0.1'}`}</span>
                           </span>
                         ) : updateCheckState === 'up-to-date' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-sans">
@@ -2538,7 +2500,9 @@ export const EcuaplacPortal: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#C5A059]/20 text-[#F6E27A] text-[10px] font-bold border border-[#C5A059]/40">
                               <Sparkles className="w-3 h-3" />
-                              {panelLang === 'es' ? 'Nueva Versión Lista · v002' : 'New Version Ready · v002'}
+                              {panelLang === 'es'
+                                ? `Nueva Versión Lista · v${newVersionNotice || '2.0.1'}`
+                                : `New Version Ready · v${newVersionNotice || '2.0.1'}`}
                             </span>
                             <span className="text-[10px] text-stone-300 font-mono">1.8 MB</span>
                           </div>
@@ -2571,7 +2535,9 @@ export const EcuaplacPortal: React.FC = () => {
                         <div className="flex items-center justify-between text-xs font-bold text-slate-800">
                           <span className="flex items-center gap-2">
                             <Loader2 className="w-3.5 h-3.5 text-[#C5A059] animate-spin" />
-                            {panelLang === 'es' ? 'Instalando actualización v002...' : 'Installing update v002...'}
+                            {panelLang === 'es'
+                              ? `Instalando actualización v${newVersionNotice || '2.0.1'}...`
+                              : `Installing update v${newVersionNotice || '2.0.1'}...`}
                           </span>
                           <span className="font-mono text-[#C5A059]">100%</span>
                         </div>
@@ -2590,7 +2556,9 @@ export const EcuaplacPortal: React.FC = () => {
                         <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
                         <div>
                           <span className="text-xs font-black block">
-                            {panelLang === 'es' ? '¡Versión v002 instalada con éxito!' : 'Version v002 installed successfully!'}
+                            {panelLang === 'es'
+                              ? `¡Versión v${installedVersion} instalada con éxito!`
+                              : `Version v${installedVersion} installed successfully!`}
                           </span>
                           <span className="text-[11px] text-emerald-100 font-medium block">
                             {panelLang === 'es' ? 'Reiniciando la aplicación en unos segundos...' : 'Restarting app in a few seconds...'}
@@ -2635,6 +2603,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={async () => {
+                  setActiveTab('inicio');
                   await signOut();
                   setDeviceFeedback(
                     panelLang === 'es' ? 'Sesión cerrada en este dispositivo.' : 'Session signed out on this device.'
@@ -3030,32 +2999,32 @@ export const EcuaplacPortal: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 5. Modal Dedicado de Bandeja de Presupuestos (CRM Leads de ecuaplac.com — Estilo Gmail Executive) */}
+      {/* 5. Modal Dedicado de Bandeja de Presupuestos (CRM Leads de ecuaplac.com — Estilo Executive Luxury) */}
       <Modal
         isOpen={isLeadsModalOpen}
         onClose={() => setIsLeadsModalOpen(false)}
-        theme="dark"
+        theme="light"
         maxWidth="3xl"
         title={panelLang === 'es' ? 'Bandeja de Presupuestos' : 'Inquiries & Quotes Inbox'}
         subtitle={
           panelLang === 'es'
-            ? 'Solicitudes de clientes recibidas desde ecuaplac.com'
-            : 'Customer inquiries received from ecuaplac.com'
+            ? 'Solicitudes desde ecuaplac.com'
+            : 'Leads from ecuaplac.com'
         }
         headerExtra={
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               Supabase Live
             </span>
             <button
               type="button"
               onClick={handleRefreshLeads}
               disabled={isSyncingLeads}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-white/10 hover:border-amber-400/40 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-stone-100 hover:bg-stone-200 border border-stone-200/90 text-xs font-semibold text-stone-700 hover:text-stone-900 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
               title={panelLang === 'es' ? 'Sincronizar con Supabase' : 'Sync with Supabase'}
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-[#F0CF85] ${isSyncingLeads ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-[#C5A059] ${isSyncingLeads ? 'animate-spin' : ''}`} />
               <span className="hidden md:inline">{panelLang === 'es' ? 'Sincronizar' : 'Sync'}</span>
             </button>
           </div>
@@ -3067,14 +3036,14 @@ export const EcuaplacPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleRestoreDefaultLeads}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-xs font-bold transition-all active:scale-95"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 hover:text-stone-900 border border-stone-200 text-xs font-bold transition-all active:scale-95"
                 >
-                  <RotateCcw className="w-3.5 h-3.5 text-[#F0CF85]" />
+                  <RotateCcw className="w-3.5 h-3.5 text-[#C5A059]" />
                   <span>{panelLang === 'es' ? 'Restaurar Ejemplos' : 'Restore Demo Leads'}</span>
                 </button>
               )}
               {copiedField && (
-                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 animate-in fade-in">
+                <span className="text-xs font-bold text-emerald-700 flex items-center gap-1 animate-in fade-in">
                   <Check className="w-3.5 h-3.5" />
                   <span>{copiedField} copiado</span>
                 </span>
@@ -3085,7 +3054,7 @@ export const EcuaplacPortal: React.FC = () => {
               size="md"
               type="button"
               onClick={() => setIsLeadsModalOpen(false)}
-              className="bg-slate-900 hover:bg-slate-800 text-slate-200 border-white/10"
+              className="bg-stone-100 hover:bg-stone-200 text-stone-800 border-stone-200"
             >
               {panelLang === 'es' ? 'Cerrar' : 'Close'}
             </Button>
@@ -3093,10 +3062,10 @@ export const EcuaplacPortal: React.FC = () => {
         }
       >
         <div className="space-y-4">
-          {/* Barra de Búsqueda Inteligente (Estilo Gmail) */}
+          {/* Barra de Búsqueda Ejecutiva */}
           <div className="relative">
-            <div className="flex items-center bg-slate-900/90 border border-white/10 focus-within:border-amber-400/50 rounded-2xl px-3.5 py-2.5 transition-all shadow-inner">
-              <Search className="w-4 h-4 text-slate-400 shrink-0 mr-2.5" />
+            <div className="flex items-center bg-stone-50 border border-stone-200/90 focus-within:bg-white focus-within:border-[#C5A059] focus-within:ring-2 focus-within:ring-[#C5A059]/15 rounded-2xl px-3.5 py-2.5 transition-all shadow-2xs">
+              <Search className="w-4 h-4 text-stone-400 shrink-0 mr-2.5" />
               <input
                 type="search"
                 inputMode="search"
@@ -3107,16 +3076,16 @@ export const EcuaplacPortal: React.FC = () => {
                 onChange={(e) => setLeadSearchQuery(e.target.value)}
                 placeholder={
                   panelLang === 'es'
-                    ? 'Buscar por cliente, teléfono, email, localidad o descripción...'
-                    : 'Search by client, phone, email, location or work...'
+                    ? 'Buscar por cliente, teléfono, email o descripción...'
+                    : 'Search by client, phone, email or work description...'
                 }
-                className="w-full bg-transparent text-base sm:text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none"
+                className="w-full bg-transparent text-base sm:text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none"
               />
               {leadSearchQuery && (
                 <button
                   type="button"
                   onClick={() => setLeadSearchQuery('')}
-                  className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-1 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -3124,20 +3093,20 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Filtros rápidos con Conteo Dinámico estilo Pestañas de Correo */}
+          {/* Filtros rápidos con Conteo Dinámico */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
             <button
               type="button"
               onClick={() => setLeadFilter('all')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'all'
-                  ? 'bg-[#C5A059] text-slate-950 shadow-md font-extrabold ring-1 ring-[#C5A059]'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-white/5'
+                  ? 'bg-[#0F172A] text-white shadow-xs font-extrabold'
+                  : 'bg-stone-100 text-stone-600 hover:text-stone-900 hover:bg-stone-200/70 border border-stone-200/70'
               }`}
             >
               <Inbox className="w-3.5 h-3.5" />
               <span>{panelLang === 'es' ? 'Todos' : 'All'}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'all' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'all' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-600'}`}>
                 {leads.length}
               </span>
             </button>
@@ -3147,13 +3116,13 @@ export const EcuaplacPortal: React.FC = () => {
               onClick={() => setLeadFilter('new')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'new'
-                  ? 'bg-rose-600 text-white shadow-md ring-1 ring-rose-500'
-                  : 'bg-rose-950/30 text-rose-300 border border-rose-500/20 hover:bg-rose-950/50'
+                  ? 'bg-rose-600 text-white shadow-xs font-extrabold'
+                  : 'bg-rose-50 text-rose-700 border border-rose-200/80 hover:bg-rose-100/70'
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'new' ? 'bg-white' : 'bg-rose-500 animate-pulse'}`} />
               <span>{panelLang === 'es' ? 'No contestados' : 'Unanswered'}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'new' ? 'bg-white/20 text-white' : 'bg-rose-900/40 text-rose-300'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'new' ? 'bg-white/20 text-white' : 'bg-rose-200/70 text-rose-800'}`}>
                 {leads.filter((l) => l.status === 'new').length}
               </span>
             </button>
@@ -3163,13 +3132,13 @@ export const EcuaplacPortal: React.FC = () => {
               onClick={() => setLeadFilter('contacted')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'contacted'
-                  ? 'bg-amber-600 text-white shadow-md ring-1 ring-amber-500'
-                  : 'bg-amber-950/30 text-amber-300 border border-amber-500/20 hover:bg-amber-950/50'
+                  ? 'bg-amber-600 text-white shadow-xs font-extrabold'
+                  : 'bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100/70'
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'contacted' ? 'bg-white' : 'bg-amber-400'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'contacted' ? 'bg-white' : 'bg-amber-500'}`} />
               <span>{panelLang === 'es' ? 'En contacto' : 'Contacted'}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'contacted' ? 'bg-white/20 text-white' : 'bg-amber-900/40 text-amber-300'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'contacted' ? 'bg-white/20 text-white' : 'bg-amber-200/70 text-amber-900'}`}>
                 {leads.filter((l) => l.status === 'contacted').length}
               </span>
             </button>
@@ -3179,29 +3148,29 @@ export const EcuaplacPortal: React.FC = () => {
               onClick={() => setLeadFilter('approved')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                 leadFilter === 'approved'
-                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-500'
-                  : 'bg-emerald-950/30 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-950/50'
+                  ? 'bg-emerald-700 text-white shadow-xs font-extrabold'
+                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100/70'
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'approved' ? 'bg-white' : 'bg-emerald-400'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${leadFilter === 'approved' ? 'bg-white' : 'bg-emerald-500'}`} />
               <span>{panelLang === 'es' ? 'Aprobados' : 'Accepted'}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'approved' ? 'bg-white/20 text-white' : 'bg-emerald-900/40 text-emerald-300'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${leadFilter === 'approved' ? 'bg-white/20 text-white' : 'bg-emerald-200/70 text-emerald-900'}`}>
                 {leads.filter((l) => l.status === 'approved').length}
               </span>
             </button>
           </div>
 
-          {/* Lista de Leads (Estilo Bandeja Gmail) */}
-          <div className="space-y-3 max-h-[62vh] overflow-y-auto pr-1">
+          {/* Lista de Solicitudes / Leads */}
+          <div className="space-y-3.5 max-h-[62vh] overflow-y-auto pr-1">
             {filteredLeads.length === 0 ? (
-              <div className="py-12 px-4 text-center rounded-2xl bg-slate-900/50 border border-white/5 space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-slate-800/80 text-[#F0CF85] flex items-center justify-center mx-auto shadow-inner">
+              <div className="py-12 px-4 text-center rounded-2xl bg-stone-50 border border-stone-200/80 space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-white text-[#C5A059] flex items-center justify-center mx-auto shadow-2xs border border-stone-200/60">
                   <Inbox className="w-6 h-6" />
                 </div>
-                <h4 className="font-bold text-sm text-slate-200">
+                <h4 className="font-bold text-sm text-stone-800">
                   {panelLang === 'es' ? 'No hay presupuestos en esta sección' : 'No inquiries found'}
                 </h4>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                <p className="text-xs text-stone-500 max-w-sm mx-auto">
                   {leadSearchQuery
                     ? panelLang === 'es'
                       ? `No hay resultados para "${leadSearchQuery}". Prueba con otro término.`
@@ -3214,9 +3183,9 @@ export const EcuaplacPortal: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleRestoreDefaultLeads}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[#F0CF85] text-xs font-bold border border-white/10 transition-all active:scale-95"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 text-xs font-bold border border-stone-200 shadow-2xs transition-all active:scale-95"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-3.5 h-3.5 text-[#C5A059]" />
                     <span>{panelLang === 'es' ? 'Cargar ejemplos visuales' : 'Load visual examples'}</span>
                   </button>
                 )}
@@ -3237,31 +3206,31 @@ export const EcuaplacPortal: React.FC = () => {
                   <div
                     key={lead.id}
                     onClick={() => setSelectedLeadId((prev) => (prev === lead.id ? null : lead.id))}
-                    className={`group relative rounded-2xl p-4 transition-all duration-200 border cursor-pointer ${
+                    className={`group relative rounded-2xl p-4 sm:p-5 transition-all duration-200 border cursor-pointer ${
                       isSelected
-                        ? 'bg-slate-800/95 border-amber-400/40 shadow-xl ring-1 ring-[#C5A059]/30'
-                        : 'bg-[#0F172A]/90 hover:bg-slate-800/80 border-white/5 hover:border-white/15 shadow-sm'
+                        ? 'bg-white border-[#C5A059] shadow-md ring-2 ring-[#C5A059]/15'
+                        : 'bg-stone-50/70 hover:bg-white border-stone-200/90 hover:border-[#C5A059]/40 shadow-2xs hover:shadow-sm'
                     } flex flex-col gap-3.5`}
                   >
                     {/* Fila Cabecera: Monograma, Nombre y Estado */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0">
                         {/* Avatar Iniciales */}
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-950 text-[#F0CF85] border border-white/10 flex items-center justify-center font-bold text-sm tracking-wider shadow-inner shrink-0 group-hover:scale-105 transition-transform">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0F172A] to-[#1E293B] text-[#C5A059] border border-stone-200/40 flex items-center justify-center font-bold text-sm tracking-wider shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
                           {initials || 'EC'}
                         </div>
 
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-extrabold text-sm sm:text-base text-white tracking-tight truncate">
+                            <h4 className="font-extrabold text-sm sm:text-base text-stone-900 tracking-tight truncate">
                               {lead.name}
                             </h4>
-                            <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                            <span className="text-[10px] text-stone-400 font-mono hidden sm:inline">
                               #{String(lead.id || '').slice(0, 8)}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-                            <Clock className="w-3 h-3 text-slate-500 shrink-0" />
+                          <div className="flex items-center gap-2 text-[11px] text-stone-500 mt-0.5">
+                            <Clock className="w-3 h-3 text-stone-400 shrink-0" />
                             <span>{lead.date}</span>
                           </div>
                         </div>
@@ -3270,27 +3239,27 @@ export const EcuaplacPortal: React.FC = () => {
                       {/* Badge de Estado */}
                       <div className="shrink-0">
                         {lead.status === 'new' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-extrabold">
-                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                             {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
                           </span>
                         ) : lead.status === 'contacted' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-extrabold">
-                            <span className="w-2 h-2 rounded-full bg-amber-400" />
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                             {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-extrabold">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                            {panelLang === 'es' ? 'Obra Aceptada' : 'Accepted'}
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            {panelLang === 'es' ? 'Aprobado' : 'Accepted'}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Mensaje / Tipo de Obra (Estilo Asunto de Gmail) */}
-                    <div className="bg-slate-950/70 rounded-xl p-3 border border-white/5 shadow-inner">
-                      <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
+                    {/* Mensaje / Tipo de Obra */}
+                    <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-stone-200/80 border-l-[3px] border-l-[#C5A059] shadow-2xs">
+                      <p className="text-xs sm:text-sm text-stone-800 leading-relaxed font-medium">
                         «{lead.work_type}»
                       </p>
                     </div>
@@ -3298,11 +3267,11 @@ export const EcuaplacPortal: React.FC = () => {
                     {/* Fila de Datos: Presupuesto, Teléfono, Email */}
                     <div className="flex flex-wrap items-center gap-2">
                       {lead.budget_estimate && (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/80 border border-[#C5A059]/25 text-[#F0CF85] text-xs font-bold shadow-xs">
-                          <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50/90 border border-amber-200 text-amber-900 text-xs font-bold shadow-2xs">
+                          <span className="text-[10px] text-amber-700/80 uppercase tracking-wider font-semibold">
                             {panelLang === 'es' ? 'Presupuesto:' : 'Budget:'}
                           </span>
-                          <span className="font-mono">{lead.budget_estimate}</span>
+                          <span className="font-mono font-extrabold">{lead.budget_estimate}</span>
                         </div>
                       )}
 
@@ -3313,12 +3282,12 @@ export const EcuaplacPortal: React.FC = () => {
                             e.stopPropagation();
                             handleCopyLeadInfo(lead.phone, 'Teléfono');
                           }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/50 border border-white/5 text-slate-300 hover:text-white hover:border-white/20 text-xs font-mono transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-300 text-xs font-mono transition-colors shadow-2xs active:scale-95"
                           title="Clic para copiar teléfono"
                         >
-                          <Phone className="w-3 h-3 text-[#F0CF85]" />
+                          <Phone className="w-3 h-3 text-[#C5A059]" />
                           <span>{lead.phone}</span>
-                          <Copy className="w-2.5 h-2.5 text-slate-500 ml-0.5" />
+                          <Copy className="w-2.5 h-2.5 text-stone-400 ml-0.5" />
                         </button>
                       )}
 
@@ -3329,92 +3298,99 @@ export const EcuaplacPortal: React.FC = () => {
                             e.stopPropagation();
                             handleCopyLeadInfo(lead.email, 'Email');
                           }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/50 border border-white/5 text-slate-400 hover:text-white hover:border-white/20 text-xs font-mono transition-colors truncate max-w-[220px]"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-300 text-xs font-mono transition-colors shadow-2xs truncate max-w-[220px] active:scale-95"
                           title="Clic para copiar correo"
                         >
-                          <Mail className="w-3 h-3 text-slate-400" />
+                          <Mail className="w-3 h-3 text-stone-400" />
                           <span className="truncate">{lead.email}</span>
-                          <Copy className="w-2.5 h-2.5 text-slate-500 ml-0.5 shrink-0" />
+                          <Copy className="w-2.5 h-2.5 text-stone-400 ml-0.5 shrink-0" />
                         </button>
                       )}
                     </div>
 
-                    {/* Nota interna si existe */}
+                    {/* Nota interna con icono sobrio de documento (Sin estrellas/sparkles AI) */}
                     {lead.notes && (
-                      <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 text-xs text-amber-200/90">
-                        <Sparkles className="w-3.5 h-3.5 text-[#F0CF85] shrink-0 mt-0.5" />
+                      <div className="flex items-start gap-2 bg-stone-100/90 border border-stone-200/90 rounded-xl p-2.5 text-xs text-stone-700">
+                        <FileText className="w-3.5 h-3.5 text-[#C5A059] shrink-0 mt-0.5" />
                         <span>
-                          <strong className="text-[#F0CF85]">{panelLang === 'es' ? 'Nota:' : 'Note:'}</strong> {lead.notes}
+                          <strong className="text-stone-900 font-bold">{panelLang === 'es' ? 'Nota:' : 'Note:'}</strong> {lead.notes}
                         </span>
                       </div>
                     )}
 
-                    {/* Barra de Acciones Ejecutivas 1-Tap */}
+                    {/* Barra de Acciones Ejecutivas: 2 Filas Claras y Cómodas */}
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="pt-2.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5"
+                      className="pt-3 border-t border-stone-200/80 flex flex-col gap-2.5"
                     >
-                      {/* Botones de Contacto Directo */}
-                      <div className="flex items-center gap-2">
-                        {lead.phone && (
-                          <>
-                            <a
-                              href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone)}?text=${encodeURIComponent(
-                                `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto para: ${lead.work_type}.`
-                              )}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 px-3.5 py-2 min-h-[40px] rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-md shadow-emerald-950/40 transition-all active:scale-95"
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              <span>WhatsApp</span>
-                            </a>
-                            <a
-                              href={`tel:${lead.phone}`}
-                              className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-white/10 shadow-xs transition-all active:scale-95"
-                            >
-                              <Phone className="w-3.5 h-3.5 text-[#F0CF85]" />
-                              <span>{panelLang === 'es' ? 'Llamar' : 'Call'}</span>
-                            </a>
-                          </>
-                        )}
-                      </div>
+                      {/* Fila 1: Contacto Inmediato WhatsApp y Llamada */}
+                      {lead.phone && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <a
+                            href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone)}?text=${encodeURIComponent(
+                              `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto para: ${lead.work_type}.`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 min-h-[42px] rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white font-bold text-xs shadow-xs transition-all active:scale-98"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <span>WhatsApp</span>
+                          </a>
+                          <a
+                            href={`tel:${lead.phone}`}
+                            className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 min-h-[42px] rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all active:scale-98"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-[#C5A059]" />
+                            <span>{panelLang === 'es' ? 'Llamar' : 'Call'}</span>
+                          </a>
+                        </div>
+                      )}
 
-                      {/* Botones de Cambio de Estado y Borrado */}
-                      <div className="flex items-center gap-1.5 flex-wrap ml-auto">
-                        {lead.status !== 'new' && (
+                      {/* Fila 2: Segmented Control de Estados (1-Click) + Botón Eliminar */}
+                      <div className="flex items-center gap-2">
+                        {/* Selector de estado segmentado */}
+                        <div className="flex-1 grid grid-cols-3 gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200/80">
                           <button
                             type="button"
                             onClick={() => handleUpdateLeadStatus(lead.id, 'new')}
-                            className="px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-bold text-rose-300 bg-rose-950/40 border border-rose-500/20 hover:bg-rose-900/40 transition-all active:scale-95"
+                            className={`py-1.5 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center leading-none ${
+                              lead.status === 'new'
+                                ? 'bg-white text-rose-700 shadow-2xs border border-rose-200/80 font-extrabold'
+                                : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
+                            }`}
                           >
-                            {panelLang === 'es' ? 'No Contestado' : 'Unanswered'}
+                            {panelLang === 'es' ? 'Pendiente' : 'Pending'}
                           </button>
-                        )}
-                        {lead.status !== 'contacted' && (
                           <button
                             type="button"
                             onClick={() => handleUpdateLeadStatus(lead.id, 'contacted')}
-                            className="px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-bold text-amber-300 bg-amber-950/40 border border-amber-500/20 hover:bg-amber-900/40 transition-all active:scale-95"
+                            className={`py-1.5 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center leading-none ${
+                              lead.status === 'contacted'
+                                ? 'bg-white text-amber-800 shadow-2xs border border-amber-200/80 font-extrabold'
+                                : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
+                            }`}
                           >
-                            {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
+                            {panelLang === 'es' ? 'En contacto' : 'Contacted'}
                           </button>
-                        )}
-                        {lead.status !== 'approved' && (
                           <button
                             type="button"
                             onClick={() => handleUpdateLeadStatus(lead.id, 'approved')}
-                            className="px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-bold text-emerald-300 bg-emerald-950/40 border border-emerald-500/20 hover:bg-emerald-900/40 transition-all active:scale-95"
+                            className={`py-1.5 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center leading-none ${
+                              lead.status === 'approved'
+                                ? 'bg-white text-emerald-800 shadow-2xs border border-emerald-200/80 font-extrabold'
+                                : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
+                            }`}
                           >
                             {panelLang === 'es' ? 'Aprobado' : 'Accepted'}
                           </button>
-                        )}
+                        </div>
 
-                        {/* Botón de Borrar Lead (para limpiar los falsos fácilmente con tap target seguro) */}
+                        {/* Botón de Borrar Lead */}
                         <button
                           type="button"
                           onClick={() => handleDeleteLead(lead.id, lead.name)}
-                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl text-rose-400 hover:text-rose-200 hover:bg-rose-950/50 border border-rose-500/20 transition-all active:scale-95 ml-1"
+                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl text-stone-400 hover:text-rose-600 bg-white hover:bg-rose-50 border border-stone-200 hover:border-rose-200 shadow-2xs transition-all active:scale-95 shrink-0"
                           title={panelLang === 'es' ? 'Eliminar solicitud' : 'Delete inquiry'}
                         >
                           <Trash2 className="w-4 h-4" />

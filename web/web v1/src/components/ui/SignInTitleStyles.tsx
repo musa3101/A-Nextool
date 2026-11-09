@@ -22,9 +22,9 @@ export function SignInTitle({ styleId }: Props) {
             repeat: Infinity,
             ease: "easeInOut",
           }}
-          className="text-4xl sm:text-[48px] font-black tracking-tight text-center font-sans bg-clip-text text-transparent bg-gradient-to-r from-[#ff7236] via-[#ec4899] via-[#a855f7] to-[#22d3ee] bg-[length:200%_auto] drop-shadow-[0_4px_24px_rgba(236,72,153,0.5)]"
+          className="text-[48px] sm:text-[56px] font-black tracking-tight text-center font-sans bg-clip-text text-transparent bg-gradient-to-r from-[#ff7236] via-[#ec4899] via-[#a855f7] to-[#22d3ee] bg-[length:200%_auto] drop-shadow-[0_4px_24px_rgba(236,72,153,0.5)] leading-tight"
         >
-          Sign In
+          Sign - In
         </motion.h1>
       </div>
     );
@@ -33,20 +33,22 @@ export function SignInTitle({ styleId }: Props) {
   // Option 2: Floating Wave with Staggered Bounces & Hover Physics
   if (styleId === "floating-wave") {
     const letters = [
-      { char: "S", color: "#ff7236", glow: "rgba(255,114,54,0.7)" },
-      { char: "i", color: "#f43f5e", glow: "rgba(244,63,94,0.7)" },
-      { char: "g", color: "#c084fc", glow: "rgba(192,132,252,0.7)" },
-      { char: "n", color: "#22d3ee", glow: "rgba(34,211,238,0.7)" },
+      { char: "S", color: "#ff7236", glow: "rgba(255,114,54,0.75)" },
+      { char: "i", color: "#f43f5e", glow: "rgba(244,63,94,0.75)" },
+      { char: "g", color: "#c084fc", glow: "rgba(192,132,252,0.75)" },
+      { char: "n", color: "#22d3ee", glow: "rgba(34,211,238,0.75)" },
       { char: " ", color: "transparent", glow: "none" },
-      { char: "I", color: "#ec4899", glow: "rgba(236,72,153,0.7)" },
-      { char: "n", color: "#38bdf8", glow: "rgba(56,189,248,0.7)" },
+      { char: "-", color: "#f43f5e", glow: "rgba(244,63,94,0.85)" },
+      { char: " ", color: "transparent", glow: "none" },
+      { char: "I", color: "#ec4899", glow: "rgba(236,72,153,0.75)" },
+      { char: "n", color: "#38bdf8", glow: "rgba(56,189,248,0.75)" },
     ];
 
     return (
       <div className="flex items-center justify-center gap-[2px] select-none py-1">
         {letters.map((l, i) =>
           l.char === " " ? (
-            <span key={i} className="w-3.5" />
+            <span key={i} className="w-2 sm:w-2.5" />
           ) : (
             <motion.span
               key={i}
@@ -57,7 +59,7 @@ export function SignInTitle({ styleId }: Props) {
                 duration: 2.4,
                 repeat: Infinity,
                 ease: "easeInOut",
-                delay: i * 0.14,
+                delay: i * 0.12,
               }}
               whileHover={{
                 scale: 1.25,
@@ -65,10 +67,14 @@ export function SignInTitle({ styleId }: Props) {
                 rotate: i % 2 === 0 ? -6 : 6,
                 transition: { type: "spring", stiffness: 400, damping: 10 },
               }}
-              className="text-4xl sm:text-[46px] font-black cursor-pointer inline-block"
+              className={`font-black cursor-pointer inline-block leading-none ${
+                l.char === "-"
+                  ? "text-4xl sm:text-[44px] px-1 opacity-90 -translate-y-[3px]"
+                  : "text-[48px] sm:text-[54px]"
+              }`}
               style={{
                 color: l.color,
-                filter: `drop-shadow(0 0 16px ${l.glow})`,
+                filter: `drop-shadow(0 0 18px ${l.glow})`,
               }}
             >
               {l.char}
@@ -84,7 +90,7 @@ export function SignInTitle({ styleId }: Props) {
     return (
       <div className="relative select-none py-1">
         <h1
-          className="text-4xl sm:text-[48px] font-black tracking-wider text-center font-sans uppercase relative"
+          className="text-[46px] sm:text-[54px] font-black tracking-wider text-center font-sans uppercase relative leading-tight"
           style={{
             color: "#0a101f",
             WebkitTextStroke: "1.5px #f43f5e",
@@ -97,7 +103,7 @@ export function SignInTitle({ styleId }: Props) {
           }}
         >
           <span className="bg-gradient-to-b from-white/90 via-white/40 to-white/10 bg-clip-text text-transparent">
-            Sign In
+            Sign - In
           </span>
         </h1>
       </div>
@@ -120,9 +126,12 @@ export function SignInTitle({ styleId }: Props) {
       </motion.div>
 
       {/* Main Letters with Vibrant Dual-Neon */}
-      <h1 className="text-4xl sm:text-[48px] font-black tracking-tight text-center font-sans flex items-center gap-1">
+      <h1 className="text-[48px] sm:text-[56px] font-black tracking-tight text-center font-sans flex items-center gap-2 leading-tight">
         <span className="bg-gradient-to-r from-[#ff7236] to-[#ec4899] bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(244,63,94,0.6)]">
           Sign
+        </span>
+        <span className="text-rose-400 font-bold opacity-80 text-3xl sm:text-4xl drop-shadow-[0_0_12px_rgba(244,63,94,0.7)]">
+          -
         </span>
         <span className="bg-gradient-to-r from-[#a855f7] to-[#22d3ee] bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(34,211,238,0.6)]">
           In
