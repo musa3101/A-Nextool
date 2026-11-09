@@ -25,6 +25,42 @@ export interface EcuaplacLeadItem {
   notes?: string;
 }
 
+export interface EcuaplacAuditLog {
+  id: string;
+  tenant_id?: string;
+  user_email?: string;
+  action: string;
+  entity: string;
+  details?: Record<string, any>;
+  created_at: string;
+  time: string;
+}
+
+export function formatLogTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+
+    if (diffMins < 2) return 'Ahora mismo';
+    if (diffMins < 60) return `Hace ${diffMins} min`;
+
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+
+    const timeStr = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    if (isToday) return `Hoy, ${timeStr}`;
+    if (isYesterday) return `Ayer, ${timeStr}`;
+
+    return `${d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}, ${timeStr}`;
+  } catch {
+    return 'Reciente';
+  }
+}
+
 export interface EcuaplacSyncResponse {
   success: boolean;
   message: string;
@@ -45,6 +81,7 @@ export interface CloudflareMetrics {
   trendPercentage: string;
   isPositiveTrend: boolean;
   status: 'optimal' | 'warning' | 'syncing';
+  updatedAt?: string;
 }
 
 export const CLOUDFLARE_ANALYTICS_DATA: Record<'30d' | '3m', CloudflareMetrics> = {
@@ -160,6 +197,33 @@ export class EcuaplacConnector {
     } catch (e) {
       console.error('Error al guardar métricas Cloudflare:', e);
     }
+  }
+
+  /**
+   * Consulta las métricas reales de Cloudflare RUM guardadas en InsForge Cloud
+   */
+  async fetchCloudflareMetricsOnline(): Promise<Record<'30d' | '3m', CloudflareMetrics> | null> {
+    try {
+      const { data, error } = await insforge.database
+        .from('audit_logs')
+        .select('*')
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .eq('entity', 'cloudflare_rum')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!error && Array.isArray(data) && data.length > 0 && data[0].details) {
+        const details = data[0].details as Record<'30d' | '3m', CloudflareMetrics>;
+        if (details['30d'] && details['3m']) {
+          this.saveCloudflareMetrics('30d', details['30d']);
+          this.saveCloudflareMetrics('3m', details['3m']);
+          return details;
+        }
+      }
+    } catch (e) {
+      console.warn('Error consultando métricas Cloudflare en InsForge:', e);
+    }
+    return null;
   }
 
   /**
@@ -671,7 +735,8 @@ export class EcuaplacConnector {
       if (!insforgePayload.id) delete (insforgePayload as any).id;
 
       await insforge.database.from('obras').upsert([insforgePayload]);
-      await this.addAuditLog(isNew ? 'upload' : 'edit', `Obra ${isNew ? 'añadida' : 'editada'}: "${work.title_es || 'Sin título'}"`);
+      const workTitle = work.title_es || this.getWorks().find(w => w.id === work.id)?.title_es || 'Obra';
+      await this.addAuditLog(isNew ? 'upload' : 'edit', `Obra ${isNew ? 'añadida' : 'editada'}: "${workTitle}"`);
     } catch (e) {
       console.warn('Fallo al sincronizar obra en InsForge:', e);
     }
@@ -738,7 +803,8 @@ export class EcuaplacConnector {
       if (!insforgePayload.id) delete (insforgePayload as any).id;
 
       await insforge.database.from('obras').upsert([insforgePayload]);
-      await this.addAuditLog(isNew ? 'upload' : 'edit', `Proyecto ${isNew ? 'añadido' : 'editado'} en Más Reformas: "${project.title_es || 'Sin título'}"`);
+      const projTitle = project.title_es || this.getMoreProjects().find(p => p.id === project.id)?.title_es || 'Proyecto';
+      await this.addAuditLog(isNew ? 'upload' : 'edit', `Proyecto ${isNew ? 'añadido' : 'editado'} en Más Reformas: "${projTitle}"`);
     } catch (e) {
       console.warn('Fallo al sincronizar proyecto en InsForge:', e);
     }
@@ -751,6 +817,9 @@ export class EcuaplacConnector {
    */
   async deleteItem(type: 'works' | 'projects', id: string): Promise<boolean> {
     const table = type === 'works' ? this.tables.carousel : this.tables.moreProjects;
+    const list = type === 'works' ? this.getWorks() : this.getMoreProjects();
+    const item = list.find(i => i.id === id);
+    const itemTitle = item?.title_es || `Elemento ${id.substring(0, 8)}`;
 
     // 1. Eliminar de Supabase (web ecuaplac.com)
     try {
@@ -765,7 +834,7 @@ export class EcuaplacConnector {
     // 2. Eliminar de InsForge (plataforma NexTool)
     try {
       await insforge.database.from('obras').delete().eq('id', id);
-      await this.addAuditLog('delete', `Elemento eliminado: ID ${id}`);
+      await this.addAuditLog('delete', `Elemento eliminado: «${itemTitle}»`);
     } catch (e) {
       console.warn('Fallo al eliminar en InsForge:', e);
     }
@@ -798,22 +867,82 @@ export class EcuaplacConnector {
   }
 
   /**
+   * Consulta los logs reales de auditoría desde InsForge Cloud
+   */
+  async fetchAuditLogsOnline(limit = 50): Promise<EcuaplacAuditLog[]> {
+    try {
+      const { data, error } = await insforge.database
+        .from('audit_logs')
+        .select('*')
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (!error && Array.isArray(data)) {
+        return data.map((d: any) => ({
+          id: d.id || String(Date.now()),
+          tenant_id: d.tenant_id,
+          user_email: d.user_email || 'ecuaplacbyjyg@gmail.com',
+          action: d.action || 'Acción registrada',
+          entity: d.entity || 'general',
+          details: d.details || {},
+          created_at: d.created_at || new Date().toISOString(),
+          time: formatLogTime(d.created_at || new Date().toISOString()),
+        }));
+      }
+    } catch (e) {
+      console.warn('Error al consultar logs en InsForge:', e);
+    }
+    return [];
+  }
+
+  /**
    * Registra un evento en la tabla de auditoría real (audit_logs)
    */
-  async addAuditLog(actionType: string, description: string, details: Record<string, any> = {}): Promise<void> {
+  async addAuditLog(actionType: string, description: string, details: Record<string, any> = {}): Promise<EcuaplacAuditLog | null> {
+    const nowIso = new Date().toISOString();
+    const payload = {
+      tenant_id: ECUAPLAC_TENANT_ID,
+      user_email: 'ecuaplacbyjyg@gmail.com',
+      action: description,
+      entity: actionType,
+      details: { source: 'nextool_gestor', ...details },
+      created_at: nowIso,
+    };
+
     try {
-      await insforge.database.from('audit_logs').insert([
-        {
-          tenant_id: ECUAPLAC_TENANT_ID,
-          user_email: 'ecuaplacbyjyg@gmail.com',
-          action: description,
-          entity: actionType,
-          details: { source: 'nextool_gestor', ...details },
-        },
-      ]);
-    } catch {
-      // Silencioso para no romper la UX si falla la red
+      const { data, error } = await insforge.database
+        .from('audit_logs')
+        .insert([payload])
+        .select();
+
+      if (!error && data && data.length > 0) {
+        const item = data[0];
+        return {
+          id: item.id,
+          tenant_id: item.tenant_id,
+          user_email: item.user_email,
+          action: item.action,
+          entity: item.entity,
+          details: item.details,
+          created_at: item.created_at,
+          time: formatLogTime(item.created_at),
+        };
+      }
+    } catch (e) {
+      console.warn('Error insertando audit log en InsForge:', e);
     }
+
+    return {
+      id: `local-${Date.now()}`,
+      tenant_id: ECUAPLAC_TENANT_ID,
+      user_email: 'ecuaplacbyjyg@gmail.com',
+      action: description,
+      entity: actionType,
+      details,
+      created_at: nowIso,
+      time: 'Ahora mismo',
+    };
   }
 
   /**
