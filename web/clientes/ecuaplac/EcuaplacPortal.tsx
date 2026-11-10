@@ -466,7 +466,10 @@ export const EcuaplacPortal: React.FC = () => {
 
   const cleanPhoneForWhatsApp = (phone?: string) => {
     if (!phone) return '';
-    const digits = phone.replace(/[^0-9]/g, '');
+    let digits = phone.replace(/[^0-9]/g, '');
+    if (digits.startsWith('00')) {
+      digits = digits.replace(/^00/, '');
+    }
     if (digits.length === 9 && (digits.startsWith('6') || digits.startsWith('7') || digits.startsWith('8') || digits.startsWith('9'))) {
       return `34${digits}`;
     }
@@ -598,6 +601,9 @@ export const EcuaplacPortal: React.FC = () => {
   const [formFitMode, setFormFitMode] = useState<'cover' | 'contain'>('cover');
   const [showEnglishFields, setShowEnglishFields] = useState(true);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [isSavingWork, setIsSavingWork] = useState(false);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<EcuaplacWorkItem | null>(null);
+  const [isDeletingWork, setIsDeletingWork] = useState(false);
   const [uploadStats, setUploadStats] = useState<{ sizeKb: number; mime: string } | null>(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -657,7 +663,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '2.0.1';
+  const CURRENT_SYSTEM_VERSION = '2.0.2';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
@@ -1533,49 +1539,53 @@ export const EcuaplacPortal: React.FC = () => {
     );
   };
 
-  const handleDelete = async (item: EcuaplacWorkItem) => {
+  const handleDelete = (item: EcuaplacWorkItem) => {
+    setDeleteConfirmItem(item);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmItem) return;
+    const item = deleteConfirmItem;
     const isCarousel = activeTab === 'obras';
-    const confirmMsg =
-      panelLang === 'es'
-        ? `¿Eliminar definitivamente la obra "${item.title_es}" de ecuaplac.com?`
-        : `Permanently delete project "${item.title_en || item.title_es}" from ecuaplac.com?`;
+    setIsDeletingWork(true);
 
-    if (window.confirm(confirmMsg)) {
-      if (isCarousel) {
-        setWorks((prev) => prev.filter((i) => i.id !== item.id));
-      } else {
-        setMoreProjects((prev) => prev.filter((i) => i.id !== item.id));
-      }
+    if (isCarousel) {
+      setWorks((prev) => prev.filter((i) => i.id !== item.id));
+    } else {
+      setMoreProjects((prev) => prev.filter((i) => i.id !== item.id));
+    }
 
+    showSyncToast(
+      panelLang === 'es' ? 'Eliminando de ecuaplac.com...' : 'Deleting from ecuaplac.com...',
+      'syncing'
+    );
+
+    try {
+      await ecuaplacConnector.deleteItem(isCarousel ? 'works' : 'projects', item.id);
       showSyncToast(
-        panelLang === 'es' ? 'Eliminando de ecuaplac.com...' : 'Deleting from ecuaplac.com...',
-        'syncing'
+        panelLang === 'es' ? '¡Obra eliminada de ecuaplac.com!' : 'Project deleted from ecuaplac.com!',
+        'success'
       );
-
-      try {
-        await ecuaplacConnector.deleteItem(isCarousel ? 'works' : 'projects', item.id);
-        showSyncToast(
-          panelLang === 'es' ? '¡Obra eliminada de ecuaplac.com!' : 'Project deleted from ecuaplac.com!',
-          'success'
-        );
-        addAuditLog(
-          `Obra «${item.title_es}» eliminada de la web`,
-          'Ecuaplac Web',
-          'warning'
-        );
-      } catch (err) {
-        console.warn('Error al eliminar en Supabase:', err);
-        // Rollback reactivo si la red falla
-        if (isCarousel) {
-          setWorks((prev) => [item, ...prev]);
-        } else {
-          setMoreProjects((prev) => [item, ...prev]);
-        }
-        showSyncToast(
-          panelLang === 'es' ? 'Error al eliminar en la web' : 'Error deleting from website',
-          'error'
-        );
+      addAuditLog(
+        `Obra «${item.title_es}» eliminada de la web`,
+        'Ecuaplac Web',
+        'warning'
+      );
+    } catch (err) {
+      console.warn('Error al eliminar en Supabase:', err);
+      // Rollback reactivo si la red falla
+      if (isCarousel) {
+        setWorks((prev) => [item, ...prev]);
+      } else {
+        setMoreProjects((prev) => [item, ...prev]);
       }
+      showSyncToast(
+        panelLang === 'es' ? 'Error al eliminar en la web' : 'Error deleting from website',
+        'error'
+      );
+    } finally {
+      setIsDeletingWork(false);
+      setDeleteConfirmItem(null);
     }
   };
 
@@ -1586,145 +1596,174 @@ export const EcuaplacPortal: React.FC = () => {
       return;
     }
 
-    let finalImage =
-      formImageUrl.trim() ||
-      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
+    if (isSavingWork) return;
+    setIsSavingWork(true);
 
-    const isCarousel = formTargetGallery === 'carousel';
+    try {
+      let finalImage =
+        formImageUrl.trim() ||
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
 
-    // Si la imagen proviene de la cámara/galería (base64 DataURL), subirla a Supabase Storage
-    if (finalImage.startsWith('data:')) {
+      const isCarousel = formTargetGallery === 'carousel';
+
+      // Si la imagen proviene de la cámara/galería (base64 DataURL), subirla a Supabase Storage
+      if (finalImage.startsWith('data:')) {
+        showSyncToast(
+          panelLang === 'es' ? 'Subiendo fotografía a la web...' : 'Uploading photo to website...',
+          'syncing'
+        );
+        try {
+          const resBlob = await fetch(finalImage);
+          const blob = await resBlob.blob();
+          const uploadedUrl = await ecuaplacConnector.uploadPhoto(
+            blob,
+            isCarousel ? 'carousel' : 'gallery'
+          );
+          if (uploadedUrl) {
+            finalImage = uploadedUrl;
+          }
+        } catch (err) {
+          console.warn('Fallo al subir a Storage, continuando con la imagen:', err);
+        }
+      }
+
+      // Generación automática inteligente si se deja en blanco
+      let finalTitleEn = formTitleEn.trim();
+      let finalTitleDe = formTitleDe.trim();
+      if (!finalTitleEn) {
+        const autoTr = await autoTranslateWork(formTitleEs, formLocation);
+        finalTitleEn = autoTr.titleEn;
+        if (!finalTitleDe) finalTitleDe = autoTr.titleDe;
+      }
+
       showSyncToast(
-        panelLang === 'es' ? 'Subiendo fotografía a la web...' : 'Uploading photo to website...',
+        panelLang === 'es' ? 'Publicando en ecuaplac.com...' : 'Publishing to ecuaplac.com...',
         'syncing'
       );
-      try {
-        const resBlob = await fetch(finalImage);
-        const blob = await resBlob.blob();
-        const uploadedUrl = await ecuaplacConnector.uploadPhoto(
-          blob,
-          isCarousel ? 'carousel' : 'gallery'
+
+      if (editingItem) {
+        const originalType = editingItem.type || (works.some((w) => w.id === editingItem.id) ? 'carousel' : 'more_projects');
+        const targetType = isCarousel ? 'carousel' : 'more_projects';
+        const switchedGallery = originalType !== targetType;
+
+        const updatedItem: EcuaplacWorkItem = {
+          ...editingItem,
+          type: targetType,
+          title_es: formTitleEs,
+          title_en: finalTitleEn,
+          location_es: formLocation,
+          image_url: finalImage,
+          active: formActive,
+          fit_mode: formFitMode,
+        };
+
+        if (switchedGallery) {
+          // Cambiar de galería: eliminar de origen y añadir al destino
+          if (originalType === 'carousel') {
+            setWorks((prev) => prev.filter((i) => i.id !== editingItem.id));
+            setMoreProjects((prev) => [updatedItem, ...prev]);
+            await ecuaplacConnector.deleteItem('works', editingItem.id);
+            await ecuaplacConnector.saveProject(updatedItem);
+          } else {
+            setMoreProjects((prev) => prev.filter((i) => i.id !== editingItem.id));
+            setWorks((prev) => [updatedItem, ...prev]);
+            await ecuaplacConnector.deleteItem('projects', editingItem.id);
+            await ecuaplacConnector.saveWork(updatedItem);
+          }
+        } else if (isCarousel) {
+          setWorks((prev) => prev.map((i) => (i.id === editingItem.id ? updatedItem : i)));
+          try {
+            await ecuaplacConnector.saveWork(updatedItem);
+            showSyncToast(
+              panelLang === 'es' ? '¡Obra actualizada en ecuaplac.com!' : 'Project updated on ecuaplac.com!',
+              'success'
+            );
+          } catch (e) {
+            console.warn('Error al guardar en Supabase:', e);
+          }
+        } else {
+          setMoreProjects((prev) => prev.map((i) => (i.id === editingItem.id ? updatedItem : i)));
+          try {
+            await ecuaplacConnector.saveProject(updatedItem);
+            showSyncToast(
+              panelLang === 'es' ? '¡Proyecto actualizado en ecuaplac.com!' : 'Project updated on ecuaplac.com!',
+              'success'
+            );
+          } catch (e) {
+            console.warn('Error al guardar en Supabase:', e);
+          }
+        }
+
+        addAuditLog(`Obra editada: «${formTitleEs}»`, 'Ecuaplac Web', 'success');
+      } else {
+        const generatedId =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : '00000000-0000-4000-8000-' + Date.now().toString(16).padStart(12, '0');
+
+        const newItem: EcuaplacWorkItem = {
+          id: generatedId,
+          type: isCarousel ? 'carousel' : 'more_projects',
+          title_es: formTitleEs,
+          title_en: finalTitleEn,
+          location_es: formLocation,
+          image_url: finalImage,
+          sort_order: 1, // al principio
+          active: formActive,
+          fit_mode: formFitMode,
+        };
+
+        if (isCarousel) {
+          setWorks((prev) => [newItem, ...prev]);
+          try {
+            const saved = await ecuaplacConnector.saveWork(newItem);
+            if (saved && saved.id) {
+              setWorks((prev) => prev.map((i) => (i.id === newItem.id ? { ...newItem, ...saved } : i)));
+            }
+            showSyncToast(
+              panelLang === 'es' ? '¡Foto publicada en ecuaplac.com!' : 'Photo published on ecuaplac.com!',
+              'success'
+            );
+          } catch (e) {
+            console.warn('Error al guardar en Supabase:', e);
+            showSyncToast(
+              panelLang === 'es' ? 'Error al sincronizar con la web' : 'Error syncing with website',
+              'error'
+            );
+          }
+          setActiveTab('obras');
+        } else {
+          setMoreProjects((prev) => [newItem, ...prev]);
+          try {
+            const saved = await ecuaplacConnector.saveProject(newItem);
+            if (saved && saved.id) {
+              setMoreProjects((prev) => prev.map((i) => (i.id === newItem.id ? { ...newItem, ...saved } : i)));
+            }
+            showSyncToast(
+              panelLang === 'es' ? '¡Proyecto publicado en ecuaplac.com!' : 'Project published on ecuaplac.com!',
+              'success'
+            );
+          } catch (e) {
+            console.warn('Error al guardar en Supabase:', e);
+            showSyncToast(
+              panelLang === 'es' ? 'Error al sincronizar con la web' : 'Error syncing with website',
+              'error'
+            );
+          }
+          setActiveTab('more_projects');
+        }
+
+        addAuditLog(
+          `Nueva obra añadida a ${isCarousel ? 'Portada (Carrusel)' : 'Más Reformas'}: «${formTitleEs}»`,
+          'Ecuaplac Web',
+          'success'
         );
-        if (uploadedUrl) {
-          finalImage = uploadedUrl;
-        }
-      } catch (err) {
-        console.warn('Fallo al subir a Storage, continuando con la imagen:', err);
-      }
-    }
-
-    // Generación automática inteligente si se deja en blanco
-    let finalTitleEn = formTitleEn.trim();
-    let finalTitleDe = formTitleDe.trim();
-    if (!finalTitleEn) {
-      const autoTr = await autoTranslateWork(formTitleEs, formLocation);
-      finalTitleEn = autoTr.titleEn;
-      if (!finalTitleDe) finalTitleDe = autoTr.titleDe;
-    }
-
-    showSyncToast(
-      panelLang === 'es' ? 'Publicando en ecuaplac.com...' : 'Publishing to ecuaplac.com...',
-      'syncing'
-    );
-
-    if (editingItem) {
-      const updatedItem: EcuaplacWorkItem = {
-        ...editingItem,
-        type: isCarousel ? 'carousel' : 'more_projects',
-        title_es: formTitleEs,
-        title_en: finalTitleEn,
-        location_es: formLocation,
-        image_url: finalImage,
-        active: formActive,
-        fit_mode: formFitMode,
-      };
-
-      if (isCarousel) {
-        setWorks((prev) => prev.map((i) => (i.id === editingItem.id ? updatedItem : i)));
-        try {
-          await ecuaplacConnector.saveWork(updatedItem);
-          showSyncToast(
-            panelLang === 'es' ? '¡Obra actualizada en ecuaplac.com!' : 'Project updated on ecuaplac.com!',
-            'success'
-          );
-        } catch (e) {
-          console.warn('Error al guardar en Supabase:', e);
-        }
-      } else {
-        setMoreProjects((prev) => prev.map((i) => (i.id === editingItem.id ? updatedItem : i)));
-        try {
-          await ecuaplacConnector.saveProject(updatedItem);
-          showSyncToast(
-            panelLang === 'es' ? '¡Proyecto actualizado en ecuaplac.com!' : 'Project updated on ecuaplac.com!',
-            'success'
-          );
-        } catch (e) {
-          console.warn('Error al guardar en Supabase:', e);
-        }
       }
 
-      addAuditLog(`Obra editada: «${formTitleEs}»`, 'Ecuaplac Web', 'success');
-    } else {
-      const newItem: EcuaplacWorkItem = {
-        id: `ecuaplac-${Date.now()}`,
-        type: isCarousel ? 'carousel' : 'more_projects',
-        title_es: formTitleEs,
-        title_en: finalTitleEn,
-        location_es: formLocation,
-        image_url: finalImage,
-        sort_order: 1, // al principio
-        active: formActive,
-        fit_mode: formFitMode,
-      };
-
-      if (isCarousel) {
-        setWorks((prev) => [newItem, ...prev]);
-        try {
-          const saved = await ecuaplacConnector.saveWork(newItem);
-          if (saved && saved.id) {
-            setWorks((prev) => prev.map((i) => (i.id === newItem.id ? { ...newItem, ...saved } : i)));
-          }
-          showSyncToast(
-            panelLang === 'es' ? '¡Foto publicada en ecuaplac.com!' : 'Photo published on ecuaplac.com!',
-            'success'
-          );
-        } catch (e) {
-          console.warn('Error al guardar en Supabase:', e);
-          showSyncToast(
-            panelLang === 'es' ? 'Error al sincronizar con la web' : 'Error syncing with website',
-            'error'
-          );
-        }
-        setActiveTab('obras');
-      } else {
-        setMoreProjects((prev) => [newItem, ...prev]);
-        try {
-          const saved = await ecuaplacConnector.saveProject(newItem);
-          if (saved && saved.id) {
-            setMoreProjects((prev) => prev.map((i) => (i.id === newItem.id ? { ...newItem, ...saved } : i)));
-          }
-          showSyncToast(
-            panelLang === 'es' ? '¡Proyecto publicado en ecuaplac.com!' : 'Project published on ecuaplac.com!',
-            'success'
-          );
-        } catch (e) {
-          console.warn('Error al guardar en Supabase:', e);
-          showSyncToast(
-            panelLang === 'es' ? 'Error al sincronizar con la web' : 'Error syncing with website',
-            'error'
-          );
-        }
-        setActiveTab('more_projects');
-      }
-
-      addAuditLog(
-        `Nueva obra añadida a ${isCarousel ? 'Portada (Carrusel)' : 'Más Reformas'}: «${formTitleEs}»`,
-        'Ecuaplac Web',
-        'success'
-      );
+      setIsModalOpen(false);
+    } finally {
+      setIsSavingWork(false);
     }
-
-    setIsModalOpen(false);
   };
 
   if (!isAuthenticated) {
@@ -1754,7 +1793,7 @@ export const EcuaplacPortal: React.FC = () => {
   }
 
   return (
-    <div className="w-full max-w-full min-w-0 bg-[#F4F1EA] min-h-screen text-slate-900 pb-20 sm:pb-24">
+    <div className="w-full max-w-full min-w-0 bg-[#F4F1EA] min-h-screen text-slate-900 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-28">
       {/* Toast Flotante de Sincronización en Tiempo Real */}
       {syncToast && (
         <div className="fixed top-3.5 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold font-sans border backdrop-blur-xl bg-[#0E1726]/95 text-white border-[#C5A059]/40 select-none pointer-events-none">
@@ -1770,44 +1809,46 @@ export const EcuaplacPortal: React.FC = () => {
       )}
 
       {/* 1. Header Oficial de Ecuaplac (Deep Sapphire Navy & Gold Trim - Safe Area Nítida) */}
-      <header className="sticky top-0 z-30 bg-[#0E1726] border-b border-slate-800 shadow-sm px-4 sm:px-6 pt-[max(14px,env(safe-area-inset-top))] pb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10">
-            <img
-              src="/ecuaplac/fav-sin-fondo.svg"
-              alt="Logo Ecuaplac"
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = '/ecuaplac/logo.webp';
-              }}
-            />
+      <header className="sticky top-0 z-30 bg-[#0E1726] border-b border-slate-800 shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(14px,env(safe-area-inset-top))] pb-3">
+        <div className="w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10">
+              <img
+                src="/ecuaplac/fav-sin-fondo.svg"
+                alt="Logo Ecuaplac"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/ecuaplac/logo.webp';
+                }}
+              />
+            </div>
+            <div>
+              <span className="text-base font-bold text-white tracking-tight leading-none block">
+                ecuaplac.com
+              </span>
+              <span className="text-[10px] text-sky-400 font-bold tracking-wider uppercase block mt-0.5">
+                {panelLang === 'es' ? 'Gestor Oficial' : 'Official Manager'}
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="text-base font-bold text-white tracking-tight leading-none block">
-              ecuaplac.com
-            </span>
-            <span className="text-[10px] text-sky-400 font-bold tracking-wider uppercase block mt-0.5">
-              {panelLang === 'es' ? 'Gestor Oficial' : 'Official Manager'}
-            </span>
-          </div>
-        </div>
 
-        {/* Botón Ver Web Directo (Limpio en todos los apartados) */}
-        <a
-          href="https://ecuaplac.com"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[38px] sm:min-h-0 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-md shadow-xs text-white hover:text-[#C5A059] transition-all text-xs font-semibold"
-          title={panelLang === 'es' ? 'Ver ecuaplac.com en directo' : 'View ecuaplac.com live'}
-        >
-          <ExternalLink className="w-3.5 h-3.5 text-[#C5A059]" />
-          <span className="hidden sm:inline">{panelLang === 'es' ? 'Ver Web' : 'View Web'}</span>
-        </a>
+          {/* Botón Ver Web Directo (Limpio en todos los apartados) */}
+          <a
+            href="https://ecuaplac.com"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[38px] sm:min-h-0 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-md shadow-xs text-white hover:text-[#C5A059] transition-all text-xs font-semibold cursor-pointer"
+            title={panelLang === 'es' ? 'Ver ecuaplac.com en directo' : 'View ecuaplac.com live'}
+          >
+            <ExternalLink className="w-3.5 h-3.5 text-[#C5A059]" />
+            <span className="hidden sm:inline">{panelLang === 'es' ? 'Ver Web' : 'View Web'}</span>
+          </a>
+        </div>
       </header>
 
       {/* Banner Notificación Auto-Actualización (InsForge Cloud) */}
       {newVersionNotice && (
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-3">
+        <div className="max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3">
           <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0E1726] border border-[#C5A059]/50 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-3">
               <span className="relative flex h-3 w-3 shrink-0">
@@ -1835,13 +1876,13 @@ export const EcuaplacPortal: React.FC = () => {
       )}
 
       {/* 2. Workspace Principal */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-4">
+      <main className="max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-6 space-y-4 lg:space-y-6">
         {/* 3. Vistas según Pestaña (Transición Cinemática Suave) */}
       {activeTab === 'inicio' ? (
         /* Pestaña 1: Inicio (Dashboard Ejecutivo Premium con Micro-Gradientes, Halos y Números Animados) */
         <div className="space-y-4 sm:space-y-5 animate-tab-enter">
           {/* Header de Bienvenida con Halos & Selector Táctil */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FAF7F0] to-[#F3ECE0] rounded-3xl p-5 sm:p-6 border border-[#E6DECD] shadow-[0_10px_32px_-6px_rgba(20,25,35,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FAF7F0] to-[#F3ECE0] rounded-3xl p-5 sm:p-6 lg:p-7 border border-[#E6DECD] shadow-[0_10px_32px_-6px_rgba(20,25,35,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* Halo de luz ámbar de fondo */}
             <div className="pointer-events-none absolute -right-10 -top-10 w-48 h-48 bg-[#C5A059]/15 rounded-full blur-3xl" />
 
@@ -1866,7 +1907,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCfPeriod('30d')}
-                className={`px-4 py-2 min-h-[36px] sm:min-h-0 rounded-full text-xs font-black transition-all active:scale-95 ${
+                className={`px-4 py-2 min-h-[36px] sm:min-h-0 rounded-full text-xs font-black transition-all active:scale-95 cursor-pointer ${
                   cfPeriod === '30d'
                     ? 'bg-slate-900 text-[#F0CF85] shadow-md'
                     : 'text-stone-600 hover:text-slate-900'
@@ -1877,7 +1918,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCfPeriod('3m')}
-                className={`px-4 py-2 min-h-[36px] sm:min-h-0 rounded-full text-xs font-black transition-all active:scale-95 ${
+                className={`px-4 py-2 min-h-[36px] sm:min-h-0 rounded-full text-xs font-black transition-all active:scale-95 cursor-pointer ${
                   cfPeriod === '3m'
                     ? 'bg-slate-900 text-[#F0CF85] shadow-md'
                     : 'text-stone-600 hover:text-slate-900'
@@ -1933,7 +1974,7 @@ export const EcuaplacPortal: React.FC = () => {
 
               {/* Visualización de Actividad y Sello de Auditoría */}
               <div className="pt-2 border-t border-sky-100/80 space-y-2 relative z-10">
-                <div className="flex items-end justify-between gap-1.5 h-6">
+                <div className="flex items-end justify-between gap-1.5 h-6 lg:h-8">
                   {[35, 60, 50, 75, 65, 90, 100].map((height, i) => (
                     <div
                       key={i}
@@ -2196,7 +2237,7 @@ export const EcuaplacPortal: React.FC = () => {
               type="button"
               onClick={handleForceSync}
               disabled={isForceSyncing}
-              className={`self-start sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full active:scale-95 border text-xs font-black transition-all shadow-sm ${
+              className={`self-start sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full active:scale-95 border text-xs font-black transition-all shadow-sm cursor-pointer disabled:cursor-not-allowed ${
                 syncFeedback
                   ? 'bg-emerald-600 border-emerald-500 text-white shadow-emerald-200'
                   : 'bg-gradient-to-r from-[#C5A059] via-[#D8B467] to-[#E5C882] hover:brightness-105 border-[#B89248] text-slate-950 shadow-xs'
@@ -2214,7 +2255,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setVisibilityFilter('all')}
-                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                   visibilityFilter === 'all'
                     ? 'bg-slate-900 text-white shadow-sm'
                     : 'text-stone-600 hover:text-slate-900'
@@ -2225,7 +2266,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setVisibilityFilter('active')}
-                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                   visibilityFilter === 'active'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-stone-600 hover:text-slate-900'
@@ -2236,7 +2277,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setVisibilityFilter('hidden')}
-                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                   visibilityFilter === 'hidden'
                     ? 'bg-stone-700 text-white shadow-sm'
                     : 'text-stone-600 hover:text-slate-900'
@@ -2314,69 +2355,76 @@ export const EcuaplacPortal: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Mini Footer en COLOR NEGRO con Controles Flotantes */}
-                  <div className="p-3 bg-[#0B111E] border-t border-white/10 flex items-center justify-between text-xs gap-2 select-none">
-                    {/* Flechas de ordenación (Subir / Bajar posición en la web) */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleMoveUp(item)}
-                        disabled={index === 0}
-                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-20 disabled:hover:bg-white/10 flex items-center justify-center text-white transition-all active:scale-90 border border-white/10 shadow-2xs"
-                        title="Subir posición en la web"
-                      >
-                        <ChevronUp className="w-4 h-4 stroke-[2.5]" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMoveDown(item)}
-                        disabled={index === filteredItems.length - 1}
-                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-20 disabled:hover:bg-white/10 flex items-center justify-center text-white transition-all active:scale-90 border border-white/10 shadow-2xs"
-                        title="Bajar posición en la web"
-                      >
-                        <ChevronDown className="w-4 h-4 stroke-[2.5]" />
-                      </button>
-                    </div>
+                  {/* Mini Footer en COLOR NEGRO con Controles Flotantes Ergonómicos */}
+                  {(() => {
+                    const globalIndex = currentCollection.findIndex((i) => i.id === item.id);
+                    const isFirst = globalIndex <= 0;
+                    const isLast = globalIndex === -1 || globalIndex >= currentCollection.length - 1;
+                    return (
+                      <div className="p-3 bg-[#0B111E] border-t border-white/10 flex items-center justify-between text-xs gap-2 select-none">
+                        {/* Flechas de ordenación (Subir / Bajar posición en la web) */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveUp(item)}
+                            disabled={isFirst}
+                            className="w-9 h-9 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-20 disabled:hover:bg-white/10 flex items-center justify-center text-white transition-all active:scale-90 border border-white/10 shadow-2xs cursor-pointer disabled:cursor-not-allowed"
+                            title="Subir posición en la web"
+                          >
+                            <ChevronUp className="w-4 h-4 stroke-[2.5]" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveDown(item)}
+                            disabled={isLast}
+                            className="w-9 h-9 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-20 disabled:hover:bg-white/10 flex items-center justify-center text-white transition-all active:scale-90 border border-white/10 shadow-2xs cursor-pointer disabled:cursor-not-allowed"
+                            title="Bajar posición en la web"
+                          >
+                            <ChevronDown className="w-4 h-4 stroke-[2.5]" />
+                          </button>
+                        </div>
 
-                    {/* Acciones principales: Ojo, Editar, Eliminar */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleActive(item)}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-95 ${
-                          item.active
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30'
-                            : 'bg-white/10 text-stone-400 border border-white/10 hover:text-white hover:bg-white/20'
-                        }`}
-                        title={item.active ? 'Ocultar de la web' : 'Publicar en la web'}
-                      >
-                        {item.active ? (
-                          <Eye className="w-4 h-4 text-emerald-400" />
-                        ) : (
-                          <EyeOff className="w-4 h-4 text-stone-400" />
-                        )}
-                      </button>
+                        {/* Acciones principales: Ojo, Editar, Eliminar */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleActive(item)}
+                            className={`w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                              item.active
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30'
+                                : 'bg-white/10 text-stone-400 border border-white/10 hover:text-white hover:bg-white/20'
+                            }`}
+                            title={item.active ? 'Ocultar de la web' : 'Publicar en la web'}
+                          >
+                            {item.active ? (
+                              <Eye className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              <EyeOff className="w-4 h-4 text-stone-400" />
+                            )}
+                          </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(item)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white font-extrabold text-xs transition-all shadow-2xs active:scale-95 border border-white/20"
-                        title="Editar obra y fotografía"
-                      >
-                        <Pencil className="w-3.5 h-3.5 text-[#F0CF85]" />
-                        <span>Editar</span>
-                      </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(item)}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 sm:px-3 sm:py-1.5 min-h-[36px] rounded-full bg-white/15 hover:bg-white/25 text-white font-extrabold text-xs transition-all shadow-2xs active:scale-95 border border-white/20 cursor-pointer"
+                            title="Editar obra y fotografía"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-[#F0CF85]" />
+                            <span>Editar</span>
+                          </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(item)}
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-stone-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all active:scale-95"
-                        title="Eliminar obra"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(item)}
+                            className="w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-stone-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all active:scale-95 cursor-pointer"
+                            title="Eliminar obra"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -2891,6 +2939,7 @@ export const EcuaplacPortal: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        maxWidth="2xl"
         title={
           editingItem
             ? `Editar ${editingItem.type === 'carousel' ? 'Obra de Portada' : 'Proyecto de Galería'}`
@@ -2911,6 +2960,7 @@ export const EcuaplacPortal: React.FC = () => {
               variant="secondary"
               size="md"
               type="button"
+              disabled={isSavingWork}
               onClick={() => setIsModalOpen(false)}
             >
               Cancelar
@@ -2920,9 +2970,20 @@ export const EcuaplacPortal: React.FC = () => {
               size="md"
               type="submit"
               form="ecuaplac-work-form"
-              icon={<RefreshCw className="w-4 h-4 text-slate-950" />}
+              disabled={isSavingWork || isCompressing}
+              icon={
+                isSavingWork ? (
+                  <Loader2 className="w-4 h-4 text-slate-950 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 text-slate-950" />
+                )
+              }
             >
-              {editingItem ? 'Actualizar Web' : 'Guardar y Publicar en Web'}
+              {isSavingWork
+                ? (panelLang === 'es' ? 'Publicando...' : 'Publishing...')
+                : editingItem
+                ? (panelLang === 'es' ? 'Actualizar Web' : 'Update Website')
+                : (panelLang === 'es' ? 'Guardar y Publicar en Web' : 'Save & Publish to Web')}
             </Button>
           </>
         }
@@ -3104,7 +3165,7 @@ export const EcuaplacPortal: React.FC = () => {
                     setFormImageUrl(e.target.value);
                     setUploadStats(null);
                   }}
-                  className="w-full border border-stone-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-[#C5A059]/40"
+                  className="w-full border border-stone-200 rounded-xl px-3 py-2 text-[16px] sm:text-xs focus:ring-2 focus:ring-[#C5A059]/40"
                 />
               </div>
             )}
@@ -3120,7 +3181,7 @@ export const EcuaplacPortal: React.FC = () => {
               placeholder="Ej. Reforma Integral de Baño con Bañera Exenta"
               value={formTitleEs}
               onChange={(e) => setFormTitleEs(e.target.value)}
-              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50"
+              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50"
             />
           </div>
 
@@ -3133,7 +3194,7 @@ export const EcuaplacPortal: React.FC = () => {
               placeholder="Ej. Andratx, Palma, Calvià, Sóller..."
               value={formLocation}
               onChange={(e) => setFormLocation(e.target.value)}
-              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50"
+              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50"
             />
             {/* Chips rápidos de municipios de Mallorca */}
             <div className="flex items-center gap-1.5 mt-2 flex-wrap">
@@ -3198,7 +3259,7 @@ export const EcuaplacPortal: React.FC = () => {
                 placeholder="Se genera automático si se deja en blanco"
                 value={formTitleEn}
                 onChange={(e) => setFormTitleEn(e.target.value)}
-                className="w-full border border-stone-200 rounded-xl px-3.5 py-2 text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40"
+                className="w-full border border-stone-200 rounded-xl px-3.5 py-2 text-[16px] sm:text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40"
               />
             </div>
 
@@ -3211,7 +3272,7 @@ export const EcuaplacPortal: React.FC = () => {
                 placeholder="Wird automatisch generiert..."
                 value={formTitleDe}
                 onChange={(e) => setFormTitleDe(e.target.value)}
-                className="w-full border border-stone-200 rounded-xl px-3.5 py-2 text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40"
+                className="w-full border border-stone-200 rounded-xl px-3.5 py-2 text-[16px] sm:text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40"
               />
             </div>
           </div>
@@ -3570,7 +3631,7 @@ export const EcuaplacPortal: React.FC = () => {
                             <span>WhatsApp</span>
                           </a>
                           <a
-                            href={`tel:${lead.phone}`}
+                            href={`tel:${lead.phone.replace(/\s+/g, '')}`}
                             onClick={() => {
                               addAuditLog(`Llamada telefónica a «${lead.name}» (${lead.phone})`, 'Ecuaplac Leads', 'info', 'contact');
                             }}
@@ -4140,7 +4201,7 @@ export const EcuaplacPortal: React.FC = () => {
         }}
         title={selectedInvoiceForView?.number ? `${selectedInvoiceForView.number} • ${selectedInvoiceForView.name}` : selectedInvoiceForView?.name || (panelLang === 'es' ? 'Factura Oficial' : 'Official Invoice')}
         subtitle={panelLang === 'es' ? 'Documento tributario oficial emitido por Ecuaplac J&G S.L.' : 'Official tax document issued by Ecuaplac J&G S.L.'}
-        maxWidth="xl"
+        maxWidth="2xl"
         footer={
           <div className="flex flex-row items-center justify-between w-full gap-2.5">
             <div className="flex items-center gap-2">
@@ -4265,14 +4326,83 @@ export const EcuaplacPortal: React.FC = () => {
         </div>
       </Modal>
 
-      {/* 9. Barra de Navegación Completa Responsive (Full-Width Native Bar con FAB Central Elevado) */}
-      <div className={`fixed bottom-0 inset-x-0 w-full z-40 pointer-events-none transition-all duration-200 ${
-        isModalOpen || isLeadsModalOpen || isProfileModalOpen || isSecurityModalOpen || isLogsModalOpen || isInvoiceViewerOpen
+      {/* Modal de Confirmación Táctil de Borrado (Sin diálogos feos de window.confirm) */}
+      <Modal
+        isOpen={!!deleteConfirmItem}
+        onClose={() => {
+          if (!isDeletingWork) setDeleteConfirmItem(null);
+        }}
+        maxWidth="sm"
+        theme="light"
+        title={panelLang === 'es' ? '¿Eliminar de la Web?' : 'Delete from Website?'}
+        subtitle={
+          panelLang === 'es'
+            ? 'Esta acción retirará la obra de ecuaplac.com'
+            : 'This will remove the project from ecuaplac.com'
+        }
+        footer={
+          <div className="flex items-center justify-end gap-2.5 w-full">
+            <Button
+              variant="secondary"
+              size="md"
+              type="button"
+              disabled={isDeletingWork}
+              onClick={() => setDeleteConfirmItem(null)}
+              className="flex-1 sm:flex-none min-h-[44px]"
+            >
+              {panelLang === 'es' ? 'Cancelar' : 'Cancel'}
+            </Button>
+            <Button
+              variant="destructive"
+              size="md"
+              type="button"
+              disabled={isDeletingWork}
+              onClick={handleConfirmDelete}
+              icon={
+                isDeletingWork ? (
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 text-white" />
+                )
+              }
+              className="flex-1 sm:flex-none min-h-[44px] bg-rose-600 hover:bg-rose-700 text-white font-bold"
+            >
+              {isDeletingWork
+                ? (panelLang === 'es' ? 'Eliminando...' : 'Deleting...')
+                : (panelLang === 'es' ? 'Eliminar Definitivamente' : 'Delete Permanently')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="py-2 text-center space-y-3">
+          {deleteConfirmItem?.image_url && (
+            <div className="w-20 h-20 mx-auto rounded-2xl overflow-hidden border border-stone-200 shadow-md">
+              <img
+                src={deleteConfirmItem.image_url}
+                alt={deleteConfirmItem.title_es}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+          <p className="text-sm font-extrabold text-slate-900 leading-snug">
+            «{deleteConfirmItem?.title_es}»
+          </p>
+          <p className="text-xs text-stone-500 leading-relaxed">
+            {panelLang === 'es'
+              ? 'Se eliminará de tu galería y dejará de ser visible para los clientes que visiten la web.'
+              : 'It will be removed from your gallery and will no longer be visible to web visitors.'}
+          </p>
+        </div>
+      </Modal>
+
+      {/* 9. Barra de Navegación Completa Responsive (Full-Width Native Bar en Móvil / Floating Island Dock en Desktop) */}
+      <div className={`fixed bottom-0 md:bottom-6 inset-x-0 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 w-full md:w-auto z-40 pointer-events-none transition-all duration-200 ${
+        isModalOpen || isLeadsModalOpen || isProfileModalOpen || isSecurityModalOpen || isLogsModalOpen || isInvoiceViewerOpen || !!deleteConfirmItem
           ? 'hidden opacity-0 pointer-events-none'
           : ''
       }`}>
-        <div className="pointer-events-auto w-full bg-[#0E1726] border-t border-slate-800 shadow-md">
-          <nav className="max-w-md sm:max-w-lg mx-auto px-4 pt-2 pb-[max(12px,env(safe-area-inset-bottom))] flex items-center justify-between relative">
+        <div className="pointer-events-auto w-full md:w-auto bg-[#0E1726]/95 md:backdrop-blur-xl border-t md:border border-slate-800 md:border-slate-700/80 shadow-md md:shadow-[0_20px_50px_rgba(0,0,0,0.5)] md:rounded-full md:px-3">
+          <nav className="max-w-md sm:max-w-lg md:w-[480px] mx-auto px-4 md:px-2 pt-2 md:pt-1.5 pb-[max(12px,env(safe-area-inset-bottom))] md:pb-1.5 flex items-center justify-between relative">
             {/* Tab 1: Inicio */}
             <button
               type="button"

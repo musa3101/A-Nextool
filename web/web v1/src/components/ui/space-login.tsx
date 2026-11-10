@@ -1186,6 +1186,20 @@ export function SpaceLogin({
           <span className="relative z-10 text-[12.5px] sm:text-[13.5px] font-extrabold tracking-[0.28em] uppercase font-display bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent drop-shadow-[0_1px_10px_rgba(255,255,255,0.4)] select-none">
             NEXTOOL
           </span>
+
+          {/* Créditos Oficiales MYNEXT */}
+          <div className="relative z-10 mt-1 flex items-center justify-center gap-1 text-[11px] sm:text-[11.5px] font-display text-slate-400/90 select-none">
+            <span className="italic font-normal">Powered by</span>
+            <a
+              href="https://mynextbymusa.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="italic font-bold text-white hover:text-[#C5A059] transition-colors underline decoration-white/30 hover:decoration-[#C5A059] underline-offset-2 tracking-wide cursor-pointer"
+              title="Visitar mynextbymusa.com"
+            >
+              MYNEXT
+            </a>
+          </div>
         </div>
       </footer>
 

@@ -1,9 +1,8 @@
 {
-  "version": "2.0.1",
-  "buildTimestamp": 1794256800000,
+  "version": "2.0.2",
+  "buildTimestamp": 1794321600000,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
-  "updatedAt": "2026-11-09T20:58:00.000Z",
-  "notes": "Métricas reales Cloudflare RUM, saludo horario adaptativo España y auto-actualizador PWA."
+  "updatedAt": "2026-11-10T14:40:00.000Z",
+  "notes": "Auditoría móvil y desktop completa, Floating Island Dock macOS, soporte WhatsApp Musa (+34 673 109 486), modal táctil de confirmación y blindaje de galería."
 }
-

@@ -20,3 +20,20 @@ Key patterns:
 - Reference users with `auth.users(id)`; use `auth.uid()` in RLS policies.
 - For storage uploads, persist both the returned `url` and `key`.
 <!-- INSFORGE:END -->
+
+## Protocolo Obligatorio de Fin de Sesión y Control de Versiones (NexTool — Musa)
+
+Siempre que Musa o el usuario solicite cerrar sesión (mediante **"cerrar sesión"**, **"@final"**, **"@end"**, **"terminar"** o expresiones similares):
+
+1. **Resumen de Trabajo Realizado**:
+   El agente debe presentar obligatoriamente un resumen claro y conciso de lo hecho en la sesión:
+   > *"¿Hoy has hecho... [resumen de tareas, mejoras o correcciones realizadas en la app/cliente]?*"
+
+2. **Pregunta Obligatoria de Actualización de Versión**:
+   Inmediatamente después, el agente debe preguntar expresamente a Musa:
+   > *"Después de hacer todo esto, ¿prefieres que actualicemos la versión de la app (ej. nueva versión en `version.json` y sistema de actualización) o mantenemos la versión actual?"*
+
+3. **Acción según la respuesta de Musa**:
+   * **Si Musa responde SÍ**: Se incrementa la versión (SemVer patch o minor según el alcance) en `web/clientes/<app>/version.json`, `web/web v1/public/version.json`, portal y base de datos, registrándolo en `docs/SESSION_LATEST_ES.md`.
+   * **Si Musa responde NO**: Se dejan registradas las mejoras y se cierra la sesión normalmente manteniendo intacto el número de versión actual.
+

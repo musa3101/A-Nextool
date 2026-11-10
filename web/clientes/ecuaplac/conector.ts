@@ -347,7 +347,6 @@ export class EcuaplacConnector {
         .select('*')
         .eq('tenant_id', ECUAPLAC_TENANT_ID)
         .eq('type', 'carousel')
-        .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
       if (!error && Array.isArray(data) && data.length > 0) {
@@ -414,7 +413,6 @@ export class EcuaplacConnector {
         .select('*')
         .eq('tenant_id', ECUAPLAC_TENANT_ID)
         .eq('type', 'gallery')
-        .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
       if (!error && Array.isArray(data) && data.length > 0) {
@@ -491,11 +489,11 @@ export class EcuaplacConnector {
             status: d.status === 'aprobado' || d.status === 'approved' ? 'approved' : d.status === 'contactado' || d.status === 'contacted' ? 'contacted' : 'new',
             date: d.created_at
               ? new Date(d.created_at).toLocaleDateString([], {
-                  day: '2-digit',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
               : 'Hoy',
             notes: d.notes || '',
           }));
@@ -526,11 +524,11 @@ export class EcuaplacConnector {
           status: d.status === 'aprobado' || d.status === 'approved' ? 'approved' : d.status === 'contactado' || d.status === 'contacted' ? 'contacted' : 'new',
           date: d.created_at
             ? new Date(d.created_at).toLocaleDateString([], {
-                day: '2-digit',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
+              day: '2-digit',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
             : 'Hoy',
           notes: d.notes || '',
         }));
@@ -679,7 +677,9 @@ export class EcuaplacConnector {
    */
   async saveWork(work: Partial<EcuaplacWorkItem>): Promise<EcuaplacWorkItem> {
     const isNew = !work.id || !this.isUUID(work.id);
-    let savedWork = { ...work } as EcuaplacWorkItem;
+    const existing = (!isNew && work.id) ? this.getWorks().find((w) => w.id === work.id) : undefined;
+    const fullWork = { ...existing, ...work };
+    let savedWork = { ...fullWork } as EcuaplacWorkItem;
 
     // 1. Guardar en Supabase (ecuaplac_carousel) -> La web viva ecuaplac.com se actualiza
     try {
@@ -688,15 +688,26 @@ export class EcuaplacConnector {
         : `${this.url}/rest/v1/${this.tables.carousel}?id=eq.${work.id}`;
 
       const method = isNew ? 'POST' : 'PATCH';
-      const supabasePayload: Record<string, any> = {
-        title_es: work.title_es,
-        title_en: work.title_en || work.title_es,
-        location_es: work.location_es || 'Mallorca',
-        location_en: work.location_en || work.location_es || 'Mallorca',
-        image_url: work.image_url,
-        sort_order: work.sort_order ?? 10,
-        active: work.active !== false,
-      };
+      const supabasePayload: Record<string, any> = isNew
+        ? {
+          ...(this.isUUID(work.id) ? { id: work.id } : {}),
+          title_es: fullWork.title_es || 'Nueva Obra',
+          title_en: fullWork.title_en || fullWork.title_es || 'New Project',
+          location_es: fullWork.location_es || 'Mallorca',
+          location_en: fullWork.location_en || fullWork.location_es || 'Mallorca',
+          image_url: fullWork.image_url || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c',
+          sort_order: fullWork.sort_order ?? 10,
+          active: work.active !== false,
+        }
+        : {
+          ...(work.title_es !== undefined && { title_es: work.title_es }),
+          ...(work.title_en !== undefined && { title_en: work.title_en }),
+          ...(work.location_es !== undefined && { location_es: work.location_es }),
+          ...(work.location_en !== undefined && { location_en: work.location_en }),
+          ...(work.image_url !== undefined && { image_url: work.image_url }),
+          ...(work.sort_order !== undefined && { sort_order: work.sort_order }),
+          ...(work.active !== undefined && { active: work.active }),
+        };
 
       const res = await fetch(endpoint, {
         method,
@@ -710,6 +721,8 @@ export class EcuaplacConnector {
         if (supaItem?.id) {
           savedWork.id = supaItem.id;
         }
+      } else {
+        console.warn('Fallo Supabase saveWork HTTP:', res.status, await res.text());
       }
     } catch (e) {
       console.warn('Fallo al guardar obra en Supabase:', e);
@@ -721,21 +734,21 @@ export class EcuaplacConnector {
         id: this.isUUID(savedWork.id) ? savedWork.id : undefined,
         tenant_id: ECUAPLAC_TENANT_ID,
         type: 'carousel',
-        title_es: work.title_es || 'Nueva Obra',
-        title_en: work.title_en || work.title_es || 'New Project',
-        location_es: work.location_es || 'Mallorca',
-        location_en: work.location_en || work.location_es || 'Mallorca',
-        image_url: work.image_url || '/ecuaplac/logo.webp',
-        sort_order: work.sort_order || 10,
-        is_active: work.active !== false,
-        fit_mode: work.fit_mode || 'cover',
+        title_es: fullWork.title_es || 'Nueva Obra',
+        title_en: fullWork.title_en || fullWork.title_es || 'New Project',
+        location_es: fullWork.location_es || 'Mallorca',
+        location_en: fullWork.location_en || fullWork.location_es || 'Mallorca',
+        image_url: fullWork.image_url || '/ecuaplac/logo.webp',
+        sort_order: fullWork.sort_order ?? 10,
+        is_active: fullWork.active !== false,
+        fit_mode: fullWork.fit_mode || 'cover',
         updated_at: new Date().toISOString(),
       };
 
       if (!insforgePayload.id) delete (insforgePayload as any).id;
 
       await insforge.database.from('obras').upsert([insforgePayload]);
-      const workTitle = work.title_es || this.getWorks().find(w => w.id === work.id)?.title_es || 'Obra';
+      const workTitle = fullWork.title_es || 'Obra';
       await this.addAuditLog(isNew ? 'upload' : 'edit', `Obra ${isNew ? 'añadida' : 'editada'}: "${workTitle}"`);
     } catch (e) {
       console.warn('Fallo al sincronizar obra en InsForge:', e);
@@ -749,7 +762,9 @@ export class EcuaplacConnector {
    */
   async saveProject(project: Partial<EcuaplacWorkItem>): Promise<EcuaplacWorkItem> {
     const isNew = !project.id || !this.isUUID(project.id);
-    let savedProject = { ...project } as EcuaplacWorkItem;
+    const existing = (!isNew && project.id) ? this.getMoreProjects().find((p) => p.id === project.id) : undefined;
+    const fullProject = { ...existing, ...project };
+    let savedProject = { ...fullProject } as EcuaplacWorkItem;
 
     // 1. Guardar en Supabase (ecuaplac_more_projects) -> La web viva ecuaplac.com se actualiza
     try {
@@ -758,13 +773,22 @@ export class EcuaplacConnector {
         : `${this.url}/rest/v1/${this.tables.moreProjects}?id=eq.${project.id}`;
 
       const method = isNew ? 'POST' : 'PATCH';
-      const supabasePayload: Record<string, any> = {
-        title_es: project.title_es,
-        title_en: project.title_en || project.title_es,
-        image_url: project.image_url,
-        sort_order: project.sort_order ?? 10,
-        active: project.active !== false,
-      };
+      const supabasePayload: Record<string, any> = isNew
+        ? {
+          ...(this.isUUID(project.id) ? { id: project.id } : {}),
+          title_es: fullProject.title_es || 'Nuevo Proyecto',
+          title_en: fullProject.title_en || fullProject.title_es || 'New Project',
+          image_url: fullProject.image_url || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c',
+          sort_order: fullProject.sort_order ?? 10,
+          active: project.active !== false,
+        }
+        : {
+          ...(project.title_es !== undefined && { title_es: project.title_es }),
+          ...(project.title_en !== undefined && { title_en: project.title_en }),
+          ...(project.image_url !== undefined && { image_url: project.image_url }),
+          ...(project.sort_order !== undefined && { sort_order: project.sort_order }),
+          ...(project.active !== undefined && { active: project.active }),
+        };
 
       const res = await fetch(endpoint, {
         method,
@@ -778,6 +802,8 @@ export class EcuaplacConnector {
         if (supaItem?.id) {
           savedProject.id = supaItem.id;
         }
+      } else {
+        console.warn('Fallo Supabase saveProject HTTP:', res.status, await res.text());
       }
     } catch (e) {
       console.warn('Fallo al guardar proyecto en Supabase:', e);
@@ -789,21 +815,21 @@ export class EcuaplacConnector {
         id: this.isUUID(savedProject.id) ? savedProject.id : undefined,
         tenant_id: ECUAPLAC_TENANT_ID,
         type: 'gallery',
-        title_es: project.title_es || 'Nuevo Proyecto',
-        title_en: project.title_en || project.title_es || 'New Project',
-        location_es: project.location_es || 'Mallorca',
-        location_en: project.location_en || project.location_es || 'Mallorca',
-        image_url: project.image_url || '/ecuaplac/logo.webp',
-        sort_order: project.sort_order || 10,
-        is_active: project.active !== false,
-        fit_mode: project.fit_mode || 'cover',
+        title_es: fullProject.title_es || 'Nuevo Proyecto',
+        title_en: fullProject.title_en || fullProject.title_es || 'New Project',
+        location_es: fullProject.location_es || 'Mallorca',
+        location_en: fullProject.location_en || fullProject.location_es || 'Mallorca',
+        image_url: fullProject.image_url || '/ecuaplac/logo.webp',
+        sort_order: fullProject.sort_order ?? 10,
+        is_active: fullProject.active !== false,
+        fit_mode: fullProject.fit_mode || 'cover',
         updated_at: new Date().toISOString(),
       };
 
       if (!insforgePayload.id) delete (insforgePayload as any).id;
 
       await insforge.database.from('obras').upsert([insforgePayload]);
-      const projTitle = project.title_es || this.getMoreProjects().find(p => p.id === project.id)?.title_es || 'Proyecto';
+      const projTitle = fullProject.title_es || 'Proyecto';
       await this.addAuditLog(isNew ? 'upload' : 'edit', `Proyecto ${isNew ? 'añadido' : 'editado'} en Más Reformas: "${projTitle}"`);
     } catch (e) {
       console.warn('Fallo al sincronizar proyecto en InsForge:', e);
@@ -821,22 +847,26 @@ export class EcuaplacConnector {
     const item = list.find(i => i.id === id);
     const itemTitle = item?.title_es || `Elemento ${id.substring(0, 8)}`;
 
-    // 1. Eliminar de Supabase (web ecuaplac.com)
-    try {
-      await fetch(`${this.url}/rest/v1/${table}?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: this.getHeaders(),
-      });
-    } catch (e) {
-      console.warn('Fallo al eliminar en Supabase:', e);
+    // 1. Eliminar de Supabase (web ecuaplac.com) - Solo si el id es un UUID válido
+    if (this.isUUID(id)) {
+      try {
+        await fetch(`${this.url}/rest/v1/${table}?id=eq.${id}`, {
+          method: 'DELETE',
+          headers: this.getHeaders(),
+        });
+      } catch (e) {
+        console.warn('Fallo al eliminar en Supabase:', e);
+      }
     }
 
     // 2. Eliminar de InsForge (plataforma NexTool)
-    try {
-      await insforge.database.from('obras').delete().eq('id', id);
-      await this.addAuditLog('delete', `Elemento eliminado: «${itemTitle}»`);
-    } catch (e) {
-      console.warn('Fallo al eliminar en InsForge:', e);
+    if (this.isUUID(id)) {
+      try {
+        await insforge.database.from('obras').delete().eq('id', id);
+        await this.addAuditLog('delete', `Elemento eliminado: «${itemTitle}»`);
+      } catch (e) {
+        console.warn('Fallo al eliminar en InsForge:', e);
+      }
     }
 
     return true;
