@@ -84,6 +84,29 @@ import { insforge } from '@/lib/insforge';
 const INITIAL_WORKS = DEFAULT_WORKS;
 const INITIAL_MORE_PROJECTS = DEFAULT_MORE_PROJECTS;
 
+// Icono Window moderno de 21st / Heroicons para acceso a la web
+function WindowIcon({ size = 20, className = '', ...props }: React.SVGProps<SVGSVGElement> & { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M3 8.25V18a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18V8.25m-18 0V6a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 6v2.25m-18 0h18M5.25 6h.008v.008H5.25zM7.5 6h.008v.008H7.5zm2.25 0h.008v.008H9.75z"
+      />
+    </svg>
+  );
+}
+
 // Motor universal de compresión y conversión a WebP (< 250 KB)
 const compressImageUniversal = (
   file: File,
@@ -1826,25 +1849,28 @@ export const EcuaplacPortal: React.FC = () => {
               />
             </div>
             <div>
-              <span className="text-base font-bold text-white tracking-tight leading-none block">
+              <span className="text-base font-bold text-white tracking-tight leading-none block font-display">
                 ecuaplac.com
-              </span>
-              <span className="text-[10px] text-sky-400 font-bold tracking-wider uppercase block mt-0.5">
-                {panelLang === 'es' ? 'Gestor Oficial' : 'Official Manager'}
               </span>
             </div>
           </div>
 
-          {/* Botón Ver Web Directo (Limpio en todos los apartados) */}
+          {/* Botón Ver Web Directo con icono Window de 21st y micro-animación elegante */}
           <a
             href="https://ecuaplac.com"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[38px] sm:min-h-0 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-md shadow-xs text-white hover:text-[#C5A059] transition-all text-xs font-semibold cursor-pointer"
-            title={panelLang === 'es' ? 'Ver ecuaplac.com en directo' : 'View ecuaplac.com live'}
+            className="group relative inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 min-h-[38px] sm:min-h-0 rounded-full bg-gradient-to-b from-white/12 to-white/6 hover:from-white/20 hover:to-white/10 active:scale-95 border border-white/15 backdrop-blur-md shadow-[0_2px_10px_-2px_rgba(0,0,0,0.3)] text-white hover:text-[#F0CF85] transition-all duration-200 text-xs font-bold cursor-pointer select-none"
+            title={panelLang === 'es' ? 'Abrir ecuaplac.com en directo' : 'Open ecuaplac.com live'}
           >
-            <ExternalLink className="w-3.5 h-3.5 text-[#C5A059]" />
-            <span className="hidden sm:inline">{panelLang === 'es' ? 'Ver Web' : 'View Web'}</span>
+            <WindowIcon
+              size={18}
+              className="text-[#C5A059] group-hover:text-[#F0CF85] group-hover:scale-110 group-hover:-translate-y-0.5 transition-all duration-200 shrink-0"
+            />
+            <span className="hidden sm:inline font-sans tracking-tight">
+              {panelLang === 'es' ? 'Ver Web' : 'View Web'}
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 group-hover:bg-emerald-300 animate-pulse shrink-0" />
           </a>
         </div>
       </header>
