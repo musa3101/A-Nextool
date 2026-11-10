@@ -41,7 +41,7 @@ export const LoginView: React.FC = () => {
     return {
       badge: 'MYNEXT SUPERADMIN',
       button: 'Acceder a NexTool',
-      defaultEmail: 'musaabdul3101@gmail.com',
+      defaultEmail: 'mynextbymusa@gmail.com',
     };
   };
 

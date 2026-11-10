@@ -28,7 +28,7 @@ const GUEST_SESSION: UserSession = {
 const DEFAULT_SUPERADMIN: UserSession = {
   userId: 'usr_musa_admin',
   name: 'Musa (MYNEXT)',
-  email: 'musaabdul3101@gmail.com',
+  email: 'mynextbymusa@gmail.com',
   role: 'SUPERADMIN',
   tenantId: null,
   isImpersonating: false,
@@ -184,7 +184,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setSession({
       userId: 'usr_musa_admin',
       name: `Musa (Viendo como ${clientName})`,
-      email: 'musaabdul3101@gmail.com',
+      email: 'mynextbymusa@gmail.com',
       role: 'SUPERADMIN',
       tenantId,
       isImpersonating: true,
