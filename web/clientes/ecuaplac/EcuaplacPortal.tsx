@@ -1918,11 +1918,11 @@ export const EcuaplacPortal: React.FC = () => {
                 <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500/15 text-emerald-600 shrink-0">
                   <Check className="w-2.5 h-2.5 stroke-[2.5]" />
                 </span>
-                <span className="text-[11px] sm:text-xs font-bold text-slate-800 tracking-tight truncate font-display">
+                <span className="text-[11px] sm:text-xs font-semibold text-slate-800 tracking-tight truncate font-sans">
                   {panelLang === 'es' ? 'Bienvenido a tu panel de Ecuaplac' : 'Welcome to your Ecuaplac portal'}
                 </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight font-display flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-semibold text-slate-950 tracking-normal leading-tight font-display flex items-center gap-2 flex-wrap">
                 <span>{getGreetingText('José')}</span>
                 <span className="animate-wave inline-block select-none transform-gpu" role="img" aria-label="Saludo">👋</span>
               </h1>
@@ -1938,7 +1938,7 @@ export const EcuaplacPortal: React.FC = () => {
                 onClick={() => setCfPeriod('30d')}
                 className={`relative px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                   cfPeriod === '30d'
-                    ? 'bg-[#08090C] text-[#F0CF85] shadow-[0_3px_12px_-2px_rgba(8,9,12,0.4),0_1px_2px_rgba(8,9,12,0.2)] ring-1 ring-white/10 font-black'
+                    ? 'bg-[#08090C] text-[#F0CF85] shadow-[0_3px_12px_-2px_rgba(8,9,12,0.4),0_1px_2px_rgba(8,9,12,0.2)] ring-1 ring-white/10 font-bold'
                     : 'text-stone-600 hover:text-slate-900 hover:bg-black/[0.03] font-medium'
                 }`}
               >
@@ -1951,7 +1951,7 @@ export const EcuaplacPortal: React.FC = () => {
                 onClick={() => setCfPeriod('3m')}
                 className={`relative px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                   cfPeriod === '3m'
-                    ? 'bg-[#08090C] text-[#F0CF85] shadow-[0_3px_12px_-2px_rgba(8,9,12,0.4),0_1px_2px_rgba(8,9,12,0.2)] ring-1 ring-white/10 font-black'
+                    ? 'bg-[#08090C] text-[#F0CF85] shadow-[0_3px_12px_-2px_rgba(8,9,12,0.4),0_1px_2px_rgba(8,9,12,0.2)] ring-1 ring-white/10 font-bold'
                     : 'text-stone-600 hover:text-slate-900 hover:bg-black/[0.03] font-medium'
                 }`}
               >
@@ -1973,11 +1973,11 @@ export const EcuaplacPortal: React.FC = () => {
                   <Users className="w-6 h-6" />
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-[11px] font-black shadow-xs">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-[11px] font-semibold shadow-xs">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Real (sin bots)</span>
                   </span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-800 text-[11px] font-black shadow-xs">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-800 text-[11px] font-semibold shadow-xs">
                     <TrendingUp className="w-3.5 h-3.5 text-sky-600" />
                     <span>{cfMetrics.trendPercentage}</span>
                   </span>
@@ -1986,14 +1986,14 @@ export const EcuaplacPortal: React.FC = () => {
 
               <div className="relative z-10">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-black text-stone-400 uppercase tracking-wider block">
+                  <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block font-sans">
                     Visitantes Únicos ({cfMetrics.periodLabel})
                   </span>
-                  <span className="text-[10px] font-bold text-sky-700 bg-sky-100/80 px-2 py-0.5 rounded-full shrink-0">
+                  <span className="text-[10px] font-semibold text-sky-700 bg-sky-100/80 px-2 py-0.5 rounded-full shrink-0 font-sans">
                     {panelLang === 'es' ? 'Métricas Oficiales' : 'Official Metrics'}
                   </span>
                 </div>
-                <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight block mt-1 font-mono">
+                <span className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight block mt-1 font-mono">
                   <AnimatedCounter value={cfMetrics.uniqueVisitors} />
                 </span>
                 <span className="text-xs text-stone-500 mt-1.5 flex items-center gap-1.5 font-medium">
@@ -2045,11 +2045,11 @@ export const EcuaplacPortal: React.FC = () => {
               </div>
 
               <div className="relative z-10">
-                <span className="text-[11px] font-black text-stone-400 uppercase tracking-wider block">
+                <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block font-sans">
                   Presupuestos Entrantes
                 </span>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight font-mono">
+                  <span className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight font-mono">
                     <AnimatedCounter
                       value={
                         cfPeriod === '30d'
@@ -2058,10 +2058,10 @@ export const EcuaplacPortal: React.FC = () => {
                       }
                     />
                   </span>
-                  <span className="text-xs font-bold text-stone-500">solicitudes</span>
+                  <span className="text-xs font-semibold text-stone-500 font-sans">solicitudes</span>
                 </div>
                 <span className="text-xs text-stone-500 mt-1.5 block font-medium truncate">
-                  Último: <span className="font-bold text-slate-800">{leads[0]?.name || 'Cliente'}</span> ({leads[0]?.date || 'Hoy'})
+                  Último: <span className="font-semibold text-slate-800">{leads[0]?.name || 'Cliente'}</span> ({leads[0]?.date || 'Hoy'})
                 </span>
               </div>
 
@@ -2093,10 +2093,10 @@ export const EcuaplacPortal: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base sm:text-lg font-black text-slate-950 font-display tracking-tight">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-950 font-display tracking-tight">
                       Facturas
                     </h3>
-                    <span className="shrink-0 whitespace-nowrap px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 text-[10px] font-bold font-sans">
+                    <span className="shrink-0 whitespace-nowrap px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 text-[10px] font-semibold font-sans">
                       {invoices.length} {invoices.length === 1 ? 'factura' : 'facturas'}
                     </span>
                   </div>
@@ -2170,7 +2170,7 @@ export const EcuaplacPortal: React.FC = () => {
                             <span className="text-[7.5px] font-black uppercase tracking-tight leading-none mt-0.5">PDF</span>
                           </div>
                           <div className="min-w-0">
-                            <span className="text-xs sm:text-sm font-black text-slate-900 truncate block font-display">
+                            <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate block font-sans">
                               {inv.name}
                             </span>
                             <div className="flex items-center gap-2 mt-0.5 text-[11px] text-stone-500 font-normal font-sans flex-wrap">
@@ -2237,23 +2237,23 @@ export const EcuaplacPortal: React.FC = () => {
           {/* Cabecera Compacta y Elegante */}
           <div className="bg-white/95 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.05)] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-black tracking-tight">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h2 className="text-xl sm:text-2xl font-semibold tracking-normal text-slate-950 font-display">
                   {activeTab === 'obras' ? (
                     <>
                       <span className="text-[#C5A059]">Galería 1</span>
-                      <span className="text-stone-300 mx-1.5 font-normal">·</span>
+                      <span className="text-stone-300 mx-2 font-normal">·</span>
                       <span className="text-slate-900">Carrusel de Portada</span>
                     </>
                   ) : (
                     <>
                       <span className="text-indigo-600">Galería 2</span>
-                      <span className="text-stone-300 mx-1.5 font-normal">·</span>
+                      <span className="text-stone-300 mx-2 font-normal">·</span>
                       <span className="text-slate-900">Más Proyectos</span>
                     </>
                   )}
                 </h2>
-                <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 shrink-0">
+                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 shrink-0 font-sans">
                   {currentCollection.length} {currentCollection.length === 1 ? 'obra' : 'obras'}
                 </span>
               </div>
@@ -2354,11 +2354,11 @@ export const EcuaplacPortal: React.FC = () => {
                       {/* Badges superiores: Número de orden (#10, #20...) y Visible/Oculto (Fiel a la app oficial de iPhone) */}
                       <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
                         <div className="flex items-center gap-1.5">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-950/85 backdrop-blur-sm text-[#C5A059] font-black text-xs border border-white/10 shadow-sm">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-950/85 backdrop-blur-sm text-[#C5A059] font-bold font-mono text-xs border border-white/10 shadow-sm">
                             #{item.sort_order || (index + 1) * 10}
                           </span>
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-xs ${
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold text-white shadow-xs ${
                               item.active ? 'bg-emerald-600' : 'bg-stone-600'
                             }`}
                           >
@@ -2369,7 +2369,7 @@ export const EcuaplacPortal: React.FC = () => {
 
                       {/* Badge de Ubicación en la esquina inferior izquierda (Flotante blanco con pin) */}
                       <div className="absolute bottom-3 left-3 pointer-events-none">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-sm text-slate-900 text-xs font-black shadow-md border border-stone-100/80">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-sm text-slate-900 text-xs font-semibold shadow-xs border border-stone-100/80 font-sans">
                           <span className="text-rose-500 text-xs leading-none">📍</span>
                           <span>{item.location_es || 'Mallorca'}</span>
                         </span>
@@ -2381,7 +2381,7 @@ export const EcuaplacPortal: React.FC = () => {
                       onClick={() => handleOpenEdit(item)}
                       className="p-4 cursor-pointer"
                     >
-                      <h3 className="font-black text-base text-slate-900 line-clamp-2 leading-snug group-hover/card:text-[#C5A059] transition-colors">
+                      <h3 className="font-semibold text-sm sm:text-base text-slate-900 line-clamp-2 leading-snug tracking-tight group-hover/card:text-[#C5A059] transition-colors font-display">
                         {item.title_es}
                       </h3>
                     </div>
@@ -2497,7 +2497,7 @@ export const EcuaplacPortal: React.FC = () => {
 
             {/* Datos del Administrador (Limpio y Minimalista) */}
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg sm:text-xl font-black text-slate-900 truncate font-display">
+              <h3 className="text-lg sm:text-xl font-semibold text-slate-900 truncate font-display tracking-normal">
                 {adminName}
               </h3>
               <p className="text-xs text-stone-500 font-mono mt-0.5 truncate">
@@ -2510,7 +2510,7 @@ export const EcuaplacPortal: React.FC = () => {
           <div className="space-y-2">
             <div className="px-3.5 pt-1 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
-              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider font-display">
+              <h4 className="text-[11px] sm:text-xs font-semibold text-stone-500 uppercase tracking-wider font-sans">
                 {panelLang === 'es' ? 'Cuenta' : 'Account'}
               </h4>
             </div>
@@ -2526,7 +2526,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <User className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                       {panelLang === 'es' ? 'Gestionar Perfil' : 'Manage Profile'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
@@ -2548,7 +2548,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <Lock className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                       {panelLang === 'es' ? 'Seguridad y Clave' : 'Security & Password'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
@@ -2566,7 +2566,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <Bell className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                       {panelLang === 'es' ? 'Notificaciones' : 'Notifications'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
@@ -2587,7 +2587,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <Globe className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                       {panelLang === 'es' ? 'Idioma del Panel' : 'Panel Language'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
@@ -2627,7 +2627,7 @@ export const EcuaplacPortal: React.FC = () => {
           <div className="space-y-2 mt-3">
             <div className="px-3.5 pt-1 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
-              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider font-display">
+              <h4 className="text-[11px] sm:text-xs font-semibold text-stone-500 uppercase tracking-wider font-sans">
                 {panelLang === 'es' ? 'Sistema & Dispositivo' : 'System & Device'}
               </h4>
             </div>
@@ -2643,7 +2643,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <MessageSquarePlus className="w-5 h-5 text-[#C5A059]" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight group-hover:text-[#C5A059] transition-colors">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight group-hover:text-[#C5A059] transition-colors">
                       {panelLang === 'es' ? 'Enviar Feedback o Problema' : 'Send Feedback or Issue'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal truncate block font-sans mt-0.5">
@@ -2675,7 +2675,7 @@ export const EcuaplacPortal: React.FC = () => {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                        <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                           {panelLang === 'es' ? 'Actualizaciones' : 'Updates'}
                         </span>
                         {updateCheckState === 'available' ? (
@@ -2894,7 +2894,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <Activity className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                       {panelLang === 'es' ? 'Últimos Movimientos' : 'Recent Activity'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
@@ -2905,7 +2905,7 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-mono text-[11px] font-bold">
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-mono text-[11px] font-semibold">
                     {logs.length}
                   </span>
                   <ChevronRight className="w-4 h-4 text-stone-400" />
@@ -2931,7 +2931,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <LogOut className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-rose-600 block group-hover:text-rose-700 font-display tracking-tight">
+                    <span className="text-sm font-semibold text-rose-600 block group-hover:text-rose-700 font-sans tracking-tight">
                       {panelLang === 'es' ? 'Cerrar Sesión' : 'Sign Out'}
                     </span>
                     <span className="text-[11.5px] text-rose-400 font-normal block mt-0.5 leading-snug font-sans">
@@ -2956,7 +2956,7 @@ export const EcuaplacPortal: React.FC = () => {
               />
             </div>
 
-            <span className="text-[12.5px] sm:text-[13px] font-black tracking-[0.24em] text-[#0F172A] uppercase font-display">
+            <span className="text-xs sm:text-[13px] font-bold tracking-[0.22em] text-[#0F172A] uppercase font-display">
               NEXT TOOLS
             </span>
 
@@ -3030,7 +3030,7 @@ export const EcuaplacPortal: React.FC = () => {
         >
           {/* Selector de Destino de la Fotografía (Portada vs Más Reformas) */}
           <div className="space-y-1.5 pb-0.5">
-            <label className="font-black text-xs text-slate-900 block">
+            <label className="font-semibold text-xs text-slate-700 block font-sans tracking-tight">
               ¿Dónde quieres colocar esta foto? *
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -3045,7 +3045,7 @@ export const EcuaplacPortal: React.FC = () => {
               >
                 <div className="flex items-center gap-2">
                   <Star className={`w-4 h-4 ${formTargetGallery === 'carousel' ? 'text-[#B38E46]' : 'text-stone-400'}`} />
-                  <span className={`text-xs font-black ${formTargetGallery === 'carousel' ? 'text-slate-900' : 'text-stone-700'}`}>
+                  <span className={`text-xs font-semibold ${formTargetGallery === 'carousel' ? 'text-slate-900 font-bold' : 'text-stone-700'}`}>
                     Portada (Galería 1)
                   </span>
                 </div>
@@ -3065,7 +3065,7 @@ export const EcuaplacPortal: React.FC = () => {
               >
                 <div className="flex items-center gap-2">
                   <Layers className={`w-4 h-4 ${formTargetGallery === 'projects' ? 'text-[#B38E46]' : 'text-stone-400'}`} />
-                  <span className={`text-xs font-black ${formTargetGallery === 'projects' ? 'text-slate-900' : 'text-stone-700'}`}>
+                  <span className={`text-xs font-semibold ${formTargetGallery === 'projects' ? 'text-slate-900 font-bold' : 'text-stone-700'}`}>
                     Más Reformas (Galería 2)
                   </span>
                 </div>
@@ -3079,13 +3079,13 @@ export const EcuaplacPortal: React.FC = () => {
           {/* Zona de Encuadre 4:3 con Previsualización (De la App Original) */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="font-black text-xs text-slate-800">Previsualización de Encuadre (4:3)</label>
+              <label className="font-semibold text-xs text-slate-700 font-sans tracking-tight">Previsualización de Encuadre (4:3)</label>
               <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-full border border-stone-200">
                 <button
                   type="button"
                   onClick={() => setFormFitMode('cover')}
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
-                    formFitMode === 'cover' ? 'bg-[#C5A059] text-slate-950 font-black shadow-xs' : 'text-stone-600'
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                    formFitMode === 'cover' ? 'bg-[#C5A059] text-slate-950 font-bold shadow-xs' : 'text-stone-600'
                   }`}
                 >
                   Llenar
@@ -3093,8 +3093,8 @@ export const EcuaplacPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setFormFitMode('contain')}
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
-                    formFitMode === 'contain' ? 'bg-[#C5A059] text-slate-950 font-black shadow-xs' : 'text-stone-600'
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                    formFitMode === 'contain' ? 'bg-[#C5A059] text-slate-950 font-bold shadow-xs' : 'text-stone-600'
                   }`}
                 >
                   Completa
@@ -3151,13 +3151,13 @@ export const EcuaplacPortal: React.FC = () => {
                   <div className="w-14 h-14 rounded-2xl bg-[#C5A059]/15 border border-[#C5A059]/30 flex items-center justify-center text-[#C5A059] mb-3 group-hover/dropzone:scale-110 transition-transform shadow-md">
                     <Camera className="w-7 h-7" />
                   </div>
-                  <span className="text-sm font-black text-white block">
+                  <span className="text-sm font-semibold text-white block font-sans">
                     Toca aquí para seleccionar o tomar foto
                   </span>
-                  <span className="text-[11px] text-stone-300 mt-1 block">
+                  <span className="text-[11px] text-stone-300 mt-1 block font-sans">
                     Abre la cámara o galería de tu teléfono móvil
                   </span>
-                  <div className="mt-3.5 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-[#C5A059] text-slate-950 font-black text-xs shadow-md">
+                  <div className="mt-3.5 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-[#C5A059] text-slate-950 font-bold text-xs shadow-md">
                     <Upload className="w-3.5 h-3.5" />
                     <span>Subir desde Móvil / PC</span>
                   </div>
@@ -3170,7 +3170,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-xs font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1.5 py-1"
+                className="text-xs font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-1.5 py-1 font-sans"
               >
                 <Camera className="w-3.5 h-3.5 text-[#B38E46]" />
                 <span>{formImageUrl ? 'Cambiar fotografía' : 'Abrir selector de fotos'}</span>
@@ -3179,7 +3179,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowUrlInput(!showUrlInput)}
-                className="text-[11px] text-stone-500 hover:text-stone-700 flex items-center gap-1 underline"
+                className="text-[11px] text-stone-500 hover:text-stone-700 flex items-center gap-1 underline font-sans"
               >
                 <LinkIcon className="w-3 h-3" />
                 <span>{showUrlInput ? 'Ocultar URL' : 'O pegar URL externa'}</span>
@@ -3189,7 +3189,7 @@ export const EcuaplacPortal: React.FC = () => {
             {/* Input de URL opcional */}
             {showUrlInput && (
               <div className="pt-1 animate-in fade-in duration-150">
-                <label className="font-bold text-stone-700 block mb-1">
+                <label className="font-semibold text-stone-700 block mb-1 font-sans text-xs">
                   Enlace / URL directa de la imagen
                 </label>
                 <input
@@ -3200,14 +3200,14 @@ export const EcuaplacPortal: React.FC = () => {
                     setFormImageUrl(e.target.value);
                     setUploadStats(null);
                   }}
-                  className="w-full border border-stone-200 rounded-xl px-3 py-2 text-[16px] sm:text-xs focus:ring-2 focus:ring-[#C5A059]/40"
+                  className="w-full border border-stone-200 rounded-xl px-3 py-2 text-[16px] sm:text-xs focus:ring-2 focus:ring-[#C5A059]/40 font-sans"
                 />
               </div>
             )}
           </div>
 
           <div>
-            <label className="font-extrabold text-xs text-slate-800 block mb-1">
+            <label className="font-semibold text-xs text-slate-700 block mb-1 font-sans tracking-tight">
               Título de la Obra / Proyecto *
             </label>
             <input
@@ -3216,12 +3216,12 @@ export const EcuaplacPortal: React.FC = () => {
               placeholder="Ej. Reforma Integral de Baño con Bañera Exenta"
               value={formTitleEs}
               onChange={(e) => setFormTitleEs(e.target.value)}
-              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50"
+              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50 font-sans"
             />
           </div>
 
           <div>
-            <label className="font-extrabold text-xs text-slate-800 block mb-1">
+            <label className="font-semibold text-xs text-slate-700 block mb-1 font-sans tracking-tight">
               Ubicación (Mallorca)
             </label>
             <input
@@ -3229,7 +3229,7 @@ export const EcuaplacPortal: React.FC = () => {
               placeholder="Ej. Andratx, Palma, Calvià, Sóller..."
               value={formLocation}
               onChange={(e) => setFormLocation(e.target.value)}
-              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50"
+              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50 font-sans"
             />
             {/* Chips rápidos de municipios de Mallorca */}
             <div className="flex items-center gap-1.5 mt-2 flex-wrap">
@@ -3238,7 +3238,7 @@ export const EcuaplacPortal: React.FC = () => {
                   key={city}
                   type="button"
                   onClick={() => setFormLocation(city)}
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border transition-all font-sans ${
                     formLocation === city
                       ? 'bg-slate-900 text-white border-slate-900'
                       : 'bg-stone-100 text-stone-600 border-stone-200 hover:bg-stone-200'
@@ -3255,7 +3255,7 @@ export const EcuaplacPortal: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4 text-[#B38E46]" />
-                <span className="text-xs font-black text-slate-900">
+                <span className="text-xs font-semibold text-slate-800 font-sans tracking-tight">
                   Versión Multilingüe (Web Internacional)
                 </span>
               </div>
@@ -3263,7 +3263,7 @@ export const EcuaplacPortal: React.FC = () => {
                 type="button"
                 onClick={handleAutoTranslate}
                 disabled={isTranslating}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-[#C5A059] text-slate-950 font-black text-[11px] shadow-xs hover:brightness-105 active:scale-95 transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-[#C5A059] text-slate-950 font-bold text-[11px] shadow-xs hover:brightness-105 active:scale-95 transition-all disabled:opacity-50 font-sans"
                 title="Autotraduce automáticamente a inglés y alemán"
               >
                 {isTranslating ? (

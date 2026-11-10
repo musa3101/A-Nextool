@@ -115,13 +115,13 @@ export const Modal: React.FC<ModalProps> = ({
           }`}
         >
           <div className="min-w-0 pr-3">
-            <h3
-              className={`text-base sm:text-lg font-black tracking-tight truncate ${
-                isDark ? 'text-white' : 'text-slate-900'
+            <h2
+              className={`text-lg sm:text-xl font-semibold font-display tracking-normal truncate ${
+                isDark ? 'text-white' : 'text-slate-950'
               }`}
             >
               {title}
-            </h3>
+            </h2>
             {subtitle && (
               <p className={`text-xs mt-0.5 truncate ${isDark ? 'text-slate-400' : 'text-stone-500'}`}>
                 {subtitle}
