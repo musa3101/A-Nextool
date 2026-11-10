@@ -117,3 +117,4 @@ const CameraIcon = forwardRef<CameraIconHandle, CameraIconProps>(
 CameraIcon.displayName = "CameraIcon";
 
 export { CameraIcon };
+
