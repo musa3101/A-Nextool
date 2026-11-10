@@ -689,7 +689,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '2.0.2';
+  const CURRENT_SYSTEM_VERSION = '3.0.0';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
