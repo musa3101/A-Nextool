@@ -14,8 +14,9 @@ export default defineConfig({
       'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
       'react-router-dom': path.resolve(__dirname, './node_modules/react-router-dom'),
       '@insforge/sdk': path.resolve(__dirname, './node_modules/@insforge/sdk'),
+      'framer-motion': path.resolve(__dirname, './node_modules/framer-motion'),
     },
-    dedupe: ['react', 'react-dom', 'lucide-react'],
+    dedupe: ['react', 'react-dom', 'lucide-react', 'framer-motion'],
   },
   server: {
     port: 5173,
