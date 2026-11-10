@@ -79,6 +79,7 @@ import { ecuaplacConnector, EcuaplacLeadItem, EcuaplacAuditLog, CloudflareMetric
 import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
 import { autoTranslateWork } from './traductor';
 import { insforge } from '@/lib/insforge';
+import { NavHomeIcon, NavGallery1Icon, NavGallery2Icon, NavSettingsIcon } from './NavIcons';
 
 // Catálogo inicial auténtico de Ecuaplac (9 Obras Reales de Portada y 11 Proyectos de Galería)
 const INITIAL_WORKS = DEFAULT_WORKS;
@@ -4479,49 +4480,41 @@ export const EcuaplacPortal: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('inicio')}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'inicio' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Home
-                className={`w-5 h-5 transition-transform duration-200 ${
-                  activeTab === 'inicio' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
-                }`}
-              />
+              <NavHomeIcon active={activeTab === 'inicio'} />
               <span
-                className={`text-[10.5px] font-sans tracking-wide leading-none ${
-                  activeTab === 'inicio' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                className={`text-[10.5px] font-sans tracking-wide leading-none transition-colors ${
+                  activeTab === 'inicio' ? 'font-bold text-white' : 'font-medium text-slate-400 group-hover:text-slate-300'
                 }`}
               >
                 {panelLang === 'es' ? 'Inicio' : 'Home'}
               </span>
               {activeTab === 'inicio' && (
-                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F0CF85] shadow-[0_0_8px_#F0CF85] -mb-1 animate-pulse" />
               )}
             </button>
 
-            {/* Tab 2: Galería 1 */}
+            {/* Tab 2: Galería 1 (Carrusel Portada) */}
             <button
               type="button"
               onClick={() => setActiveTab('obras')}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'obras' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <ImageIcon
-                className={`w-5 h-5 transition-transform duration-200 ${
-                  activeTab === 'obras' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
-                }`}
-              />
+              <NavGallery1Icon active={activeTab === 'obras'} />
               <span
-                className={`text-[10.5px] font-sans tracking-wide leading-none ${
-                  activeTab === 'obras' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                className={`text-[10.5px] font-sans tracking-wide leading-none transition-colors ${
+                  activeTab === 'obras' ? 'font-bold text-white' : 'font-medium text-slate-400 group-hover:text-slate-300'
                 }`}
               >
                 {panelLang === 'es' ? 'Galería 1' : 'Gallery 1'}
               </span>
               {activeTab === 'obras' && (
-                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F0CF85] shadow-[0_0_8px_#F0CF85] -mb-1 animate-pulse" />
               )}
             </button>
 
@@ -4534,35 +4527,31 @@ export const EcuaplacPortal: React.FC = () => {
                   background: 'linear-gradient(135deg, #9E782F 0%, #D4AF37 50%, #F5DE98 100%)',
                   boxShadow: '0 8px 24px -2px rgba(212,175,55,0.45)',
                 }}
-                className="w-14 h-14 rounded-full text-slate-950 flex items-center justify-center ring-4 ring-[#0E1726] active:scale-90 transition-all hover:brightness-110 group cursor-pointer"
+                className="w-14 h-14 rounded-full text-slate-950 flex items-center justify-center ring-4 ring-[#0E1726] active:scale-90 transition-all hover:brightness-110 hover:shadow-[0_12px_28px_-2px_rgba(212,175,55,0.6)] group cursor-pointer"
                 title={panelLang === 'es' ? 'Añadir nueva fotografía / obra' : 'Add new project photo'}
               >
-                <Plus className="w-6 h-6 text-slate-950 stroke-[2.5] group-hover:rotate-90 transition-transform duration-200" />
+                <Plus className="w-6 h-6 text-slate-950 stroke-[2.5] group-hover:rotate-90 group-hover:scale-110 transition-transform duration-200" />
               </button>
             </div>
 
-            {/* Tab 3: Galería 2 (Mismo Icono Fotográfico que Galería 1) */}
+            {/* Tab 3: Galería 2 (Catálogo / Más Reformas con Icono Distintivo) */}
             <button
               type="button"
               onClick={() => setActiveTab('more_projects')}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'more_projects' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <ImageIcon
-                className={`w-5 h-5 transition-transform duration-200 ${
-                  activeTab === 'more_projects' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
-                }`}
-              />
+              <NavGallery2Icon active={activeTab === 'more_projects'} />
               <span
-                className={`text-[10.5px] font-sans tracking-wide leading-none ${
-                  activeTab === 'more_projects' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                className={`text-[10.5px] font-sans tracking-wide leading-none transition-colors ${
+                  activeTab === 'more_projects' ? 'font-bold text-white' : 'font-medium text-slate-400 group-hover:text-slate-300'
                 }`}
               >
                 {panelLang === 'es' ? 'Galería 2' : 'Gallery 2'}
               </span>
               {activeTab === 'more_projects' && (
-                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F0CF85] shadow-[0_0_8px_#F0CF85] -mb-1 animate-pulse" />
               )}
             </button>
 
@@ -4570,24 +4559,20 @@ export const EcuaplacPortal: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('ajustes')}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-1 relative transition-all select-none active:scale-95 cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 relative transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'ajustes' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Settings
-                className={`w-5 h-5 transition-transform duration-200 ${
-                  activeTab === 'ajustes' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
-                }`}
-              />
+              <NavSettingsIcon active={activeTab === 'ajustes'} />
               <span
-                className={`text-[10.5px] font-sans tracking-wide leading-none ${
-                  activeTab === 'ajustes' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                className={`text-[10.5px] font-sans tracking-wide leading-none transition-colors ${
+                  activeTab === 'ajustes' ? 'font-bold text-white' : 'font-medium text-slate-400 group-hover:text-slate-300'
                 }`}
               >
                 {panelLang === 'es' ? 'Ajustes' : 'Settings'}
               </span>
               {activeTab === 'ajustes' && (
-                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F0CF85] shadow-[0_0_8px_#F0CF85] -mb-1 animate-pulse" />
               )}
             </button>
           </nav>
