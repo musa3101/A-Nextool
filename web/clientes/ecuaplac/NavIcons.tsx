@@ -185,3 +185,4 @@ export const NavSettingsIcon: React.FC<NavIconProps> = ({ active, className = ''
     </div>
   );
 };
+

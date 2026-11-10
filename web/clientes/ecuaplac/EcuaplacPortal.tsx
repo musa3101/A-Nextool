@@ -80,6 +80,7 @@ import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
 import { autoTranslateWork } from './traductor';
 import { insforge } from '@/lib/insforge';
 import { NavHomeIcon, NavGallery1Icon, NavGallery2Icon, NavSettingsIcon } from './NavIcons';
+import { CameraIcon } from './CameraIcon';
 
 // Catálogo inicial auténtico de Ecuaplac (9 Obras Reales de Portada y 11 Proyectos de Galería)
 const INITIAL_WORKS = DEFAULT_WORKS;
@@ -4518,7 +4519,7 @@ export const EcuaplacPortal: React.FC = () => {
               )}
             </button>
 
-            {/* CENTER FAB (+): Botón Circular Elevado para Subir Foto WebP */}
+            {/* CENTER FAB: Botón Circular Elevado para Subir Foto WebP con CameraIcon animado */}
             <div className="relative -top-5 px-1 shrink-0 flex items-center justify-center">
               <button
                 type="button"
@@ -4530,7 +4531,7 @@ export const EcuaplacPortal: React.FC = () => {
                 className="w-14 h-14 rounded-full text-slate-950 flex items-center justify-center ring-4 ring-[#0E1726] active:scale-90 transition-all hover:brightness-110 hover:shadow-[0_12px_28px_-2px_rgba(212,175,55,0.6)] group cursor-pointer"
                 title={panelLang === 'es' ? 'Añadir nueva fotografía / obra' : 'Add new project photo'}
               >
-                <Plus className="w-6 h-6 text-slate-950 stroke-[2.5] group-hover:rotate-90 group-hover:scale-110 transition-transform duration-200" />
+                <CameraIcon size={26} className="text-slate-950 group-hover:scale-110 transition-transform duration-200" />
               </button>
             </div>
 
