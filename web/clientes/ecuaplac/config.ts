@@ -35,7 +35,7 @@ export const ECUAPLAC_CONFIG: EcuaplacClientConfig = {
   role: 'Administrador / Gerente',
   websiteUrl: 'https://ecuaplac.com',
   brandColor: '#ECB51C', // Oro distintivo de Ecuaplac
-  version: '2.0.1',
+  version: '2.0.2',
   backend: {
     type: 'supabase',
     url: 'https://wkfddccsantywcrsxpox.supabase.co',

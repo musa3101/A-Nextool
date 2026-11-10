@@ -270,7 +270,7 @@ export const EcuaplacPortal: React.FC = () => {
   };
 
   // Saludo contextual según la hora oficial de España / Baleares (Europe/Madrid)
-  const getGreeting = (name = 'José') => {
+  const getGreetingText = (name = 'José') => {
     try {
       const hourStr = new Intl.DateTimeFormat('es-ES', {
         timeZone: 'Europe/Madrid',
@@ -283,21 +283,21 @@ export const EcuaplacPortal: React.FC = () => {
       // 14:00 a 20:59 -> Buenas tardes (tarde)
       // 21:00 a 05:59 -> Buenas noches (noche y madrugada completa)
       if (hour >= 6 && hour < 14) {
-        return panelLang === 'es' ? `Buenos días, ${name} 👋` : `Good morning, ${name} 👋`;
+        return panelLang === 'es' ? `Buenos días, ${name}` : `Good morning, ${name}`;
       }
       if (hour >= 14 && hour < 21) {
-        return panelLang === 'es' ? `Buenas tardes, ${name} 👋` : `Good afternoon, ${name} 👋`;
+        return panelLang === 'es' ? `Buenas tardes, ${name}` : `Good afternoon, ${name}`;
       }
-      return panelLang === 'es' ? `Buenas noches, ${name} 👋` : `Good evening, ${name} 👋`;
+      return panelLang === 'es' ? `Buenas noches, ${name}` : `Good evening, ${name}`;
     } catch {
       const hour = new Date().getHours();
       if (hour >= 6 && hour < 14) {
-        return panelLang === 'es' ? `Buenos días, ${name} 👋` : `Good morning, ${name} 👋`;
+        return panelLang === 'es' ? `Buenos días, ${name}` : `Good morning, ${name}`;
       }
       if (hour >= 14 && hour < 21) {
-        return panelLang === 'es' ? `Buenas tardes, ${name} 👋` : `Good afternoon, ${name} 👋`;
+        return panelLang === 'es' ? `Buenas tardes, ${name}` : `Good afternoon, ${name}`;
       }
-      return panelLang === 'es' ? `Buenas noches, ${name} 👋` : `Good evening, ${name} 👋`;
+      return panelLang === 'es' ? `Buenas noches, ${name}` : `Good evening, ${name}`;
     }
   };
 
@@ -669,10 +669,10 @@ export const EcuaplacPortal: React.FC = () => {
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // Normalizar a versión 2.0.1 si la caché tenía versiones legacy (000, 001, 1.0, 200, 2.0.0, etc.)
-    if (!cached || cached === '000' || cached === '001' || cached === '1.0' || cached === '200' || cached === '2.0.0' || cached === 'v2.0.0') {
-      localStorage.setItem('nextool_app_version', '2.0.1');
-      return '2.0.1';
+    // Si no hay versión o difiere de la empaquetada en el código, sincronizar de inmediato con CURRENT_SYSTEM_VERSION
+    if (!cached || cached === '000' || cached === '001' || cached === '1.0' || cached === '200' || cached === '2.0.0' || cached === 'v2.0.0' || cached === '2.0.1') {
+      localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
+      return CURRENT_SYSTEM_VERSION;
     }
     return cached;
   });
@@ -774,7 +774,7 @@ export const EcuaplacPortal: React.FC = () => {
         if (res.ok) {
           const data = await res.json();
           if (!isMounted) return;
-          if (data?.version && data.version !== installedVersion && data.version !== CURRENT_SYSTEM_VERSION) {
+          if (data?.version && data.version !== CURRENT_SYSTEM_VERSION) {
             setNewVersionNotice(data.version);
             setSimulatedUpdateAvailable(true);
             setUpdateCheckState('available');
@@ -785,7 +785,7 @@ export const EcuaplacPortal: React.FC = () => {
         // 2. Comprobación de respaldo contra InsForge Cloud
         const cloudVer = await ecuaplacConnector.fetchTenantVersion();
         if (!isMounted) return;
-        if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion && cloudVer !== CURRENT_SYSTEM_VERSION) {
+        if (cloudVer && cloudVer !== '000' && cloudVer !== CURRENT_SYSTEM_VERSION) {
           setNewVersionNotice(cloudVer);
           setSimulatedUpdateAvailable(true);
           setUpdateCheckState('available');
@@ -831,7 +831,7 @@ export const EcuaplacPortal: React.FC = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data?.version && data.version !== installedVersion && data.version !== CURRENT_SYSTEM_VERSION) {
+        if (data?.version && data.version !== CURRENT_SYSTEM_VERSION) {
           setNewVersionNotice(data.version);
           setSimulatedUpdateAvailable(true);
           setUpdateCheckState('available');
@@ -841,7 +841,7 @@ export const EcuaplacPortal: React.FC = () => {
 
       // 2. Comprobar InsForge Cloud
       const cloudVer = await ecuaplacConnector.fetchTenantVersion();
-      if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion && cloudVer !== CURRENT_SYSTEM_VERSION) {
+      if (cloudVer && cloudVer !== '000' && cloudVer !== CURRENT_SYSTEM_VERSION) {
         setNewVersionNotice(cloudVer);
         setSimulatedUpdateAvailable(true);
         setUpdateCheckState('available');
@@ -858,7 +858,7 @@ export const EcuaplacPortal: React.FC = () => {
 
   const handleInstallUpdate = async () => {
     setUpdateCheckState('installing');
-    const targetVer = newVersionNotice || '2.0.1';
+    const targetVer = newVersionNotice || CURRENT_SYSTEM_VERSION;
     try {
       await ecuaplacConnector.updateTenantVersion(targetVer);
     } catch {}
@@ -880,9 +880,9 @@ export const EcuaplacPortal: React.FC = () => {
       addAuditLog(`Actualización aplicada: Versión ${targetVer} en producción`, 'Next Tools Core', 'success');
       setTimeout(() => {
         // Recargar saltando caché
-        window.location.reload();
-      }, 800);
-    }, 1200);
+        window.location.href = window.location.pathname + '?v=' + targetVer + '&t=' + Date.now();
+      }, 500);
+    }, 1000);
   };
 
   // Facturas y Documentos del Proyecto (Plegadas / Escondiditas por defecto)
@@ -1894,8 +1894,9 @@ export const EcuaplacPortal: React.FC = () => {
                 </span>
                 <span className="text-[11px] font-mono text-stone-500 font-semibold">ecuaplac.com</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight font-display">
-                {getGreeting('José')}
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight font-display flex items-center gap-2 flex-wrap">
+                <span>{getGreetingText('José')}</span>
+                <span className="animate-wave inline-block select-none transform-gpu" role="img" aria-label="Saludo">👋</span>
               </h1>
               <p className="text-xs sm:text-sm text-stone-500 mt-1 leading-relaxed font-normal font-sans">
                 Panel de rendimiento, tráfico web y presupuestos de reformas en Mallorca.
@@ -2604,14 +2605,14 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsFeedbackModalOpen(true)}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer group"
               >
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-800 shadow-xs shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100/80 border border-amber-200/90 flex items-center justify-center text-amber-800 shadow-xs shrink-0 group-hover:scale-105 transition-transform">
                     <MessageSquarePlus className="w-5 h-5 text-[#C5A059]" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight group-hover:text-[#C5A059] transition-colors">
                       {panelLang === 'es' ? 'Enviar Feedback o Problema' : 'Send Feedback or Issue'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal truncate block font-sans mt-0.5">
@@ -2622,10 +2623,11 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] font-bold text-[#C5A059] bg-amber-50/80 border border-amber-200/70 px-2.5 py-1 rounded-full hidden sm:inline-block">
-                    {panelLang === 'es' ? 'Soporte' : 'Support'}
+                  <span className="text-[11px] font-bold text-[#B38E46] bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059] animate-pulse" />
+                    <span>{panelLang === 'es' ? 'Soporte Musa' : 'Musa Support'}</span>
                   </span>
-                  <ChevronRight className="w-4 h-4 text-stone-400" />
+                  <ChevronRight className="w-4 h-4 text-stone-400 group-hover:text-slate-900 group-hover:translate-x-0.5 transition-all" />
                 </div>
               </button>
 
@@ -2648,7 +2650,7 @@ export const EcuaplacPortal: React.FC = () => {
                         {updateCheckState === 'available' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 font-sans">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                            <span>{panelLang === 'es' ? `Nueva v${newVersionNotice || '2.0.1'}` : `New v${newVersionNotice || '2.0.1'}`}</span>
+                            <span>{panelLang === 'es' ? `Nueva v${newVersionNotice || CURRENT_SYSTEM_VERSION}` : `New v${newVersionNotice || CURRENT_SYSTEM_VERSION}`}</span>
                           </span>
                         ) : updateCheckState === 'up-to-date' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-sans">
@@ -2778,8 +2780,8 @@ export const EcuaplacPortal: React.FC = () => {
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#C5A059]/20 text-[#F6E27A] text-[10px] font-bold border border-[#C5A059]/40">
                               <Sparkles className="w-3 h-3" />
                               {panelLang === 'es'
-                                ? `Nueva Versión Lista · v${newVersionNotice || '2.0.1'}`
-                                : `New Version Ready · v${newVersionNotice || '2.0.1'}`}
+                                ? `Nueva Versión Lista · v${newVersionNotice || CURRENT_SYSTEM_VERSION}`
+                                : `New Version Ready · v${newVersionNotice || CURRENT_SYSTEM_VERSION}`}
                             </span>
                             <span className="text-[10px] text-stone-300 font-mono">1.8 MB</span>
                           </div>
@@ -2813,8 +2815,8 @@ export const EcuaplacPortal: React.FC = () => {
                           <span className="flex items-center gap-2">
                             <Loader2 className="w-3.5 h-3.5 text-[#C5A059] animate-spin" />
                             {panelLang === 'es'
-                              ? `Instalando actualización v${newVersionNotice || '2.0.1'}...`
-                              : `Installing update v${newVersionNotice || '2.0.1'}...`}
+                              ? `Instalando actualización v${newVersionNotice || CURRENT_SYSTEM_VERSION}...`
+                              : `Installing update v${newVersionNotice || CURRENT_SYSTEM_VERSION}...`}
                           </span>
                           <span className="font-mono text-[#C5A059]">100%</span>
                         </div>
@@ -4145,14 +4147,16 @@ export const EcuaplacPortal: React.FC = () => {
           </div>
 
           {/* Contexto técnico sutil */}
-          <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/70 flex items-center justify-between text-[11px] text-amber-900">
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-50/90 via-amber-50/60 to-white border border-amber-200/80 flex items-center justify-between text-[11px] text-amber-950">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="w-2 h-2 rounded-full bg-[#C5A059] shrink-0" />
-              <span className="font-semibold truncate">
-                {panelLang === 'es' ? 'Destinatario: Musa (Desarrollador / MYNEXT)' : 'Recipient: Musa (Lead Developer / MYNEXT)'}
+              <span className="w-2 h-2 rounded-full bg-[#C5A059] shrink-0 animate-pulse" />
+              <span className="font-bold truncate">
+                {panelLang === 'es' ? 'Soporte Directo con Musa' : 'Direct Support with Musa'}
               </span>
             </div>
-            <span className="font-mono text-[10px] text-amber-800 font-bold shrink-0 ml-2">musaabdul3101@gmail.com</span>
+            <span className="font-mono text-[10.5px] text-[#8C6D2B] font-bold shrink-0 ml-2 bg-amber-100/60 px-2.5 py-0.5 rounded-md border border-amber-200/60">
+              mynextbymusa@gmail.com
+            </span>
           </div>
 
           {/* Botones de Envío: WhatsApp Directo + Email + Solo Registro */}
@@ -4161,9 +4165,9 @@ export const EcuaplacPortal: React.FC = () => {
               type="button"
               disabled={isSendingFeedback || !feedbackMessage.trim()}
               onClick={() => handleSendFeedback('whatsapp')}
-              className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
+              className="w-full py-3.5 px-4 rounded-2xl bg-[#25D366] hover:bg-[#20BD5A] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer font-sans"
             >
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquare className="w-4 h-4 fill-white/20" />
               <span>{panelLang === 'es' ? 'Enviar por WhatsApp a Musa' : 'Send via WhatsApp to Musa'}</span>
             </button>
 
@@ -4172,9 +4176,9 @@ export const EcuaplacPortal: React.FC = () => {
                 type="button"
                 disabled={isSendingFeedback || !feedbackMessage.trim()}
                 onClick={() => handleSendFeedback('email')}
-                className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
+                className="py-3 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer font-sans"
               >
-                <Mail className="w-3.5 h-3.5 text-[#C5A059]" />
+                <Mail className="w-4 h-4 text-[#F0CF85]" />
                 <span>{panelLang === 'es' ? 'Enviar por Correo' : 'Send by Email'}</span>
               </button>
 
@@ -4182,9 +4186,9 @@ export const EcuaplacPortal: React.FC = () => {
                 type="button"
                 disabled={isSendingFeedback || !feedbackMessage.trim()}
                 onClick={() => handleSendFeedback('system')}
-                className="py-2.5 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 disabled:opacity-50 disabled:cursor-not-allowed text-stone-800 font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-98 cursor-pointer"
+                className="py-3 px-3 rounded-2xl bg-stone-100 hover:bg-stone-200 active:scale-[0.99] border border-stone-200 disabled:opacity-50 disabled:cursor-not-allowed text-stone-800 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer font-sans"
               >
-                <Check className="w-3.5 h-3.5 text-stone-600" />
+                <Save className="w-4 h-4 text-stone-600" />
                 <span>{panelLang === 'es' ? 'Solo en el Sistema' : 'Log Only'}</span>
               </button>
             </div>
