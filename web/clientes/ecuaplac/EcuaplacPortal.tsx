@@ -3550,10 +3550,10 @@ export const EcuaplacPortal: React.FC = () => {
                               ]);
                               setUpdateCheckState('available');
                             }}
-                            className="text-[11px] font-semibold text-[#C5A059] hover:underline"
+                            className="text-[11px] font-semibold text-[#C5A059] hover:underline cursor-pointer"
                             title="Simula que hay una nueva actualización lista para instalar"
                           >
-                            {panelLang === 'es' ? 'Simular nueva v002' : 'Simulate new v002'}
+                            {panelLang === 'es' ? 'Simular nueva v3.0.2' : 'Simulate new v3.0.2'}
                           </button>
                         </div>
                       </div>
