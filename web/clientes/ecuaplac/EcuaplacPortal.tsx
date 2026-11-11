@@ -970,13 +970,13 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '3.0.2';
+  const CURRENT_SYSTEM_VERSION = '3.0.5';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.2)
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.5)
     if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
@@ -3542,7 +3542,7 @@ export const EcuaplacPortal: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setSimulatedUpdateAvailable(true);
-                              setNewVersionNotice('3.0.2');
+                              setNewVersionNotice('3.0.6');
                               setNewVersionChanges([
                                 'Nuevo panel de Contacto de la Web sincronizado con Supabase',
                                 'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
@@ -3553,7 +3553,7 @@ export const EcuaplacPortal: React.FC = () => {
                             className="text-[11px] font-semibold text-[#C5A059] hover:underline cursor-pointer"
                             title="Simula que hay una nueva actualización lista para instalar"
                           >
-                            {panelLang === 'es' ? 'Simular nueva v3.0.2' : 'Simulate new v3.0.2'}
+                            {panelLang === 'es' ? 'Simular nueva v3.0.6' : 'Simulate new v3.0.6'}
                           </button>
                         </div>
                       </div>

@@ -1,10 +1,10 @@
 {
-  "version": "3.0.2",
-  "buildTimestamp": 1794430950000,
+  "version": "3.0.5",
+  "buildTimestamp": 1794431150000,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
   "updatedAt": "2026-11-11T21:05:00.000Z",
-  "notes": "Versión 3.0.2: Panel de Contacto de la Web sincronizado con Supabase, bordes finos sutiles en Ajustes, motor reactivo de notificaciones con sonido acústico chime y sincronización mensual de visitas Cloudflare RUM.",
+  "notes": "Versión 3.0.5: Panel de Contacto de la Web sincronizado con Supabase, bordes finos sutiles en Ajustes, motor reactivo de notificaciones con sonido acústico chime y sincronización mensual de visitas Cloudflare RUM.",
   "changes": [
     "Nuevo panel de Contacto de la Web sincronizado con Supabase",
     "Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo",
