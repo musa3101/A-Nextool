@@ -42,6 +42,65 @@ export interface ParsedLeadDetails {
   rawMessage: string;
 }
 
+export interface EcuaplacContactItem {
+  id: string;
+  key: string;
+  name_es: string;
+  name_en?: string;
+  value_es: string;
+  value_en?: string;
+  icon?: string;
+  active?: boolean;
+  sort_order?: number;
+}
+
+export const DEFAULT_CONTACTS: EcuaplacContactItem[] = [
+  {
+    id: '943c15d2-d94b-4e9c-add9-c9c75e85f6ae',
+    key: 'goyo',
+    name_es: 'José Rivadeneira',
+    name_en: 'José Rivadeneira',
+    value_es: '+34 678 15 98 78',
+    value_en: '+34 678 15 98 78',
+    icon: 'phone',
+    active: true,
+    sort_order: 20,
+  },
+  {
+    id: 'ecb03840-43ef-418e-9a35-c597b871cb44',
+    key: 'Jofrre',
+    name_es: 'Joffre Méndez',
+    name_en: 'Joffre Méndez',
+    value_es: '+34 603 40 44 50',
+    value_en: '+34 603 40 44 50',
+    icon: 'phone',
+    active: true,
+    sort_order: 30,
+  },
+  {
+    id: '5c5fce03-e747-490c-9451-158a9ce5f6c2',
+    key: 'email',
+    name_es: 'Email',
+    name_en: 'Email',
+    value_es: 'ecuaplac.jyg.sl@gmail.com',
+    value_en: 'ecuaplac.jyg.sl@gmail.com',
+    icon: 'mail',
+    active: true,
+    sort_order: 40,
+  },
+  {
+    id: '2e7202f5-82bf-4b86-a319-34e3e09aeee0',
+    key: 'address',
+    name_es: 'Dirección de Proyectos',
+    name_en: 'Project Management',
+    value_es: 'Palma de Mallorca, Islas Baleares',
+    value_en: 'Palma de Mallorca, Balearic Islands',
+    icon: 'map-pin',
+    active: true,
+    sort_order: 10,
+  },
+];
+
 /**
  * Analizador inteligente de mensajes de leads procedentes de Tally.so, Gmail o formularios web
  */
@@ -233,6 +292,7 @@ export class EcuaplacConnector {
   private storageKeyLeads = 'ecuaplac_leads_data';
   private storageKeyDismissedLeads = 'ecuaplac_dismissed_leads_ids';
   private storageKeyProfile = 'ecuaplac_profile_data';
+  private storageKeyContacts = 'ecuaplac_contacts_data';
   private storageKeyCloudflare = 'ecuaplac_cf_rum_v2';
 
   getDismissedLeadIds(): string[] {
@@ -710,6 +770,83 @@ export class EcuaplacConnector {
     // La base de datos de producción ecuaplac_leads queda inmutable y protegida como histórico.
     await this.addAuditLog('delete', `Lead archivado localmente en el panel (ID ${leadId})`);
     return true;
+  }
+
+  /**
+   * Obtiene los contactos de la web oficial guardados localmente
+   */
+  getContacts(fallback: EcuaplacContactItem[] = DEFAULT_CONTACTS): EcuaplacContactItem[] {
+    try {
+      const cached = localStorage.getItem(this.storageKeyContacts);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Error al leer caché local de contactos:', e);
+    }
+    return fallback;
+  }
+
+  /**
+   * Guarda los contactos de la web en caché local
+   */
+  saveContacts(contacts: EcuaplacContactItem[]): void {
+    try {
+      localStorage.setItem(this.storageKeyContacts, JSON.stringify(contacts));
+    } catch (e) {
+      console.error('Error al persistir contactos:', e);
+    }
+  }
+
+  /**
+   * Consulta los contactos en vivo desde Supabase (tabla ecuaplac_contact)
+   */
+  async fetchContactsOnline(): Promise<EcuaplacContactItem[]> {
+    try {
+      const contactTable = this.tables.contact || 'ecuaplac_contact';
+      const res = await fetch(`${this.url}/rest/v1/${contactTable}?select=*&order=sort_order.asc&_t=${Date.now()}`, {
+        headers: this.getHeaders(),
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          this.saveContacts(data);
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('Fallo de red al consultar contactos en Supabase:', e);
+    }
+    return this.getContacts();
+  }
+
+  /**
+   * Actualiza un elemento de contacto en Supabase (ecuaplac_contact) y en local
+   */
+  async updateContactItem(id: string, updates: Partial<EcuaplacContactItem>): Promise<boolean> {
+    const contacts = this.getContacts();
+    const updated = contacts.map((c) => (c.id === id ? { ...c, ...updates } : c));
+    this.saveContacts(updated);
+
+    try {
+      const contactTable = this.tables.contact || 'ecuaplac_contact';
+      const res = await fetch(`${this.url}/rest/v1/${contactTable}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        await this.addAuditLog('update', `Contacto web actualizado para ID ${id}`);
+        return true;
+      }
+    } catch (e) {
+      console.error('Error al actualizar contacto en Supabase:', e);
+    }
+    return false;
   }
 
   /**

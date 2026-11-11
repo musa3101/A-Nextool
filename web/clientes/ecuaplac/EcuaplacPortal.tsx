@@ -77,7 +77,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Switch } from '@/components/ui/Switch';
 import { SpaceLogin } from '@/components/ui/space-login';
 import { ECUAPLAC_CONFIG } from './config';
-import { ecuaplacConnector, EcuaplacLeadItem, EcuaplacAuditLog, CloudflareMetrics, formatLogTime } from './conector';
+import { ecuaplacConnector, EcuaplacLeadItem, EcuaplacAuditLog, CloudflareMetrics, formatLogTime, EcuaplacContactItem } from './conector';
 import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
 import { autoTranslateWork } from './traductor';
 import { insforge } from '@/lib/insforge';
@@ -604,6 +604,117 @@ export const EcuaplacPortal: React.FC = () => {
         'info',
         'status'
       );
+    }
+  };
+
+  // --- Estados y Lógica para Contacto de la Web (ecuaplac_contact en Supabase) ---
+  const [contacts, setContacts] = useState<EcuaplacContactItem[]>(() =>
+    ecuaplacConnector.getContacts()
+  );
+  const [isEditingContacts, setIsEditingContacts] = useState(false);
+  const [isSavingContacts, setIsSavingContacts] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    joseName: 'José Rivadeneira',
+    josePhone: '+34 678 15 98 78',
+    joffreName: 'Joffre Méndez',
+    joffrePhone: '+34 603 40 44 50',
+    email: 'ecuaplac.jyg.sl@gmail.com',
+  });
+
+  // Consulta en segundo plano a Supabase al abrir el panel
+  useEffect(() => {
+    ecuaplacConnector.fetchContactsOnline().then((liveContacts) => {
+      if (liveContacts && liveContacts.length > 0) {
+        setContacts(liveContacts);
+      }
+    });
+  }, []);
+
+  // Sincronizar formulario con los contactos cargados
+  useEffect(() => {
+    const jose = contacts.find((c) => c.key === 'goyo' || c.name_es.toLowerCase().includes('josé') || c.name_es.toLowerCase().includes('jose'));
+    const joffre = contacts.find((c) => c.key === 'Jofrre' || c.key.toLowerCase().includes('joffre') || c.name_es.toLowerCase().includes('joffre'));
+    const emailItem = contacts.find((c) => c.key === 'email' || c.icon === 'mail');
+
+    setContactForm({
+      joseName: jose?.name_es || 'José Rivadeneira',
+      josePhone: jose?.value_es || '+34 678 15 98 78',
+      joffreName: joffre?.name_es || 'Joffre Méndez',
+      joffrePhone: joffre?.value_es || '+34 603 40 44 50',
+      email: emailItem?.value_es || 'ecuaplac.jyg.sl@gmail.com',
+    });
+  }, [contacts]);
+
+  const handleSaveContacts = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSavingContacts(true);
+    showSyncToast(
+      panelLang === 'es' ? 'Guardando contactos en la web (ecuaplac.com)...' : 'Saving website contacts...',
+      'syncing'
+    );
+
+    try {
+      const startTime = Date.now();
+      const jose = contacts.find((c) => c.key === 'goyo' || c.name_es.toLowerCase().includes('josé') || c.name_es.toLowerCase().includes('jose'));
+      const joffre = contacts.find((c) => c.key === 'Jofrre' || c.key.toLowerCase().includes('joffre') || c.name_es.toLowerCase().includes('joffre'));
+      const emailItem = contacts.find((c) => c.key === 'email' || c.icon === 'mail');
+
+      const promises: Promise<boolean>[] = [];
+
+      if (jose) {
+        promises.push(
+          ecuaplacConnector.updateContactItem(jose.id, {
+            name_es: contactForm.joseName.trim(),
+            name_en: contactForm.joseName.trim(),
+            value_es: contactForm.josePhone.trim(),
+            value_en: contactForm.josePhone.trim(),
+          })
+        );
+      }
+      if (joffre) {
+        promises.push(
+          ecuaplacConnector.updateContactItem(joffre.id, {
+            name_es: contactForm.joffreName.trim(),
+            name_en: contactForm.joffreName.trim(),
+            value_es: contactForm.joffrePhone.trim(),
+            value_en: contactForm.joffrePhone.trim(),
+          })
+        );
+      }
+      if (emailItem) {
+        promises.push(
+          ecuaplacConnector.updateContactItem(emailItem.id, {
+            value_es: contactForm.email.trim(),
+            value_en: contactForm.email.trim(),
+          })
+        );
+      }
+
+      await Promise.all(promises);
+
+      // Esperar al menos 600ms para confirmación táctil visual
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 600) {
+        await new Promise((r) => setTimeout(r, 600 - elapsed));
+      }
+
+      // Refrescar lista local y estado
+      const updatedContacts = ecuaplacConnector.getContacts();
+      setContacts([...updatedContacts]);
+
+      addAuditLog('Contacto de la web actualizado', 'Ecuaplac Web', 'success', 'update');
+      showSyncToast(
+        panelLang === 'es' ? 'Contacto de la web actualizado con éxito' : 'Website contact updated successfully',
+        'success'
+      );
+      setIsEditingContacts(false);
+    } catch {
+      showSyncToast(
+        panelLang === 'es' ? 'Error al guardar contactos en la web' : 'Error updating website contacts',
+        'error'
+      );
+    } finally {
+      setIsSavingContacts(false);
     }
   };
 
@@ -2785,7 +2896,303 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Grupo 2: Sistema y Dispositivo (Jerarquía y Título con Autoridad) */}
+          {/* Grupo 2: Contacto de la Web (Conexión directa en vivo con ecuaplac.com / Supabase) */}
+          <div className="space-y-2 mt-4">
+            <div className="px-3.5 pt-1 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+                <h4 className="text-[11px] sm:text-xs font-semibold text-stone-500 uppercase tracking-wider font-sans">
+                  {panelLang === 'es' ? 'Contacto de la Web' : 'Website Contact'}
+                </h4>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold font-sans">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>ecuaplac.com</span>
+              </span>
+            </div>
+
+            {/* Tarjeta con Borde Negro Fuerte (#08090C) estilo NexTool Luxury */}
+            <div className="bg-white rounded-3xl border-2 border-[#08090C] shadow-[0_4px_24px_-4px_rgba(20,25,35,0.08)] overflow-hidden">
+              {/* Cabecera de la tarjeta */}
+              <div className="p-4 sm:p-5 flex items-center justify-between border-b border-stone-100 bg-[#FAF7F0]/60">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-[#08090C] text-[#F0CF85] flex items-center justify-center border border-[#C5A059]/40 shadow-xs shrink-0">
+                    <Globe className="w-5 h-5 text-[#F0CF85]" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-950 font-display tracking-tight truncate">
+                      {panelLang === 'es' ? 'Contacto: Contacto de la Web' : 'Website Contact Info'}
+                    </h3>
+                    <p className="text-[11.5px] text-stone-500 font-normal font-sans mt-0.5 truncate">
+                      {panelLang === 'es'
+                        ? 'Números de teléfono y correo visibles en la web oficial'
+                        : 'Phone numbers and email visible on the public website'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Botón Editar / Cancelar */}
+                <button
+                  type="button"
+                  onClick={() => setIsEditingContacts(!isEditingContacts)}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs shrink-0 ${
+                    isEditingContacts
+                      ? 'bg-stone-200 hover:bg-stone-300 text-stone-800'
+                      : 'bg-[#08090C] hover:bg-stone-800 text-white border border-[#C5A059]/50'
+                  }`}
+                  title={isEditingContacts ? 'Cancelar edición' : 'Editar contactos de la web'}
+                >
+                  {isEditingContacts ? (
+                    <>
+                      <X className="w-3.5 h-3.5 text-stone-600" />
+                      <span>{panelLang === 'es' ? 'Cancelar' : 'Cancel'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Pencil className="w-3.5 h-3.5 text-[#F0CF85]" />
+                      <span>{panelLang === 'es' ? 'Editar' : 'Edit'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Vista o Formulario de Edición */}
+              {isEditingContacts ? (
+                /* MODO EDICIÓN */
+                <form onSubmit={handleSaveContacts} className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
+                  <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 leading-relaxed font-sans">
+                    <Sparkles className="w-4 h-4 text-[#C5A059] shrink-0 mt-0.5" />
+                    <span>
+                      {panelLang === 'es'
+                        ? 'Al pulsar guardar, los cambios se sincronizan en vivo con Supabase y se muestran al instante en ecuaplac.com.'
+                        : 'When saved, changes sync live to Supabase and immediately show on ecuaplac.com.'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Dueño 1: José Rivadeneira */}
+                    <div className="space-y-1.5 bg-stone-50/60 p-3.5 rounded-2xl border border-stone-200/80">
+                      <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans">
+                        {panelLang === 'es' ? 'Dueño 1 (Nombre)' : 'Owner 1 (Name)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={contactForm.joseName}
+                        onChange={(e) => setContactForm({ ...contactForm, joseName: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-semibold text-slate-900 focus:outline-none transition-all"
+                        placeholder="Ej. José Rivadeneira"
+                      />
+                      <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans pt-1">
+                        {panelLang === 'es' ? 'Teléfono / WhatsApp' : 'Phone / WhatsApp'}
+                      </label>
+                      <input
+                        type="tel"
+                        value={contactForm.josePhone}
+                        onChange={(e) => setContactForm({ ...contactForm, josePhone: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-mono font-bold text-slate-900 focus:outline-none transition-all"
+                        placeholder="+34 678 15 98 78"
+                      />
+                    </div>
+
+                    {/* Dueño 2: Joffre Méndez */}
+                    <div className="space-y-1.5 bg-stone-50/60 p-3.5 rounded-2xl border border-stone-200/80">
+                      <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans">
+                        {panelLang === 'es' ? 'Dueño 2 (Nombre)' : 'Owner 2 (Name)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={contactForm.joffreName}
+                        onChange={(e) => setContactForm({ ...contactForm, joffreName: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-semibold text-slate-900 focus:outline-none transition-all"
+                        placeholder="Ej. Joffre Méndez"
+                      />
+                      <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans pt-1">
+                        {panelLang === 'es' ? 'Teléfono / WhatsApp' : 'Phone / WhatsApp'}
+                      </label>
+                      <input
+                        type="tel"
+                        value={contactForm.joffrePhone}
+                        onChange={(e) => setContactForm({ ...contactForm, joffrePhone: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-mono font-bold text-slate-900 focus:outline-none transition-all"
+                        placeholder="+34 603 40 44 50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Fila Email Oficial */}
+                  <div className="space-y-1.5 bg-stone-50/60 p-3.5 rounded-2xl border border-stone-200/80">
+                    <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans">
+                      {panelLang === 'es' ? 'Correo Electrónico Oficial (Gmail)' : 'Official Company Email'}
+                    </label>
+                    <input
+                      type="email"
+                      value={contactForm.email}
+                      onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-mono font-semibold text-slate-900 focus:outline-none transition-all"
+                      placeholder="ecuaplac.jyg.sl@gmail.com"
+                    />
+                  </div>
+
+                  {/* Botones de acción */}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingContacts(false)}
+                      disabled={isSavingContacts}
+                      className="px-4 py-2 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      {panelLang === 'es' ? 'Descartar' : 'Discard'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingContacts}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#08090C] hover:bg-stone-800 text-white border border-[#C5A059]/50 text-xs font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-60 shadow-sm"
+                    >
+                      {isSavingContacts ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 text-[#F0CF85] animate-spin" />
+                          <span>{panelLang === 'es' ? 'Guardando en la Web...' : 'Saving...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5 text-[#F0CF85]" />
+                          <span>{panelLang === 'es' ? 'Guardar en la Web' : 'Save to Website'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* MODO VISTA (3 FILAS IDÉNTICAS AL RECUADRO DE LA WEB CON BORDES DEFINIDOS) */
+                <div className="divide-y divide-stone-100">
+                  {/* Fila José Rivadeneira */}
+                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/60 transition-colors">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-center text-[#B38E46] shadow-2xs shrink-0">
+                        <Phone className="w-4 h-4 text-[#C5A059]" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900 block font-sans tracking-tight truncate">
+                            {contactForm.joseName}
+                          </span>
+                          <span className="text-[10px] font-bold text-[#B38E46] bg-amber-50 border border-amber-200/70 px-2 py-0.2 rounded-md font-sans">
+                            {panelLang === 'es' ? 'Dueño / Gerencia' : 'Owner'}
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-stone-700 block mt-0.5">
+                          {contactForm.josePhone}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLeadInfo(contactForm.josePhone, 'Teléfono José')}
+                        className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all active:scale-95 border border-stone-200/60 cursor-pointer shadow-2xs"
+                        title="Copiar teléfono"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                      <a
+                        href={`tel:${contactForm.josePhone.replace(/\s+/g, '')}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#08090C] hover:bg-stone-800 text-white text-xs font-bold transition-all active:scale-95 border border-[#C5A059]/40 cursor-pointer shadow-2xs"
+                        title="Llamar directamente"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-[#F0CF85]" />
+                        <span className="hidden sm:inline">{panelLang === 'es' ? 'Llamar' : 'Call'}</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Fila Joffre Méndez */}
+                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/60 transition-colors">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-center text-[#B38E46] shadow-2xs shrink-0">
+                        <Phone className="w-4 h-4 text-[#C5A059]" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900 block font-sans tracking-tight truncate">
+                            {contactForm.joffreName}
+                          </span>
+                          <span className="text-[10px] font-bold text-[#B38E46] bg-amber-50 border border-amber-200/70 px-2 py-0.2 rounded-md font-sans">
+                            {panelLang === 'es' ? 'Dueño / Gerencia' : 'Owner'}
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-stone-700 block mt-0.5">
+                          {contactForm.joffrePhone}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLeadInfo(contactForm.joffrePhone, 'Teléfono Joffre')}
+                        className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all active:scale-95 border border-stone-200/60 cursor-pointer shadow-2xs"
+                        title="Copiar teléfono"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                      <a
+                        href={`tel:${contactForm.joffrePhone.replace(/\s+/g, '')}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#08090C] hover:bg-stone-800 text-white text-xs font-bold transition-all active:scale-95 border border-[#C5A059]/40 cursor-pointer shadow-2xs"
+                        title="Llamar directamente"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-[#F0CF85]" />
+                        <span className="hidden sm:inline">{panelLang === 'es' ? 'Llamar' : 'Call'}</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Fila Email Oficial */}
+                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/60 transition-colors">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 shadow-2xs shrink-0">
+                        <Mail className="w-4 h-4 text-sky-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900 block font-sans tracking-tight truncate">
+                            {panelLang === 'es' ? 'Email Oficial' : 'Official Email'}
+                          </span>
+                          <span className="text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-200/70 px-2 py-0.2 rounded-md font-sans">
+                            Gmail
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono font-medium text-stone-700 block mt-0.5 truncate">
+                          {contactForm.email}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLeadInfo(contactForm.email, 'Email Oficial')}
+                        className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all active:scale-95 border border-stone-200/60 cursor-pointer shadow-2xs"
+                        title="Copiar email"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                      <a
+                        href={`mailto:${contactForm.email}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-stone-100 text-slate-900 text-xs font-bold transition-all active:scale-95 border border-stone-200 cursor-pointer shadow-2xs"
+                        title="Enviar correo"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-slate-700" />
+                        <span className="hidden sm:inline">{panelLang === 'es' ? 'Escribir' : 'Email'}</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Grupo 3: Sistema y Dispositivo (Jerarquía y Título con Autoridad) */}
           <div className="space-y-2 mt-3">
             <div className="px-3.5 pt-1 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
