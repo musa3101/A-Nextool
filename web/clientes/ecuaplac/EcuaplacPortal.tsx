@@ -1944,7 +1944,7 @@ export const EcuaplacPortal: React.FC = () => {
         /* Pestaña 1: Inicio (Dashboard Ejecutivo Premium con Micro-Gradientes, Halos y Números Animados) */
         <div className="space-y-4 sm:space-y-5 animate-tab-enter">
           {/* Header de Bienvenida con Halos & Selector Táctil */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FAF7F0] to-[#F3ECE0] rounded-3xl p-5 sm:p-6 lg:p-7 border border-[#08090C]/15 shadow-[0_10px_32px_-6px_rgba(20,25,35,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FAF7F0] to-[#F3ECE0] rounded-3xl p-5 sm:p-6 lg:p-7 border border-[#08090C]/30 shadow-[0_10px_32px_-6px_rgba(20,25,35,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* Halo de luz ámbar de fondo */}
             <div className="pointer-events-none absolute -right-10 -top-10 w-48 h-48 bg-[#C5A059]/15 rounded-full blur-3xl" />
 
@@ -1999,7 +1999,7 @@ export const EcuaplacPortal: React.FC = () => {
           {/* Bloque 1: Métricas Maestras (Visitantes y Presupuestos Reales de Ecuaplac) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             {/* KPI 1: Audiencia & Visitantes Reales */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-5 sm:p-6 border border-[#08090C]/15 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-4">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-4">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-sky-400/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -2066,7 +2066,7 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
 
             {/* KPI 2: Solicitudes de Presupuesto (Leads de reformas de Ecuaplac) */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-[#08090C]/15 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -2119,7 +2119,7 @@ export const EcuaplacPortal: React.FC = () => {
           </div>
 
           {/* Bloque: Facturas (Plegable / Escondidito por defecto con Scroll Suave Inteligente) */}
-          <div ref={facturasSectionRef} className="bg-white/95 rounded-3xl border border-[#08090C]/15 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
+          <div ref={facturasSectionRef} className="bg-white/95 rounded-3xl border border-[#08090C]/30 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
             {/* Cabecera / Trigger de Facturas */}
             <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -2270,7 +2270,7 @@ export const EcuaplacPortal: React.FC = () => {
       ) : activeTab === 'obras' || activeTab === 'more_projects' ? (
         <div className="space-y-4 animate-tab-enter">
           {/* Cabecera Compacta y Elegante */}
-          <div className="bg-white/95 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-[#08090C]/15 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.05)] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+          <div className="bg-white/95 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-[#08090C]/30 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.05)] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h2 className="text-xl sm:text-2xl font-semibold tracking-normal text-slate-950 font-display">
@@ -2318,7 +2318,7 @@ export const EcuaplacPortal: React.FC = () => {
 
           {/* Selector de Filtros iOS Style (Limpio y directo, sin buscador innecesario) */}
           <div className="flex items-center justify-between gap-2">
-            <div className="bg-stone-200/70 p-1 rounded-full flex items-center gap-1 border border-[#08090C]/20 shadow-inner">
+            <div className="bg-stone-200/70 p-1 rounded-full flex items-center gap-1 border border-[#08090C]/35 shadow-inner">
               <button
                 type="button"
                 onClick={() => setVisibilityFilter('all')}
@@ -2501,7 +2501,7 @@ export const EcuaplacPortal: React.FC = () => {
         /* Pestaña 4: Ajustes del Gestor (Diseño Pinterest After - Minimalista, iOS-Style y Elegante) */
         <div className="max-w-2xl mx-auto flex flex-col gap-4 pb-32 animate-tab-enter">
           {/* Card 1: Perfil Hero del Administrador */}
-          <div className="bg-white/95 rounded-3xl p-5 sm:p-6 border border-[#08090C]/15 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.06)] flex items-center gap-4 sm:gap-5">
+          <div className="bg-white/95 rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.06)] flex items-center gap-4 sm:gap-5">
             {/* Avatar circular con badge de cámara */}
             <div
               onClick={() => avatarInputRef.current?.click()}
@@ -2549,7 +2549,7 @@ export const EcuaplacPortal: React.FC = () => {
                 {panelLang === 'es' ? 'Cuenta' : 'Account'}
               </h4>
             </div>
-            <div className="bg-white/95 rounded-3xl border border-[#08090C]/15 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
+            <div className="bg-white/95 rounded-3xl border border-[#08090C]/30 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
               {/* Item 1: Gestionar Perfil */}
               <button
                 type="button"
@@ -2666,7 +2666,7 @@ export const EcuaplacPortal: React.FC = () => {
                 {panelLang === 'es' ? 'Sistema & Dispositivo' : 'System & Device'}
               </h4>
             </div>
-            <div className="bg-white/95 rounded-3xl border border-[#08090C]/15 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
+            <div className="bg-white/95 rounded-3xl border border-[#08090C]/30 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
               {/* Item 1: Enviar Feedback o Reportar Problema a Musa */}
               <button
                 type="button"
