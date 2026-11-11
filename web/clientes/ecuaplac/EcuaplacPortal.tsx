@@ -2960,30 +2960,11 @@ export const EcuaplacPortal: React.FC = () => {
               {isEditingContacts ? (
                 /* MODO EDICIÓN */
                 <form onSubmit={handleSaveContacts} className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
-                  <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 leading-relaxed font-sans">
-                    <Sparkles className="w-4 h-4 text-[#C5A059] shrink-0 mt-0.5" />
-                    <span>
-                      {panelLang === 'es'
-                        ? 'Al pulsar guardar, los cambios se sincronizan en vivo con Supabase y se muestran al instante en ecuaplac.com.'
-                        : 'When saved, changes sync live to Supabase and immediately show on ecuaplac.com.'}
-                    </span>
-                  </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {/* Dueño 1: José Rivadeneira */}
+                    {/* José Rivadeneira */}
                     <div className="space-y-1.5 bg-stone-50/60 p-3.5 rounded-2xl border border-stone-200/80">
                       <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans">
-                        {panelLang === 'es' ? 'Dueño 1 (Nombre)' : 'Owner 1 (Name)'}
-                      </label>
-                      <input
-                        type="text"
-                        value={contactForm.joseName}
-                        onChange={(e) => setContactForm({ ...contactForm, joseName: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-semibold text-slate-900 focus:outline-none transition-all"
-                        placeholder="Ej. José Rivadeneira"
-                      />
-                      <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans pt-1">
-                        {panelLang === 'es' ? 'Teléfono / WhatsApp' : 'Phone / WhatsApp'}
+                        José Rivadeneira (Teléfono)
                       </label>
                       <input
                         type="tel"
@@ -2994,20 +2975,10 @@ export const EcuaplacPortal: React.FC = () => {
                       />
                     </div>
 
-                    {/* Dueño 2: Joffre Méndez */}
+                    {/* Joffre Méndez */}
                     <div className="space-y-1.5 bg-stone-50/60 p-3.5 rounded-2xl border border-stone-200/80">
                       <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans">
-                        {panelLang === 'es' ? 'Dueño 2 (Nombre)' : 'Owner 2 (Name)'}
-                      </label>
-                      <input
-                        type="text"
-                        value={contactForm.joffreName}
-                        onChange={(e) => setContactForm({ ...contactForm, joffreName: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-semibold text-slate-900 focus:outline-none transition-all"
-                        placeholder="Ej. Joffre Méndez"
-                      />
-                      <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans pt-1">
-                        {panelLang === 'es' ? 'Teléfono / WhatsApp' : 'Phone / WhatsApp'}
+                        Joffre Méndez (Teléfono)
                       </label>
                       <input
                         type="tel"
@@ -3019,10 +2990,10 @@ export const EcuaplacPortal: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Fila Email Oficial */}
+                  {/* Fila Email */}
                   <div className="space-y-1.5 bg-stone-50/60 p-3.5 rounded-2xl border border-stone-200/80">
                     <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans">
-                      {panelLang === 'es' ? 'Correo Electrónico Oficial (Gmail)' : 'Official Company Email'}
+                      Email
                     </label>
                     <input
                       type="email"
@@ -3063,129 +3034,51 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                 </form>
               ) : (
-                /* MODO VISTA (3 FILAS IDÉNTICAS AL RECUADRO DE LA WEB CON BORDES DEFINIDOS) */
+                /* MODO VISTA (LIMPIO, MINIMALISTA Y EXACTO AL RECUADRO DE ECUAPLAC.COM) */
                 <div className="divide-y divide-stone-100">
                   {/* Fila José Rivadeneira */}
-                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/60 transition-colors">
+                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/50 transition-colors">
                     <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-center text-[#B38E46] shadow-2xs shrink-0">
-                        <Phone className="w-4 h-4 text-[#C5A059]" />
+                      <div className="w-10 h-10 rounded-2xl bg-[#FAF6EE] border border-stone-200/70 flex items-center justify-center text-[#B38E46] shrink-0">
+                        <Phone className="w-4 h-4 text-[#B38E46]" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-slate-900 block font-sans tracking-tight truncate">
-                            {contactForm.joseName}
-                          </span>
-                          <span className="text-[10px] font-bold text-[#B38E46] bg-amber-50 border border-amber-200/70 px-2 py-0.2 rounded-md font-sans">
-                            {panelLang === 'es' ? 'Dueño / Gerencia' : 'Owner'}
-                          </span>
-                        </div>
-                        <span className="text-xs font-mono font-bold text-stone-700 block mt-0.5">
-                          {contactForm.josePhone}
-                        </span>
-                      </div>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 font-sans tracking-tight truncate">
+                        {contactForm.joseName}
+                      </span>
                     </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleCopyLeadInfo(contactForm.josePhone, 'Teléfono José')}
-                        className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all active:scale-95 border border-stone-200/60 cursor-pointer shadow-2xs"
-                        title="Copiar teléfono"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                      <a
-                        href={`tel:${contactForm.josePhone.replace(/\s+/g, '')}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#08090C] hover:bg-stone-800 text-white text-xs font-bold transition-all active:scale-95 border border-[#C5A059]/40 cursor-pointer shadow-2xs"
-                        title="Llamar directamente"
-                      >
-                        <Phone className="w-3.5 h-3.5 text-[#F0CF85]" />
-                        <span className="hidden sm:inline">{panelLang === 'es' ? 'Llamar' : 'Call'}</span>
-                      </a>
-                    </div>
+                    <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 shrink-0">
+                      {contactForm.josePhone}
+                    </span>
                   </div>
 
                   {/* Fila Joffre Méndez */}
-                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/60 transition-colors">
+                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/50 transition-colors">
                     <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-center text-[#B38E46] shadow-2xs shrink-0">
-                        <Phone className="w-4 h-4 text-[#C5A059]" />
+                      <div className="w-10 h-10 rounded-2xl bg-[#FAF6EE] border border-stone-200/70 flex items-center justify-center text-[#B38E46] shrink-0">
+                        <Phone className="w-4 h-4 text-[#B38E46]" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-slate-900 block font-sans tracking-tight truncate">
-                            {contactForm.joffreName}
-                          </span>
-                          <span className="text-[10px] font-bold text-[#B38E46] bg-amber-50 border border-amber-200/70 px-2 py-0.2 rounded-md font-sans">
-                            {panelLang === 'es' ? 'Dueño / Gerencia' : 'Owner'}
-                          </span>
-                        </div>
-                        <span className="text-xs font-mono font-bold text-stone-700 block mt-0.5">
-                          {contactForm.joffrePhone}
-                        </span>
-                      </div>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 font-sans tracking-tight truncate">
+                        {contactForm.joffreName}
+                      </span>
                     </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleCopyLeadInfo(contactForm.joffrePhone, 'Teléfono Joffre')}
-                        className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all active:scale-95 border border-stone-200/60 cursor-pointer shadow-2xs"
-                        title="Copiar teléfono"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                      <a
-                        href={`tel:${contactForm.joffrePhone.replace(/\s+/g, '')}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#08090C] hover:bg-stone-800 text-white text-xs font-bold transition-all active:scale-95 border border-[#C5A059]/40 cursor-pointer shadow-2xs"
-                        title="Llamar directamente"
-                      >
-                        <Phone className="w-3.5 h-3.5 text-[#F0CF85]" />
-                        <span className="hidden sm:inline">{panelLang === 'es' ? 'Llamar' : 'Call'}</span>
-                      </a>
-                    </div>
+                    <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 shrink-0">
+                      {contactForm.joffrePhone}
+                    </span>
                   </div>
 
-                  {/* Fila Email Oficial */}
-                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/60 transition-colors">
+                  {/* Fila Email */}
+                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/50 transition-colors">
                     <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 shadow-2xs shrink-0">
-                        <Mail className="w-4 h-4 text-sky-600" />
+                      <div className="w-10 h-10 rounded-2xl bg-[#FAF6EE] border border-stone-200/70 flex items-center justify-center text-[#B38E46] shrink-0">
+                        <Mail className="w-4 h-4 text-[#B38E46]" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-slate-900 block font-sans tracking-tight truncate">
-                            {panelLang === 'es' ? 'Email Oficial' : 'Official Email'}
-                          </span>
-                          <span className="text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-200/70 px-2 py-0.2 rounded-md font-sans">
-                            Gmail
-                          </span>
-                        </div>
-                        <span className="text-xs font-mono font-medium text-stone-700 block mt-0.5 truncate">
-                          {contactForm.email}
-                        </span>
-                      </div>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 font-sans tracking-tight">
+                        Email
+                      </span>
                     </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleCopyLeadInfo(contactForm.email, 'Email Oficial')}
-                        className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all active:scale-95 border border-stone-200/60 cursor-pointer shadow-2xs"
-                        title="Copiar email"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                      <a
-                        href={`mailto:${contactForm.email}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-stone-100 text-slate-900 text-xs font-bold transition-all active:scale-95 border border-stone-200 cursor-pointer shadow-2xs"
-                        title="Enviar correo"
-                      >
-                        <Mail className="w-3.5 h-3.5 text-slate-700" />
-                        <span className="hidden sm:inline">{panelLang === 'es' ? 'Escribir' : 'Email'}</span>
-                      </a>
-                    </div>
+                    <span className="text-xs sm:text-sm font-medium font-sans text-slate-800 truncate text-right">
+                      {contactForm.email}
+                    </span>
                   </div>
                 </div>
               )}
