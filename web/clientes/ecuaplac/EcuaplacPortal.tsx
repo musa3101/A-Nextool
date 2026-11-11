@@ -2224,7 +2224,7 @@ export const EcuaplacPortal: React.FC = () => {
                 }`}
               >
                 <Clock className={`w-3.5 h-3.5 transition-colors ${cfPeriod === '30d' ? 'text-[#C5A059]' : 'text-stone-400'}`} />
-                <span>30 Días</span>
+                <span>{panelLang === 'es' ? 'Mensual' : 'Monthly'}</span>
               </button>
 
               <button
@@ -2997,10 +2997,10 @@ export const EcuaplacPortal: React.FC = () => {
               </span>
             </div>
 
-            {/* Tarjeta con Borde Negro Fuerte (#08090C) estilo NexTool Luxury */}
-            <div className="bg-white rounded-3xl border-2 border-[#08090C] shadow-[0_4px_24px_-4px_rgba(20,25,35,0.08)] overflow-hidden">
+            {/* Tarjeta con Mismo Bordado Armonioso (#08090C/30) que el resto de Ajustes */}
+            <div className="bg-white/95 rounded-3xl border border-[#08090C]/30 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden">
               {/* Cabecera de la tarjeta */}
-              <div className="p-4 sm:p-5 flex items-center justify-between border-b border-stone-100 bg-[#FAF7F0]/60">
+              <div className="p-4 sm:p-5 flex items-center justify-between border-b border-stone-100 bg-stone-50/50">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-2xl bg-[#08090C] text-[#F0CF85] flex items-center justify-center border border-[#C5A059]/40 shadow-xs shrink-0">
                     <Globe className="w-5 h-5 text-[#F0CF85]" />

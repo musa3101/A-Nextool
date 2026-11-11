@@ -225,6 +225,21 @@ export interface CloudflareMetrics {
   isPositiveTrend: boolean;
   status: 'optimal' | 'warning' | 'syncing';
   updatedAt?: string;
+  closingInfo?: {
+    type: 'official_month_close' | 'monthly_progress';
+    closedMonth: {
+      name: string;
+      visits: number;
+      pageViews: number;
+      period: string;
+    };
+    currentMonth: {
+      name: string;
+      visits: number;
+      pageViews: number;
+      period: string;
+    };
+  };
 }
 
 export const CLOUDFLARE_ANALYTICS_DATA: Record<'30d' | '3m', CloudflareMetrics> = {
