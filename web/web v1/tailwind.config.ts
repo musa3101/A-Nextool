@@ -44,8 +44,9 @@ export default {
         },
       },
       fontFamily: {
-        display: ['"Satoshi"', 'system-ui', 'sans-serif'],
-        sans: ['"General Sans"', 'system-ui', 'sans-serif'],
+        display: ['"Clash Display"', '"Satoshi"', 'system-ui', 'sans-serif'],
+        sans: ['"Satoshi"', '"General Sans"', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       borderRadius: {
         'card-sm': '12px',

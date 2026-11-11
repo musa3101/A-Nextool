@@ -985,7 +985,7 @@ export class EcuaplacConnector {
       const liveWorks = await this.fetchWorksOnline();
       return {
         success: true,
-        message: 'Sincronizado con InsForge en tiempo real',
+        message: 'Sincronizado con el servidor en tiempo real',
         synced_count: liveWorks.length > 0 ? liveWorks.length : works.length,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
@@ -1100,7 +1100,7 @@ export class EcuaplacConnector {
         client_cif: 'B-07982341',
         client_address: 'Palma de Mallorca, Illes Balears',
         total_amount: doc.total_amount || 0,
-        notes: doc.notes || 'Documento sincronizado con InsForge Cloud',
+        notes: doc.notes || 'Documento sincronizado en la nube',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -1111,17 +1111,17 @@ export class EcuaplacConnector {
         .select();
 
       if (!error && data && data.length > 0) {
-        await this.addAuditLog('upload_doc', `Factura/Documento subido a InsForge: "${doc.name}"`);
+        await this.addAuditLog('upload_doc', `Factura/Documento subido a la nube: "${doc.name}"`);
         return data[0].id;
       }
     } catch (e) {
-      console.warn('Fallo guardando documento en InsForge:', e);
+      console.warn('Fallo guardando documento en la nube:', e);
     }
     return null;
   }
 
   /**
-   * Elimina un documento o factura de InsForge Database
+   * Elimina un documento o factura de la base de datos
    */
   async deleteDocumentOnline(id: string): Promise<boolean> {
     try {
@@ -1131,11 +1131,11 @@ export class EcuaplacConnector {
         .eq('id', id);
 
       if (!error) {
-        await this.addAuditLog('delete_doc', `Documento eliminado de InsForge: ID ${id}`);
+        await this.addAuditLog('delete_doc', `Documento eliminado de la nube: ID ${id}`);
         return true;
       }
     } catch (e) {
-      console.warn('Error eliminando documento de InsForge:', e);
+      console.warn('Error eliminando documento de la nube:', e);
     }
     return false;
   }

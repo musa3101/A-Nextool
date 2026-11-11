@@ -79,10 +79,35 @@ import { ecuaplacConnector, EcuaplacLeadItem, EcuaplacAuditLog, CloudflareMetric
 import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
 import { autoTranslateWork } from './traductor';
 import { insforge } from '@/lib/insforge';
+import { NavHomeIcon, NavGallery1Icon, NavGallery2Icon, NavSettingsIcon } from './NavIcons';
+import { CameraIcon } from './CameraIcon';
 
 // Catálogo inicial auténtico de Ecuaplac (9 Obras Reales de Portada y 11 Proyectos de Galería)
 const INITIAL_WORKS = DEFAULT_WORKS;
 const INITIAL_MORE_PROJECTS = DEFAULT_MORE_PROJECTS;
+
+// Icono Window moderno de 21st / Heroicons para acceso a la web
+function WindowIcon({ size = 20, className = '', ...props }: React.SVGProps<SVGSVGElement> & { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      className={className}
+      {...props}
+    >
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M3 8.25V18a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18V8.25m-18 0V6a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 6v2.25m-18 0h18M5.25 6h.008v.008H5.25zM7.5 6h.008v.008H7.5zm2.25 0h.008v.008H9.75z"
+      />
+    </svg>
+  );
+}
 
 // Motor universal de compresión y conversión a WebP (< 250 KB)
 const compressImageUniversal = (
@@ -270,7 +295,7 @@ export const EcuaplacPortal: React.FC = () => {
   };
 
   // Saludo contextual según la hora oficial de España / Baleares (Europe/Madrid)
-  const getGreeting = (name = 'José') => {
+  const getGreetingText = (name = 'José') => {
     try {
       const hourStr = new Intl.DateTimeFormat('es-ES', {
         timeZone: 'Europe/Madrid',
@@ -283,21 +308,21 @@ export const EcuaplacPortal: React.FC = () => {
       // 14:00 a 20:59 -> Buenas tardes (tarde)
       // 21:00 a 05:59 -> Buenas noches (noche y madrugada completa)
       if (hour >= 6 && hour < 14) {
-        return panelLang === 'es' ? `Buenos días, ${name} 👋` : `Good morning, ${name} 👋`;
+        return panelLang === 'es' ? `Buenos días, ${name}` : `Good morning, ${name}`;
       }
       if (hour >= 14 && hour < 21) {
-        return panelLang === 'es' ? `Buenas tardes, ${name} 👋` : `Good afternoon, ${name} 👋`;
+        return panelLang === 'es' ? `Buenas tardes, ${name}` : `Good afternoon, ${name}`;
       }
-      return panelLang === 'es' ? `Buenas noches, ${name} 👋` : `Good evening, ${name} 👋`;
+      return panelLang === 'es' ? `Buenas noches, ${name}` : `Good evening, ${name}`;
     } catch {
       const hour = new Date().getHours();
       if (hour >= 6 && hour < 14) {
-        return panelLang === 'es' ? `Buenos días, ${name} 👋` : `Good morning, ${name} 👋`;
+        return panelLang === 'es' ? `Buenos días, ${name}` : `Good morning, ${name}`;
       }
       if (hour >= 14 && hour < 21) {
-        return panelLang === 'es' ? `Buenas tardes, ${name} 👋` : `Good afternoon, ${name} 👋`;
+        return panelLang === 'es' ? `Buenas tardes, ${name}` : `Good afternoon, ${name}`;
       }
-      return panelLang === 'es' ? `Buenas noches, ${name} 👋` : `Good evening, ${name} 👋`;
+      return panelLang === 'es' ? `Buenas noches, ${name}` : `Good evening, ${name}`;
     }
   };
 
@@ -491,7 +516,7 @@ export const EcuaplacPortal: React.FC = () => {
   const handleRefreshLeads = async () => {
     setIsSyncingLeads(true);
     showSyncToast(
-      panelLang === 'es' ? 'Consultando leads en Supabase (ecuaplac.com)...' : 'Checking leads in Supabase...',
+      panelLang === 'es' ? 'Consultando presupuestos en la web (ecuaplac.com)...' : 'Checking leads on website...',
       'syncing'
     );
     try {
@@ -500,21 +525,21 @@ export const EcuaplacPortal: React.FC = () => {
         setLeads(liveLeads);
         showSyncToast(
           panelLang === 'es'
-            ? `Sincronizados ${liveLeads.length} presupuestos desde Supabase`
-            : `${liveLeads.length} leads synced from Supabase`,
+            ? `Sincronizados ${liveLeads.length} presupuestos desde la web`
+            : `${liveLeads.length} leads synced from website`,
           'success'
         );
       } else {
         showSyncToast(
           panelLang === 'es'
-            ? 'Backend Supabase conectado (0 solicitudes nuevas en la web)'
-            : 'Supabase connected (0 new inquiries)',
+            ? 'Conexión con la web oficial establecida (0 solicitudes nuevas)'
+            : 'Website connected (0 new inquiries)',
           'success'
         );
       }
     } catch {
       showSyncToast(
-        panelLang === 'es' ? 'Error al contactar con Supabase' : 'Error contacting Supabase',
+        panelLang === 'es' ? 'Error al contactar con el servidor web' : 'Error contacting website server',
         'error'
       );
     } finally {
@@ -602,6 +627,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [showEnglishFields, setShowEnglishFields] = useState(true);
   const [isCompressing, setIsCompressing] = useState(false);
   const [isSavingWork, setIsSavingWork] = useState(false);
+  const isSubmittingWorkRef = useRef(false);
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<EcuaplacWorkItem | null>(null);
   const [isDeletingWork, setIsDeletingWork] = useState(false);
   const [uploadStats, setUploadStats] = useState<{ sizeKb: number; mime: string } | null>(null);
@@ -663,16 +689,16 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '2.0.2';
+  const CURRENT_SYSTEM_VERSION = '3.0.0';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // Normalizar a versión 2.0.1 si la caché tenía versiones legacy (000, 001, 1.0, 200, 2.0.0, etc.)
-    if (!cached || cached === '000' || cached === '001' || cached === '1.0' || cached === '200' || cached === '2.0.0' || cached === 'v2.0.0') {
-      localStorage.setItem('nextool_app_version', '2.0.1');
-      return '2.0.1';
+    // Si no hay versión o difiere de la empaquetada en el código, sincronizar de inmediato con CURRENT_SYSTEM_VERSION
+    if (!cached || cached === '000' || cached === '001' || cached === '1.0' || cached === '200' || cached === '2.0.0' || cached === 'v2.0.0' || cached === '2.0.1') {
+      localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
+      return CURRENT_SYSTEM_VERSION;
     }
     return cached;
   });
@@ -687,15 +713,15 @@ export const EcuaplacPortal: React.FC = () => {
 
     setIsSendingFeedback(true);
     const categoryLabels = {
-      bug: panelLang === 'es' ? '🐛 Incidencia / Problema' : '🐛 Issue / Bug',
-      idea: panelLang === 'es' ? '💡 Sugerencia / Idea' : '💡 Feature / Idea',
-      question: panelLang === 'es' ? '💬 Consulta Técnica' : '💬 Technical Question',
+      bug: panelLang === 'es' ? 'Incidencia / Problema' : 'Issue / Bug',
+      idea: panelLang === 'es' ? 'Sugerencia / Idea' : 'Feature / Idea',
+      question: panelLang === 'es' ? 'Consulta Técnica' : 'Technical Question',
     };
 
     const subjectText = feedbackSubject.trim() || (panelLang === 'es' ? 'Sin asunto' : 'No subject');
     const deviceDetails = `${navigator.userAgent.includes('Mobile') ? 'Móvil' : 'Escritorio'} · v${installedVersion} · Ecuaplac`;
 
-    // 1. Guardar en backend InsForge (tabla audit_logs con entity 'feedback')
+    // 1. Guardar en backend (tabla audit_logs con entity 'feedback')
     try {
       await ecuaplacConnector.addAuditLog(
         'feedback',
@@ -716,7 +742,7 @@ export const EcuaplacPortal: React.FC = () => {
         'profile'
       );
     } catch (e) {
-      console.warn('Error al guardar feedback en InsForge:', e);
+      console.warn('Error al guardar feedback:', e);
     }
 
     // 2. Notificación y canal directo
@@ -728,9 +754,9 @@ export const EcuaplacPortal: React.FC = () => {
         `*Mensaje:*\n${feedbackMessage.trim()}\n\n` +
         `_Dispositivo: ${deviceDetails}_`;
 
-      window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
+      window.open(`https://wa.me/34673109486?text=${encodeURIComponent(waText)}`, '_blank');
     } else if (channel === 'email') {
-      const mailtoUrl = `mailto:musaabdul3101@gmail.com?subject=${encodeURIComponent(
+      const mailtoUrl = `mailto:mynextbymusa@gmail.com?subject=${encodeURIComponent(
         `[NexTool Feedback] ${categoryLabels[feedbackCategory]} - ${subjectText} (Ecuaplac)`
       )}&body=${encodeURIComponent(
         `Hola Musa,\n\nTe envío este mensaje desde el panel de control de Ecuaplac:\n\n` +
@@ -774,7 +800,7 @@ export const EcuaplacPortal: React.FC = () => {
         if (res.ok) {
           const data = await res.json();
           if (!isMounted) return;
-          if (data?.version && data.version !== installedVersion && data.version !== CURRENT_SYSTEM_VERSION) {
+          if (data?.version && data.version !== CURRENT_SYSTEM_VERSION) {
             setNewVersionNotice(data.version);
             setSimulatedUpdateAvailable(true);
             setUpdateCheckState('available');
@@ -785,7 +811,7 @@ export const EcuaplacPortal: React.FC = () => {
         // 2. Comprobación de respaldo contra InsForge Cloud
         const cloudVer = await ecuaplacConnector.fetchTenantVersion();
         if (!isMounted) return;
-        if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion && cloudVer !== CURRENT_SYSTEM_VERSION) {
+        if (cloudVer && cloudVer !== '000' && cloudVer !== CURRENT_SYSTEM_VERSION) {
           setNewVersionNotice(cloudVer);
           setSimulatedUpdateAvailable(true);
           setUpdateCheckState('available');
@@ -831,7 +857,7 @@ export const EcuaplacPortal: React.FC = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data?.version && data.version !== installedVersion && data.version !== CURRENT_SYSTEM_VERSION) {
+        if (data?.version && data.version !== CURRENT_SYSTEM_VERSION) {
           setNewVersionNotice(data.version);
           setSimulatedUpdateAvailable(true);
           setUpdateCheckState('available');
@@ -841,7 +867,7 @@ export const EcuaplacPortal: React.FC = () => {
 
       // 2. Comprobar InsForge Cloud
       const cloudVer = await ecuaplacConnector.fetchTenantVersion();
-      if (cloudVer && cloudVer !== '000' && cloudVer !== installedVersion && cloudVer !== CURRENT_SYSTEM_VERSION) {
+      if (cloudVer && cloudVer !== '000' && cloudVer !== CURRENT_SYSTEM_VERSION) {
         setNewVersionNotice(cloudVer);
         setSimulatedUpdateAvailable(true);
         setUpdateCheckState('available');
@@ -858,7 +884,7 @@ export const EcuaplacPortal: React.FC = () => {
 
   const handleInstallUpdate = async () => {
     setUpdateCheckState('installing');
-    const targetVer = newVersionNotice || '2.0.1';
+    const targetVer = newVersionNotice || CURRENT_SYSTEM_VERSION;
     try {
       await ecuaplacConnector.updateTenantVersion(targetVer);
     } catch {}
@@ -880,9 +906,9 @@ export const EcuaplacPortal: React.FC = () => {
       addAuditLog(`Actualización aplicada: Versión ${targetVer} en producción`, 'Next Tools Core', 'success');
       setTimeout(() => {
         // Recargar saltando caché
-        window.location.reload();
-      }, 800);
-    }, 1200);
+        window.location.href = window.location.pathname + '?v=' + targetVer + '&t=' + Date.now();
+      }, 500);
+    }, 1000);
   };
 
   // Facturas y Documentos del Proyecto (Plegadas / Escondiditas por defecto)
@@ -954,7 +980,7 @@ export const EcuaplacPortal: React.FC = () => {
           total: 850.0,
         },
         {
-          description: 'Configuración DNS Cloudflare Edge, SSL y optimización WebP ultra-rápida',
+          description: 'Aceleración y Seguridad Web SSL, optimización WebP ultra-rápida',
           qty: 1,
           unitPrice: 250.0,
           total: 250.0,
@@ -968,7 +994,7 @@ export const EcuaplacPortal: React.FC = () => {
     {
       id: 'doc-002',
       number: 'FAC-2026-002',
-      name: 'Presupuesto_Hosting_Cloudflare_2026.pdf',
+      name: 'Presupuesto_Hosting_Web_2026.pdf',
       fileUrl: '',
       fileSize: '185 KB',
       uploadDate: '1 Nov 2026',
@@ -981,13 +1007,13 @@ export const EcuaplacPortal: React.FC = () => {
       clientAddress: 'C/ Gremi Teixidors 24, Palma de Mallorca',
       items: [
         {
-          description: 'Hosting y CDN Cloudflare Edge Workers Anual (Servidor Mallorca)',
+          description: 'Servidor de Alto Rendimiento y Web Oficial Anual (Mallorca)',
           qty: 1,
           unitPrice: 180.0,
           total: 180.0,
         },
         {
-          description: 'Mantenimiento de copias y mitigación DDoS Cloudflare Pro',
+          description: 'Mantenimiento de copias de seguridad y blindaje de seguridad',
           qty: 1,
           unitPrice: 60.0,
           total: 60.0,
@@ -996,7 +1022,7 @@ export const EcuaplacPortal: React.FC = () => {
       subtotal: 240.0,
       vatAmount: 50.4,
       totalAmount: 290.4,
-      notes: 'Presupuesto oficial y factura proforma Cloudflare Edge anual.',
+      notes: 'Presupuesto oficial y factura proforma de hosting web anual.',
     },
     {
       id: 'doc-003',
@@ -1044,9 +1070,9 @@ export const EcuaplacPortal: React.FC = () => {
       const fileDataUrl = (reader.result as string) || '';
       const docNumber = `FAC-2026-${String(projectDocs.length + 1).padStart(3, '0')}`;
 
-      showSyncToast(panelLang === 'es' ? 'Sincronizando con InsForge Cloud...' : 'Syncing with InsForge Cloud...', 'syncing');
+      showSyncToast(panelLang === 'es' ? 'Sincronizando con la nube...' : 'Syncing with cloud...', 'syncing');
 
-      // 1. Guardar en Base de Datos de InsForge Cloud para que esté disponible en Safari móvil y ordenador
+      // 1. Guardar en Base de Datos para que esté disponible en Safari móvil y ordenador
       const savedId = await ecuaplacConnector.saveDocumentOnline({
         doc_number: docNumber,
         name: file.name,
@@ -1078,7 +1104,7 @@ export const EcuaplacPortal: React.FC = () => {
 
       setProjectDocs((prev) => [newDoc, ...prev]);
       setIsFacturasOpen(true);
-      showSyncToast(panelLang === 'es' ? 'Documento sincronizado con InsForge' : 'Document synced with InsForge', 'success');
+      showSyncToast(panelLang === 'es' ? 'Documento sincronizado en la nube' : 'Document synced to cloud', 'success');
       addAuditLog(`Documento PDF subido: «${file.name}» (${sizeFormatted})`, 'Documentación', 'success');
     };
     reader.readAsDataURL(file);
@@ -1094,7 +1120,7 @@ export const EcuaplacPortal: React.FC = () => {
       addAuditLog(`Documento eliminado: «${doc.name}»`, 'Documentación', 'info');
     }
     await ecuaplacConnector.deleteDocumentOnline(id);
-    showSyncToast(panelLang === 'es' ? 'Eliminado de InsForge Cloud' : 'Deleted from InsForge Cloud', 'success');
+    showSyncToast(panelLang === 'es' ? 'Eliminado de la nube' : 'Deleted from cloud', 'success');
   };
 
   const handleViewDoc = (doc: ProjectDocItem) => {
@@ -1250,7 +1276,7 @@ export const EcuaplacPortal: React.FC = () => {
 
       setPasswordFeedback({
         type: 'success',
-        msg: panelLang === 'es' ? '¡Contraseña actualizada en el servidor InsForge!' : 'Password updated on InsForge server!',
+        msg: panelLang === 'es' ? '¡Contraseña actualizada en el servidor!' : 'Password updated on server!',
       });
       setCurrPass('');
       setNewPass('');
@@ -1260,10 +1286,10 @@ export const EcuaplacPortal: React.FC = () => {
         setPasswordFeedback(null);
       }, 2000);
       showSyncToast(
-        panelLang === 'es' ? 'Contraseña sincronizada con InsForge' : 'Password synced with InsForge',
+        panelLang === 'es' ? 'Contraseña sincronizada con el servidor' : 'Password synced with server',
         'success'
       );
-      addAuditLog('Contraseña de administrador actualizada en InsForge', 'Ecuaplac App', 'success');
+      addAuditLog('Contraseña de administrador actualizada en el servidor', 'Ecuaplac App', 'success');
     } catch (err: any) {
       setPasswordFeedback({
         type: 'error',
@@ -1326,12 +1352,12 @@ export const EcuaplacPortal: React.FC = () => {
       const liveLogs = await ecuaplacConnector.fetchAuditLogsOnline(50);
       setLogs(liveLogs);
       showSyncToast(
-        panelLang === 'es' ? 'Historial sincronizado con InsForge' : 'Logs synced with InsForge',
+        panelLang === 'es' ? 'Historial sincronizado con el servidor' : 'History synced with server',
         'success'
       );
     } catch {
       showSyncToast(
-        panelLang === 'es' ? 'Error al consultar logs en InsForge' : 'Error querying logs in InsForge',
+        panelLang === 'es' ? 'Error al consultar historial del servidor' : 'Error querying server history',
         'error'
       );
     } finally {
@@ -1591,12 +1617,13 @@ export const EcuaplacPortal: React.FC = () => {
 
   const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingWorkRef.current) return;
     if (!formTitleEs.trim()) {
       alert('Indica un título en español para la obra');
       return;
     }
 
-    if (isSavingWork) return;
+    isSubmittingWorkRef.current = true;
     setIsSavingWork(true);
 
     try {
@@ -1762,6 +1789,7 @@ export const EcuaplacPortal: React.FC = () => {
 
       setIsModalOpen(false);
     } finally {
+      isSubmittingWorkRef.current = false;
       setIsSavingWork(false);
     }
   };
@@ -1782,10 +1810,6 @@ export const EcuaplacPortal: React.FC = () => {
             throw new Error(res.error || 'Login failed');
           } else {
             setActiveTab('inicio');
-            showSyncToast(
-              panelLang === 'es' ? 'Bienvenido a tu panel de Ecuaplac' : 'Welcome to your Ecuaplac portal',
-              'success'
-            );
           }
         }}
       />
@@ -1796,7 +1820,7 @@ export const EcuaplacPortal: React.FC = () => {
     <div className="w-full max-w-full min-w-0 bg-[#F4F1EA] min-h-screen text-slate-900 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-28">
       {/* Toast Flotante de Sincronización en Tiempo Real */}
       {syncToast && (
-        <div className="fixed top-3.5 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold font-sans border backdrop-blur-xl bg-[#0E1726]/95 text-white border-[#C5A059]/40 select-none pointer-events-none">
+        <div className="fixed top-3.5 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold font-sans border backdrop-blur-xl bg-[#08090C]/95 text-white border-[#C5A059]/40 select-none pointer-events-none">
           {syncToast.type === 'syncing' ? (
             <RefreshCw className="w-3.5 h-3.5 text-[#F0CF85] animate-spin shrink-0" />
           ) : syncToast.type === 'success' ? (
@@ -1808,8 +1832,8 @@ export const EcuaplacPortal: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Header Oficial de Ecuaplac (Deep Sapphire Navy & Gold Trim - Safe Area Nítida) */}
-      <header className="sticky top-0 z-30 bg-[#0E1726] border-b border-slate-800 shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(14px,env(safe-area-inset-top))] pb-3">
+      {/* 1. Header Oficial de Ecuaplac (Obsidian Black & Gold Trim - Safe Area Nítida) */}
+      <header className="sticky top-0 z-30 bg-[#08090C]/95 backdrop-blur-md border-b border-white/[0.08] shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(14px,env(safe-area-inset-top))] pb-3">
         <div className="w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10">
@@ -1823,33 +1847,36 @@ export const EcuaplacPortal: React.FC = () => {
               />
             </div>
             <div>
-              <span className="text-base font-bold text-white tracking-tight leading-none block">
+              <span className="text-base font-bold text-white tracking-tight leading-none block font-display">
                 ecuaplac.com
-              </span>
-              <span className="text-[10px] text-sky-400 font-bold tracking-wider uppercase block mt-0.5">
-                {panelLang === 'es' ? 'Gestor Oficial' : 'Official Manager'}
               </span>
             </div>
           </div>
 
-          {/* Botón Ver Web Directo (Limpio en todos los apartados) */}
+          {/* Botón Ver Web Directo con icono Window de 21st y micro-animación elegante */}
           <a
             href="https://ecuaplac.com"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[38px] sm:min-h-0 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 backdrop-blur-md shadow-xs text-white hover:text-[#C5A059] transition-all text-xs font-semibold cursor-pointer"
-            title={panelLang === 'es' ? 'Ver ecuaplac.com en directo' : 'View ecuaplac.com live'}
+            className="group relative inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 min-h-[38px] sm:min-h-0 rounded-full bg-gradient-to-b from-white/12 to-white/6 hover:from-white/20 hover:to-white/10 active:scale-95 border border-white/15 backdrop-blur-md shadow-[0_2px_10px_-2px_rgba(0,0,0,0.3)] text-white hover:text-[#F0CF85] transition-all duration-200 text-xs font-bold cursor-pointer select-none"
+            title={panelLang === 'es' ? 'Abrir ecuaplac.com en directo' : 'Open ecuaplac.com live'}
           >
-            <ExternalLink className="w-3.5 h-3.5 text-[#C5A059]" />
-            <span className="hidden sm:inline">{panelLang === 'es' ? 'Ver Web' : 'View Web'}</span>
+            <WindowIcon
+              size={18}
+              className="text-[#C5A059] group-hover:text-[#F0CF85] group-hover:scale-110 group-hover:-translate-y-0.5 transition-all duration-200 shrink-0"
+            />
+            <span className="hidden sm:inline font-sans tracking-tight">
+              {panelLang === 'es' ? 'Ver Web' : 'View Web'}
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 group-hover:bg-emerald-300 animate-pulse shrink-0" />
           </a>
         </div>
       </header>
 
-      {/* Banner Notificación Auto-Actualización (InsForge Cloud) */}
+      {/* Banner Notificación Auto-Actualización (Negro Obsidiana) */}
       {newVersionNotice && (
         <div className="max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3">
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#0E1726] border border-[#C5A059]/50 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#08090C] border border-[#C5A059]/50 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-3">
               <span className="relative flex h-3 w-3 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -1887,44 +1914,49 @@ export const EcuaplacPortal: React.FC = () => {
             <div className="pointer-events-none absolute -right-10 -top-10 w-48 h-48 bg-[#C5A059]/15 rounded-full blur-3xl" />
 
             <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 text-[10px] font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Cloudflare Edge en Directo</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#08090C]/[0.05] border border-[#08090C]/10 shadow-[0_1px_2px_rgba(0,0,0,0.03)] mb-2.5 backdrop-blur-xs max-w-full">
+                <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500/15 text-emerald-600 shrink-0">
+                  <Check className="w-2.5 h-2.5 stroke-[2.5]" />
                 </span>
-                <span className="text-[11px] font-mono text-stone-500 font-semibold">ecuaplac.com</span>
+                <span className="text-[11px] sm:text-xs font-semibold text-slate-800 tracking-tight truncate font-sans">
+                  {panelLang === 'es' ? 'Bienvenido a tu panel de Ecuaplac' : 'Welcome to your Ecuaplac portal'}
+                </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight leading-tight font-display">
-                {getGreeting('José')}
+              <h1 className="text-2xl sm:text-3xl font-semibold text-slate-950 tracking-normal leading-tight font-display flex items-center gap-2 flex-wrap">
+                <span>{getGreetingText('José')}</span>
+                <span className="animate-wave inline-block select-none transform-gpu" role="img" aria-label="Saludo">👋</span>
               </h1>
               <p className="text-xs sm:text-sm text-stone-500 mt-1 leading-relaxed font-normal font-sans">
                 Panel de rendimiento, tráfico web y presupuestos de reformas en Mallorca.
               </p>
             </div>
 
-            {/* Selector de Período 30 Días / 3 Meses */}
-            <div className="relative z-10 bg-stone-200/80 p-1 rounded-full flex items-center gap-1 border border-stone-300/60 self-start sm:self-auto shrink-0 shadow-inner">
+            {/* Selector de Período 30 Días / 3 Meses (Segmented Control Luxury) */}
+            <div className="relative z-10 w-full sm:w-auto p-1 bg-gradient-to-b from-stone-200/90 to-stone-200/60 rounded-2xl sm:rounded-full border border-stone-300/70 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-md grid grid-cols-2 sm:flex items-center gap-1 shrink-0">
               <button
                 type="button"
                 onClick={() => setCfPeriod('30d')}
-                className={`px-4 py-2 min-h-[36px] sm:min-h-0 rounded-full text-xs font-black transition-all active:scale-95 cursor-pointer ${
+                className={`relative px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                   cfPeriod === '30d'
-                    ? 'bg-slate-900 text-[#F0CF85] shadow-md'
-                    : 'text-stone-600 hover:text-slate-900'
+                    ? 'bg-[#08090C] text-[#F0CF85] shadow-[0_3px_12px_-2px_rgba(8,9,12,0.4),0_1px_2px_rgba(8,9,12,0.2)] ring-1 ring-white/10 font-bold'
+                    : 'text-stone-600 hover:text-slate-900 hover:bg-black/[0.03] font-medium'
                 }`}
               >
-                30 Días
+                <Clock className={`w-3.5 h-3.5 transition-colors ${cfPeriod === '30d' ? 'text-[#C5A059]' : 'text-stone-400'}`} />
+                <span>30 Días</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => setCfPeriod('3m')}
-                className={`px-4 py-2 min-h-[36px] sm:min-h-0 rounded-full text-xs font-black transition-all active:scale-95 cursor-pointer ${
+                className={`relative px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                   cfPeriod === '3m'
-                    ? 'bg-slate-900 text-[#F0CF85] shadow-md'
-                    : 'text-stone-600 hover:text-slate-900'
+                    ? 'bg-[#08090C] text-[#F0CF85] shadow-[0_3px_12px_-2px_rgba(8,9,12,0.4),0_1px_2px_rgba(8,9,12,0.2)] ring-1 ring-white/10 font-bold'
+                    : 'text-stone-600 hover:text-slate-900 hover:bg-black/[0.03] font-medium'
                 }`}
               >
-                3 Meses
+                <Clock className={`w-3.5 h-3.5 transition-colors ${cfPeriod === '3m' ? 'text-[#C5A059]' : 'text-stone-400'}`} />
+                <span>3 Meses</span>
               </button>
             </div>
           </div>
@@ -1941,11 +1973,11 @@ export const EcuaplacPortal: React.FC = () => {
                   <Users className="w-6 h-6" />
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-[11px] font-black shadow-xs">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-[11px] font-semibold shadow-xs">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Real (sin bots)</span>
                   </span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-800 text-[11px] font-black shadow-xs">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-800 text-[11px] font-semibold shadow-xs">
                     <TrendingUp className="w-3.5 h-3.5 text-sky-600" />
                     <span>{cfMetrics.trendPercentage}</span>
                   </span>
@@ -1954,14 +1986,14 @@ export const EcuaplacPortal: React.FC = () => {
 
               <div className="relative z-10">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-black text-stone-400 uppercase tracking-wider block">
+                  <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block font-sans">
                     Visitantes Únicos ({cfMetrics.periodLabel})
                   </span>
-                  <span className="text-[10px] font-bold text-sky-700 bg-sky-100/80 px-2 py-0.5 rounded-full shrink-0">
-                    Cloudflare RUM
+                  <span className="text-[10px] font-semibold text-sky-700 bg-sky-100/80 px-2 py-0.5 rounded-full shrink-0 font-sans">
+                    {panelLang === 'es' ? 'Métricas Oficiales' : 'Official Metrics'}
                   </span>
                 </div>
-                <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight block mt-1 font-mono">
+                <span className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight block mt-1 font-mono">
                   <AnimatedCounter value={cfMetrics.uniqueVisitors} />
                 </span>
                 <span className="text-xs text-stone-500 mt-1.5 flex items-center gap-1.5 font-medium">
@@ -2013,11 +2045,11 @@ export const EcuaplacPortal: React.FC = () => {
               </div>
 
               <div className="relative z-10">
-                <span className="text-[11px] font-black text-stone-400 uppercase tracking-wider block">
+                <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block font-sans">
                   Presupuestos Entrantes
                 </span>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight font-mono">
+                  <span className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight font-mono">
                     <AnimatedCounter
                       value={
                         cfPeriod === '30d'
@@ -2026,10 +2058,10 @@ export const EcuaplacPortal: React.FC = () => {
                       }
                     />
                   </span>
-                  <span className="text-xs font-bold text-stone-500">solicitudes</span>
+                  <span className="text-xs font-semibold text-stone-500 font-sans">solicitudes</span>
                 </div>
                 <span className="text-xs text-stone-500 mt-1.5 block font-medium truncate">
-                  Último: <span className="font-bold text-slate-800">{leads[0]?.name || 'Cliente'}</span> ({leads[0]?.date || 'Hoy'})
+                  Último: <span className="font-semibold text-slate-800">{leads[0]?.name || 'Cliente'}</span> ({leads[0]?.date || 'Hoy'})
                 </span>
               </div>
 
@@ -2061,10 +2093,10 @@ export const EcuaplacPortal: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base sm:text-lg font-black text-slate-950 font-display tracking-tight">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-950 font-display tracking-tight">
                       Facturas
                     </h3>
-                    <span className="shrink-0 whitespace-nowrap px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 text-[10px] font-bold font-sans">
+                    <span className="shrink-0 whitespace-nowrap px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 text-[10px] font-semibold font-sans">
                       {invoices.length} {invoices.length === 1 ? 'factura' : 'facturas'}
                     </span>
                   </div>
@@ -2138,7 +2170,7 @@ export const EcuaplacPortal: React.FC = () => {
                             <span className="text-[7.5px] font-black uppercase tracking-tight leading-none mt-0.5">PDF</span>
                           </div>
                           <div className="min-w-0">
-                            <span className="text-xs sm:text-sm font-black text-slate-900 truncate block font-display">
+                            <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate block font-sans">
                               {inv.name}
                             </span>
                             <div className="flex items-center gap-2 mt-0.5 text-[11px] text-stone-500 font-normal font-sans flex-wrap">
@@ -2205,23 +2237,23 @@ export const EcuaplacPortal: React.FC = () => {
           {/* Cabecera Compacta y Elegante */}
           <div className="bg-white/95 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.05)] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-black tracking-tight">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h2 className="text-xl sm:text-2xl font-semibold tracking-normal text-slate-950 font-display">
                   {activeTab === 'obras' ? (
                     <>
                       <span className="text-[#C5A059]">Galería 1</span>
-                      <span className="text-stone-300 mx-1.5 font-normal">·</span>
+                      <span className="text-stone-300 mx-2 font-normal">·</span>
                       <span className="text-slate-900">Carrusel de Portada</span>
                     </>
                   ) : (
                     <>
                       <span className="text-indigo-600">Galería 2</span>
-                      <span className="text-stone-300 mx-1.5 font-normal">·</span>
+                      <span className="text-stone-300 mx-2 font-normal">·</span>
                       <span className="text-slate-900">Más Proyectos</span>
                     </>
                   )}
                 </h2>
-                <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 shrink-0">
+                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200 shrink-0 font-sans">
                   {currentCollection.length} {currentCollection.length === 1 ? 'obra' : 'obras'}
                 </span>
               </div>
@@ -2322,11 +2354,11 @@ export const EcuaplacPortal: React.FC = () => {
                       {/* Badges superiores: Número de orden (#10, #20...) y Visible/Oculto (Fiel a la app oficial de iPhone) */}
                       <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
                         <div className="flex items-center gap-1.5">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-950/85 backdrop-blur-sm text-[#C5A059] font-black text-xs border border-white/10 shadow-sm">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-950/85 backdrop-blur-sm text-[#C5A059] font-bold font-mono text-xs border border-white/10 shadow-sm">
                             #{item.sort_order || (index + 1) * 10}
                           </span>
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold text-white shadow-xs ${
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold text-white shadow-xs ${
                               item.active ? 'bg-emerald-600' : 'bg-stone-600'
                             }`}
                           >
@@ -2337,7 +2369,7 @@ export const EcuaplacPortal: React.FC = () => {
 
                       {/* Badge de Ubicación en la esquina inferior izquierda (Flotante blanco con pin) */}
                       <div className="absolute bottom-3 left-3 pointer-events-none">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-sm text-slate-900 text-xs font-black shadow-md border border-stone-100/80">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-sm text-slate-900 text-xs font-semibold shadow-xs border border-stone-100/80 font-sans">
                           <span className="text-rose-500 text-xs leading-none">📍</span>
                           <span>{item.location_es || 'Mallorca'}</span>
                         </span>
@@ -2349,7 +2381,7 @@ export const EcuaplacPortal: React.FC = () => {
                       onClick={() => handleOpenEdit(item)}
                       className="p-4 cursor-pointer"
                     >
-                      <h3 className="font-black text-base text-slate-900 line-clamp-2 leading-snug group-hover/card:text-[#C5A059] transition-colors">
+                      <h3 className="font-semibold text-sm sm:text-base text-slate-900 line-clamp-2 leading-snug tracking-tight group-hover/card:text-[#C5A059] transition-colors font-display">
                         {item.title_es}
                       </h3>
                     </div>
@@ -2465,7 +2497,7 @@ export const EcuaplacPortal: React.FC = () => {
 
             {/* Datos del Administrador (Limpio y Minimalista) */}
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg sm:text-xl font-black text-slate-900 truncate font-display">
+              <h3 className="text-lg sm:text-xl font-semibold text-slate-900 truncate font-display tracking-normal">
                 {adminName}
               </h3>
               <p className="text-xs text-stone-500 font-mono mt-0.5 truncate">
@@ -2478,7 +2510,7 @@ export const EcuaplacPortal: React.FC = () => {
           <div className="space-y-2">
             <div className="px-3.5 pt-1 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
-              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider font-display">
+              <h4 className="text-[11px] sm:text-xs font-semibold text-stone-500 uppercase tracking-wider font-sans">
                 {panelLang === 'es' ? 'Cuenta' : 'Account'}
               </h4>
             </div>
@@ -2494,7 +2526,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <User className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                       {panelLang === 'es' ? 'Gestionar Perfil' : 'Manage Profile'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
@@ -2516,7 +2548,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <Lock className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                       {panelLang === 'es' ? 'Seguridad y Clave' : 'Security & Password'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
@@ -2534,7 +2566,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <Bell className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                       {panelLang === 'es' ? 'Notificaciones' : 'Notifications'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
@@ -2555,7 +2587,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <Globe className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                       {panelLang === 'es' ? 'Idioma del Panel' : 'Panel Language'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
@@ -2595,7 +2627,7 @@ export const EcuaplacPortal: React.FC = () => {
           <div className="space-y-2 mt-3">
             <div className="px-3.5 pt-1 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
-              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider font-display">
+              <h4 className="text-[11px] sm:text-xs font-semibold text-stone-500 uppercase tracking-wider font-sans">
                 {panelLang === 'es' ? 'Sistema & Dispositivo' : 'System & Device'}
               </h4>
             </div>
@@ -2604,14 +2636,14 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsFeedbackModalOpen(true)}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer group"
               >
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-800 shadow-xs shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100/80 border border-amber-200/90 flex items-center justify-center text-amber-800 shadow-xs shrink-0 group-hover:scale-105 transition-transform">
                     <MessageSquarePlus className="w-5 h-5 text-[#C5A059]" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight group-hover:text-[#C5A059] transition-colors">
                       {panelLang === 'es' ? 'Enviar Feedback o Problema' : 'Send Feedback or Issue'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal truncate block font-sans mt-0.5">
@@ -2622,10 +2654,11 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] font-bold text-[#C5A059] bg-amber-50/80 border border-amber-200/70 px-2.5 py-1 rounded-full hidden sm:inline-block">
-                    {panelLang === 'es' ? 'Soporte' : 'Support'}
+                  <span className="text-[11px] font-bold text-[#B38E46] bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059] animate-pulse" />
+                    <span>{panelLang === 'es' ? 'Soporte Musa' : 'Musa Support'}</span>
                   </span>
-                  <ChevronRight className="w-4 h-4 text-stone-400" />
+                  <ChevronRight className="w-4 h-4 text-stone-400 group-hover:text-slate-900 group-hover:translate-x-0.5 transition-all" />
                 </div>
               </button>
 
@@ -2642,13 +2675,13 @@ export const EcuaplacPortal: React.FC = () => {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                        <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                           {panelLang === 'es' ? 'Actualizaciones' : 'Updates'}
                         </span>
                         {updateCheckState === 'available' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 font-sans">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                            <span>{panelLang === 'es' ? `Nueva v${newVersionNotice || '2.0.1'}` : `New v${newVersionNotice || '2.0.1'}`}</span>
+                            <span>{panelLang === 'es' ? `Nueva v${newVersionNotice || CURRENT_SYSTEM_VERSION}` : `New v${newVersionNotice || CURRENT_SYSTEM_VERSION}`}</span>
                           </span>
                         ) : updateCheckState === 'up-to-date' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-sans">
@@ -2778,8 +2811,8 @@ export const EcuaplacPortal: React.FC = () => {
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#C5A059]/20 text-[#F6E27A] text-[10px] font-bold border border-[#C5A059]/40">
                               <Sparkles className="w-3 h-3" />
                               {panelLang === 'es'
-                                ? `Nueva Versión Lista · v${newVersionNotice || '2.0.1'}`
-                                : `New Version Ready · v${newVersionNotice || '2.0.1'}`}
+                                ? `Nueva Versión Lista · v${newVersionNotice || CURRENT_SYSTEM_VERSION}`
+                                : `New Version Ready · v${newVersionNotice || CURRENT_SYSTEM_VERSION}`}
                             </span>
                             <span className="text-[10px] text-stone-300 font-mono">1.8 MB</span>
                           </div>
@@ -2813,8 +2846,8 @@ export const EcuaplacPortal: React.FC = () => {
                           <span className="flex items-center gap-2">
                             <Loader2 className="w-3.5 h-3.5 text-[#C5A059] animate-spin" />
                             {panelLang === 'es'
-                              ? `Instalando actualización v${newVersionNotice || '2.0.1'}...`
-                              : `Installing update v${newVersionNotice || '2.0.1'}...`}
+                              ? `Instalando actualización v${newVersionNotice || CURRENT_SYSTEM_VERSION}...`
+                              : `Installing update v${newVersionNotice || CURRENT_SYSTEM_VERSION}...`}
                           </span>
                           <span className="font-mono text-[#C5A059]">100%</span>
                         </div>
@@ -2861,7 +2894,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <Activity className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-slate-950 block font-display tracking-tight">
+                    <span className="text-sm font-semibold text-slate-900 block font-sans tracking-tight">
                       {panelLang === 'es' ? 'Últimos Movimientos' : 'Recent Activity'}
                     </span>
                     <span className="text-[11.5px] text-stone-500 font-normal block mt-0.5 leading-snug font-sans">
@@ -2872,7 +2905,7 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-mono text-[11px] font-bold">
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-mono text-[11px] font-semibold">
                     {logs.length}
                   </span>
                   <ChevronRight className="w-4 h-4 text-stone-400" />
@@ -2898,7 +2931,7 @@ export const EcuaplacPortal: React.FC = () => {
                     <LogOut className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-sm font-black text-rose-600 block group-hover:text-rose-700 font-display tracking-tight">
+                    <span className="text-sm font-semibold text-rose-600 block group-hover:text-rose-700 font-sans tracking-tight">
                       {panelLang === 'es' ? 'Cerrar Sesión' : 'Sign Out'}
                     </span>
                     <span className="text-[11.5px] text-rose-400 font-normal block mt-0.5 leading-snug font-sans">
@@ -2923,7 +2956,7 @@ export const EcuaplacPortal: React.FC = () => {
               />
             </div>
 
-            <span className="text-[12.5px] sm:text-[13px] font-black tracking-[0.24em] text-[#0F172A] uppercase font-display">
+            <span className="text-xs sm:text-[13px] font-bold tracking-[0.22em] text-[#0F172A] uppercase font-display">
               NEXT TOOLS
             </span>
 
@@ -2980,7 +3013,7 @@ export const EcuaplacPortal: React.FC = () => {
               }
             >
               {isSavingWork
-                ? (panelLang === 'es' ? 'Publicando...' : 'Publishing...')
+                ? (panelLang === 'es' ? 'Guardando y publicando...' : 'Publishing...')
                 : editingItem
                 ? (panelLang === 'es' ? 'Actualizar Web' : 'Update Website')
                 : (panelLang === 'es' ? 'Guardar y Publicar en Web' : 'Save & Publish to Web')}
@@ -2991,11 +3024,13 @@ export const EcuaplacPortal: React.FC = () => {
         <form
           id="ecuaplac-work-form"
           onSubmit={handleSaveForm}
-          className="space-y-4 text-xs"
+          className={`space-y-4 text-xs transition-opacity ${
+            isSavingWork ? 'pointer-events-none opacity-60' : ''
+          }`}
         >
           {/* Selector de Destino de la Fotografía (Portada vs Más Reformas) */}
           <div className="space-y-1.5 pb-0.5">
-            <label className="font-black text-xs text-slate-900 block">
+            <label className="font-semibold text-xs text-slate-700 block font-sans tracking-tight">
               ¿Dónde quieres colocar esta foto? *
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -3010,7 +3045,7 @@ export const EcuaplacPortal: React.FC = () => {
               >
                 <div className="flex items-center gap-2">
                   <Star className={`w-4 h-4 ${formTargetGallery === 'carousel' ? 'text-[#B38E46]' : 'text-stone-400'}`} />
-                  <span className={`text-xs font-black ${formTargetGallery === 'carousel' ? 'text-slate-900' : 'text-stone-700'}`}>
+                  <span className={`text-xs font-semibold ${formTargetGallery === 'carousel' ? 'text-slate-900 font-bold' : 'text-stone-700'}`}>
                     Portada (Galería 1)
                   </span>
                 </div>
@@ -3030,7 +3065,7 @@ export const EcuaplacPortal: React.FC = () => {
               >
                 <div className="flex items-center gap-2">
                   <Layers className={`w-4 h-4 ${formTargetGallery === 'projects' ? 'text-[#B38E46]' : 'text-stone-400'}`} />
-                  <span className={`text-xs font-black ${formTargetGallery === 'projects' ? 'text-slate-900' : 'text-stone-700'}`}>
+                  <span className={`text-xs font-semibold ${formTargetGallery === 'projects' ? 'text-slate-900 font-bold' : 'text-stone-700'}`}>
                     Más Reformas (Galería 2)
                   </span>
                 </div>
@@ -3044,13 +3079,13 @@ export const EcuaplacPortal: React.FC = () => {
           {/* Zona de Encuadre 4:3 con Previsualización (De la App Original) */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="font-black text-xs text-slate-800">Previsualización de Encuadre (4:3)</label>
+              <label className="font-semibold text-xs text-slate-700 font-sans tracking-tight">Previsualización de Encuadre (4:3)</label>
               <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-full border border-stone-200">
                 <button
                   type="button"
                   onClick={() => setFormFitMode('cover')}
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
-                    formFitMode === 'cover' ? 'bg-[#C5A059] text-slate-950 font-black shadow-xs' : 'text-stone-600'
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                    formFitMode === 'cover' ? 'bg-[#C5A059] text-slate-950 font-bold shadow-xs' : 'text-stone-600'
                   }`}
                 >
                   Llenar
@@ -3058,8 +3093,8 @@ export const EcuaplacPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setFormFitMode('contain')}
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
-                    formFitMode === 'contain' ? 'bg-[#C5A059] text-slate-950 font-black shadow-xs' : 'text-stone-600'
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                    formFitMode === 'contain' ? 'bg-[#C5A059] text-slate-950 font-bold shadow-xs' : 'text-stone-600'
                   }`}
                 >
                   Completa
@@ -3116,13 +3151,13 @@ export const EcuaplacPortal: React.FC = () => {
                   <div className="w-14 h-14 rounded-2xl bg-[#C5A059]/15 border border-[#C5A059]/30 flex items-center justify-center text-[#C5A059] mb-3 group-hover/dropzone:scale-110 transition-transform shadow-md">
                     <Camera className="w-7 h-7" />
                   </div>
-                  <span className="text-sm font-black text-white block">
+                  <span className="text-sm font-semibold text-white block font-sans">
                     Toca aquí para seleccionar o tomar foto
                   </span>
-                  <span className="text-[11px] text-stone-300 mt-1 block">
+                  <span className="text-[11px] text-stone-300 mt-1 block font-sans">
                     Abre la cámara o galería de tu teléfono móvil
                   </span>
-                  <div className="mt-3.5 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-[#C5A059] text-slate-950 font-black text-xs shadow-md">
+                  <div className="mt-3.5 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-[#C5A059] text-slate-950 font-bold text-xs shadow-md">
                     <Upload className="w-3.5 h-3.5" />
                     <span>Subir desde Móvil / PC</span>
                   </div>
@@ -3135,7 +3170,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-xs font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1.5 py-1"
+                className="text-xs font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-1.5 py-1 font-sans"
               >
                 <Camera className="w-3.5 h-3.5 text-[#B38E46]" />
                 <span>{formImageUrl ? 'Cambiar fotografía' : 'Abrir selector de fotos'}</span>
@@ -3144,7 +3179,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowUrlInput(!showUrlInput)}
-                className="text-[11px] text-stone-500 hover:text-stone-700 flex items-center gap-1 underline"
+                className="text-[11px] text-stone-500 hover:text-stone-700 flex items-center gap-1 underline font-sans"
               >
                 <LinkIcon className="w-3 h-3" />
                 <span>{showUrlInput ? 'Ocultar URL' : 'O pegar URL externa'}</span>
@@ -3154,7 +3189,7 @@ export const EcuaplacPortal: React.FC = () => {
             {/* Input de URL opcional */}
             {showUrlInput && (
               <div className="pt-1 animate-in fade-in duration-150">
-                <label className="font-bold text-stone-700 block mb-1">
+                <label className="font-semibold text-stone-700 block mb-1 font-sans text-xs">
                   Enlace / URL directa de la imagen
                 </label>
                 <input
@@ -3165,14 +3200,14 @@ export const EcuaplacPortal: React.FC = () => {
                     setFormImageUrl(e.target.value);
                     setUploadStats(null);
                   }}
-                  className="w-full border border-stone-200 rounded-xl px-3 py-2 text-[16px] sm:text-xs focus:ring-2 focus:ring-[#C5A059]/40"
+                  className="w-full border border-stone-200 rounded-xl px-3 py-2 text-[16px] sm:text-xs focus:ring-2 focus:ring-[#C5A059]/40 font-sans"
                 />
               </div>
             )}
           </div>
 
           <div>
-            <label className="font-extrabold text-xs text-slate-800 block mb-1">
+            <label className="font-semibold text-xs text-slate-700 block mb-1 font-sans tracking-tight">
               Título de la Obra / Proyecto *
             </label>
             <input
@@ -3181,12 +3216,12 @@ export const EcuaplacPortal: React.FC = () => {
               placeholder="Ej. Reforma Integral de Baño con Bañera Exenta"
               value={formTitleEs}
               onChange={(e) => setFormTitleEs(e.target.value)}
-              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50"
+              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50 font-sans"
             />
           </div>
 
           <div>
-            <label className="font-extrabold text-xs text-slate-800 block mb-1">
+            <label className="font-semibold text-xs text-slate-700 block mb-1 font-sans tracking-tight">
               Ubicación (Mallorca)
             </label>
             <input
@@ -3194,7 +3229,7 @@ export const EcuaplacPortal: React.FC = () => {
               placeholder="Ej. Andratx, Palma, Calvià, Sóller..."
               value={formLocation}
               onChange={(e) => setFormLocation(e.target.value)}
-              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50"
+              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50 font-sans"
             />
             {/* Chips rápidos de municipios de Mallorca */}
             <div className="flex items-center gap-1.5 mt-2 flex-wrap">
@@ -3203,7 +3238,7 @@ export const EcuaplacPortal: React.FC = () => {
                   key={city}
                   type="button"
                   onClick={() => setFormLocation(city)}
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border transition-all font-sans ${
                     formLocation === city
                       ? 'bg-slate-900 text-white border-slate-900'
                       : 'bg-stone-100 text-stone-600 border-stone-200 hover:bg-stone-200'
@@ -3220,7 +3255,7 @@ export const EcuaplacPortal: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4 text-[#B38E46]" />
-                <span className="text-xs font-black text-slate-900">
+                <span className="text-xs font-semibold text-slate-800 font-sans tracking-tight">
                   Versión Multilingüe (Web Internacional)
                 </span>
               </div>
@@ -3228,7 +3263,7 @@ export const EcuaplacPortal: React.FC = () => {
                 type="button"
                 onClick={handleAutoTranslate}
                 disabled={isTranslating}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-[#C5A059] text-slate-950 font-black text-[11px] shadow-xs hover:brightness-105 active:scale-95 transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-[#C5A059] text-slate-950 font-bold text-[11px] shadow-xs hover:brightness-105 active:scale-95 transition-all disabled:opacity-50 font-sans"
                 title="Autotraduce automáticamente a inglés y alemán"
               >
                 {isTranslating ? (
@@ -3305,14 +3340,14 @@ export const EcuaplacPortal: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Supabase Live
+              {panelLang === 'es' ? 'Web Oficial Live' : 'Official Web Live'}
             </span>
             <button
               type="button"
               onClick={handleRefreshLeads}
               disabled={isSyncingLeads}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-stone-100 hover:bg-stone-200 border border-stone-200/90 text-xs font-semibold text-stone-700 hover:text-stone-900 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-              title={panelLang === 'es' ? 'Sincronizar con Supabase' : 'Sync with Supabase'}
+              title={panelLang === 'es' ? 'Sincronizar con la web' : 'Sync with website'}
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[#C5A059] ${isSyncingLeads ? 'animate-spin' : ''}`} />
               <span className="hidden md:inline">{panelLang === 'es' ? 'Sincronizar' : 'Sync'}</span>
@@ -3980,8 +4015,8 @@ export const EcuaplacPortal: React.FC = () => {
                 <Activity className="w-8 h-8 text-stone-300 mx-auto mb-2" />
                 <p className="text-xs font-bold text-stone-600">
                   {panelLang === 'es'
-                    ? 'No hay movimientos registrados en InsForge todavía'
-                    : 'No activity recorded in InsForge yet'}
+                    ? 'No hay movimientos registrados en el servidor todavía'
+                    : 'No activity recorded on server yet'}
                 </p>
                 <p className="text-[11px] text-stone-400 mt-0.5">
                   {panelLang === 'es'
@@ -4061,54 +4096,80 @@ export const EcuaplacPortal: React.FC = () => {
         }
       >
         <div className="space-y-4 pt-1">
-          {/* Selector de Categoría (Pills) */}
+          {/* Selector de Categoría (Tarjetas Táctiles Profesionales con Lucide) */}
           <div>
-            <label className="text-xs font-bold text-slate-800 block mb-2 font-display">
-              {panelLang === 'es' ? '¿De qué se trata tu mensaje?' : 'What is your message about?'}
+            <label className="text-xs font-bold text-slate-900 block mb-2.5 font-display tracking-tight flex items-center justify-between">
+              <span>{panelLang === 'es' ? 'Tipo de mensaje' : 'Message type'}</span>
+              <span className="text-[11px] font-normal text-stone-500">
+                {panelLang === 'es' ? 'Selecciona una categoría' : 'Select category'}
+              </span>
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2.5">
+              {/* 1. Incidencia / Problema */}
               <button
                 type="button"
                 onClick={() => setFeedbackCategory('bug')}
-                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border text-center flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                className={`relative p-3 rounded-2xl text-xs font-bold transition-all duration-150 border text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] ${
                   feedbackCategory === 'bug'
-                    ? 'bg-rose-50 border-rose-300 text-rose-800 shadow-xs ring-1 ring-rose-200'
-                    : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
+                    ? 'bg-rose-500/10 border-rose-300 text-rose-900 shadow-[0_4px_14px_-2px_rgba(244,63,94,0.18)] ring-1 ring-rose-400/40'
+                    : 'bg-white/80 border-stone-200/90 text-stone-600 hover:bg-stone-50 hover:border-stone-300'
                 }`}
               >
-                <span>🐛</span>
-                <span>{panelLang === 'es' ? 'Problema' : 'Bug / Issue'}</span>
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform ${
+                  feedbackCategory === 'bug' ? 'bg-rose-600 text-white scale-105 shadow-sm' : 'bg-rose-50 text-rose-600'
+                }`}>
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <span className="leading-tight text-[11px] font-sans">
+                  {panelLang === 'es' ? 'Problema' : 'Issue / Bug'}
+                </span>
               </button>
+
+              {/* 2. Sugerencia / Idea */}
               <button
                 type="button"
                 onClick={() => setFeedbackCategory('idea')}
-                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border text-center flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                className={`relative p-3 rounded-2xl text-xs font-bold transition-all duration-150 border text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] ${
                   feedbackCategory === 'idea'
-                    ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-xs ring-1 ring-amber-200'
-                    : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
+                    ? 'bg-amber-500/10 border-amber-300 text-amber-950 shadow-[0_4px_14px_-2px_rgba(245,158,11,0.18)] ring-1 ring-amber-400/40'
+                    : 'bg-white/80 border-stone-200/90 text-stone-600 hover:bg-stone-50 hover:border-stone-300'
                 }`}
               >
-                <span>💡</span>
-                <span>{panelLang === 'es' ? 'Sugerencia' : 'Suggestion'}</span>
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform ${
+                  feedbackCategory === 'idea' ? 'bg-[#C5A059] text-white scale-105 shadow-sm' : 'bg-amber-50 text-amber-700'
+                }`}>
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <span className="leading-tight text-[11px] font-sans">
+                  {panelLang === 'es' ? 'Sugerencia' : 'Feature Idea'}
+                </span>
               </button>
+
+              {/* 3. Duda Técnica */}
               <button
                 type="button"
                 onClick={() => setFeedbackCategory('question')}
-                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all border text-center flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                className={`relative p-3 rounded-2xl text-xs font-bold transition-all duration-150 border text-center flex flex-col items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] ${
                   feedbackCategory === 'question'
-                    ? 'bg-blue-50 border-blue-300 text-blue-800 shadow-xs ring-1 ring-blue-200'
-                    : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
+                    ? 'bg-blue-500/10 border-blue-300 text-blue-950 shadow-[0_4px_14px_-2px_rgba(59,130,246,0.18)] ring-1 ring-blue-400/40'
+                    : 'bg-white/80 border-stone-200/90 text-stone-600 hover:bg-stone-50 hover:border-stone-300'
                 }`}
               >
-                <span>💬</span>
-                <span>{panelLang === 'es' ? 'Duda Técnica' : 'Question'}</span>
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform ${
+                  feedbackCategory === 'question' ? 'bg-blue-600 text-white scale-105 shadow-sm' : 'bg-blue-50 text-blue-600'
+                }`}>
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <span className="leading-tight text-[11px] font-sans">
+                  {panelLang === 'es' ? 'Consulta' : 'Question'}
+                </span>
               </button>
             </div>
           </div>
 
           {/* Asunto Breve */}
           <div>
-            <label className="text-xs font-bold text-slate-800 block mb-1 font-display">
+            <label className="text-xs font-bold text-slate-800 block mb-1.5 font-display tracking-tight">
               {panelLang === 'es' ? 'Título o Asunto' : 'Subject'}
             </label>
             <input
@@ -4122,13 +4183,13 @@ export const EcuaplacPortal: React.FC = () => {
                   ? (panelLang === 'es' ? 'Ej: Me gustaría un botón para descargar presupuestos' : 'e.g. Would love a button to export leads')
                   : (panelLang === 'es' ? 'Ej: ¿Cómo cambio el número de teléfono de la web?' : 'e.g. How do I change phone number?')
               }
-              className="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 border border-stone-200 text-slate-900 text-xs focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all font-medium font-sans"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-200/90 text-slate-900 text-xs placeholder:text-stone-400 focus:outline-none focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 transition-all font-medium font-sans shadow-xs"
             />
           </div>
 
           {/* Mensaje Detallado */}
           <div>
-            <label className="text-xs font-bold text-slate-800 block mb-1 font-display">
+            <label className="text-xs font-bold text-slate-800 block mb-1.5 font-display tracking-tight">
               {panelLang === 'es' ? 'Mensaje o Explicación' : 'Message Details'}
             </label>
             <textarea
@@ -4140,30 +4201,40 @@ export const EcuaplacPortal: React.FC = () => {
                   ? 'Explica aquí con claridad qué ha sucedido o qué te gustaría añadir a la app...'
                   : 'Write here what went wrong or what you would like to improve...'
               }
-              className="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 border border-stone-200 text-slate-900 text-xs focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all resize-none font-medium leading-relaxed font-sans"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-200/90 text-slate-900 text-xs placeholder:text-stone-400 focus:outline-none focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 transition-all resize-none font-medium leading-relaxed font-sans shadow-xs"
             />
           </div>
 
-          {/* Contexto técnico sutil */}
-          <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/70 flex items-center justify-between text-[11px] text-amber-900">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="w-2 h-2 rounded-full bg-[#C5A059] shrink-0" />
-              <span className="font-semibold truncate">
-                {panelLang === 'es' ? 'Destinatario: Musa (Desarrollador / MYNEXT)' : 'Recipient: Musa (Lead Developer / MYNEXT)'}
-              </span>
+          {/* Contexto de Soporte Seguro (Zero Raw Email Exposure) */}
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-[#FAF7F0] to-white border border-[#E6DECD] flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-[#08090C] flex items-center justify-center text-[#F0CF85] shrink-0 shadow-xs">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-950 font-sans leading-snug truncate">
+                  {panelLang === 'es' ? 'Línea de Soporte Ecuaplac' : 'Ecuaplac Support Channel'}
+                </p>
+                <p className="text-[11px] text-stone-500 font-sans truncate">
+                  {panelLang === 'es' ? 'Canal directo preferente · Respuesta en < 24h' : 'Direct priority channel · Response < 24h'}
+                </p>
+              </div>
             </div>
-            <span className="font-mono text-[10px] text-amber-800 font-bold shrink-0 ml-2">musaabdul3101@gmail.com</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-900 text-[10px] font-black shrink-0 font-mono tracking-tight">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+              <span>{panelLang === 'es' ? 'En Línea' : 'Online'}</span>
+            </span>
           </div>
 
-          {/* Botones de Envío: WhatsApp Directo + Email + Solo Registro */}
-          <div className="space-y-2 pt-1">
+          {/* Botones de Envío: WhatsApp Directo + Email Sin Fugas + Guardar en Sistema */}
+          <div className="space-y-2.5 pt-1">
             <button
               type="button"
               disabled={isSendingFeedback || !feedbackMessage.trim()}
               onClick={() => handleSendFeedback('whatsapp')}
-              className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
+              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#25D366] to-[#1EBE5D] hover:from-[#20BD5A] hover:to-[#1AA34F] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-xs shadow-[0_6px_20px_-4px_rgba(37,211,102,0.45)] ring-1 ring-white/25 transition-all flex items-center justify-center gap-2.5 cursor-pointer font-sans"
             >
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquare className="w-4 h-4 fill-white/20 text-white" />
               <span>{panelLang === 'es' ? 'Enviar por WhatsApp a Musa' : 'Send via WhatsApp to Musa'}</span>
             </button>
 
@@ -4172,9 +4243,9 @@ export const EcuaplacPortal: React.FC = () => {
                 type="button"
                 disabled={isSendingFeedback || !feedbackMessage.trim()}
                 onClick={() => handleSendFeedback('email')}
-                className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
+                className="py-3 px-3 rounded-2xl bg-[#08090C] hover:bg-slate-900 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-[0_4px_12px_-2px_rgba(8,9,12,0.25)] ring-1 ring-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer font-sans"
               >
-                <Mail className="w-3.5 h-3.5 text-[#C5A059]" />
+                <Mail className="w-4 h-4 text-[#F0CF85]" />
                 <span>{panelLang === 'es' ? 'Enviar por Correo' : 'Send by Email'}</span>
               </button>
 
@@ -4182,10 +4253,10 @@ export const EcuaplacPortal: React.FC = () => {
                 type="button"
                 disabled={isSendingFeedback || !feedbackMessage.trim()}
                 onClick={() => handleSendFeedback('system')}
-                className="py-2.5 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 disabled:opacity-50 disabled:cursor-not-allowed text-stone-800 font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-98 cursor-pointer"
+                className="py-3 px-3 rounded-2xl bg-stone-100/90 hover:bg-stone-200/90 active:scale-[0.99] border border-stone-200/90 disabled:opacity-50 disabled:cursor-not-allowed text-stone-800 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer font-sans"
               >
-                <Check className="w-3.5 h-3.5 text-stone-600" />
-                <span>{panelLang === 'es' ? 'Solo en el Sistema' : 'Log Only'}</span>
+                <Save className="w-4 h-4 text-stone-600" />
+                <span>{panelLang === 'es' ? 'Guardar en Sistema' : 'Log in System'}</span>
               </button>
             </div>
           </div>
@@ -4401,59 +4472,51 @@ export const EcuaplacPortal: React.FC = () => {
           ? 'hidden opacity-0 pointer-events-none'
           : ''
       }`}>
-        <div className="pointer-events-auto w-full md:w-auto bg-[#0E1726]/95 md:backdrop-blur-xl border-t md:border border-slate-800 md:border-slate-700/80 shadow-md md:shadow-[0_20px_50px_rgba(0,0,0,0.5)] md:rounded-full md:px-3">
+        <div className="pointer-events-auto w-full md:w-auto bg-[#08090C] md:bg-[#08090C]/96 md:backdrop-blur-xl border-t md:border border-white/[0.08] shadow-md md:shadow-[0_20px_50px_rgba(0,0,0,0.5)] md:rounded-full md:px-3">
           <nav className="max-w-md sm:max-w-lg md:w-[480px] mx-auto px-4 md:px-2 pt-2 md:pt-1.5 pb-[max(12px,env(safe-area-inset-bottom))] md:pb-1.5 flex items-center justify-between relative">
             {/* Tab 1: Inicio */}
             <button
               type="button"
               onClick={() => setActiveTab('inicio')}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'inicio' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Home
-                className={`w-5 h-5 transition-transform duration-200 ${
-                  activeTab === 'inicio' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
-                }`}
-              />
+              <NavHomeIcon active={activeTab === 'inicio'} />
               <span
-                className={`text-[10.5px] font-sans tracking-wide leading-none ${
-                  activeTab === 'inicio' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                className={`text-[10.5px] font-sans tracking-wide leading-none transition-colors ${
+                  activeTab === 'inicio' ? 'font-bold text-white' : 'font-medium text-slate-400 group-hover:text-slate-300'
                 }`}
               >
                 {panelLang === 'es' ? 'Inicio' : 'Home'}
               </span>
               {activeTab === 'inicio' && (
-                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F0CF85] shadow-[0_0_8px_#F0CF85] -mb-1 animate-pulse" />
               )}
             </button>
 
-            {/* Tab 2: Galería 1 */}
+            {/* Tab 2: Galería 1 (Carrusel Portada) */}
             <button
               type="button"
               onClick={() => setActiveTab('obras')}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'obras' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <ImageIcon
-                className={`w-5 h-5 transition-transform duration-200 ${
-                  activeTab === 'obras' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
-                }`}
-              />
+              <NavGallery1Icon active={activeTab === 'obras'} />
               <span
-                className={`text-[10.5px] font-sans tracking-wide leading-none ${
-                  activeTab === 'obras' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                className={`text-[10.5px] font-sans tracking-wide leading-none transition-colors ${
+                  activeTab === 'obras' ? 'font-bold text-white' : 'font-medium text-slate-400 group-hover:text-slate-300'
                 }`}
               >
                 {panelLang === 'es' ? 'Galería 1' : 'Gallery 1'}
               </span>
               {activeTab === 'obras' && (
-                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F0CF85] shadow-[0_0_8px_#F0CF85] -mb-1 animate-pulse" />
               )}
             </button>
 
-            {/* CENTER FAB (+): Botón Circular Elevado para Subir Foto WebP */}
+            {/* CENTER FAB: Botón Circular Elevado para Subir Foto WebP con CameraIcon animado */}
             <div className="relative -top-5 px-1 shrink-0 flex items-center justify-center">
               <button
                 type="button"
@@ -4462,35 +4525,31 @@ export const EcuaplacPortal: React.FC = () => {
                   background: 'linear-gradient(135deg, #9E782F 0%, #D4AF37 50%, #F5DE98 100%)',
                   boxShadow: '0 8px 24px -2px rgba(212,175,55,0.45)',
                 }}
-                className="w-14 h-14 rounded-full text-slate-950 flex items-center justify-center ring-4 ring-[#0E1726] active:scale-90 transition-all hover:brightness-110 group cursor-pointer"
+                className="w-14 h-14 rounded-full text-slate-950 flex items-center justify-center ring-4 ring-[#08090C] active:scale-90 transition-all hover:brightness-110 hover:shadow-[0_12px_28px_-2px_rgba(212,175,55,0.6)] group cursor-pointer"
                 title={panelLang === 'es' ? 'Añadir nueva fotografía / obra' : 'Add new project photo'}
               >
-                <Plus className="w-6 h-6 text-slate-950 stroke-[2.5] group-hover:rotate-90 transition-transform duration-200" />
+                <CameraIcon size={26} className="text-slate-950 group-hover:scale-110 transition-transform duration-200" />
               </button>
             </div>
 
-            {/* Tab 3: Galería 2 (Mismo Icono Fotográfico que Galería 1) */}
+            {/* Tab 3: Galería 2 (Catálogo / Más Reformas con Icono Distintivo) */}
             <button
               type="button"
               onClick={() => setActiveTab('more_projects')}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'more_projects' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <ImageIcon
-                className={`w-5 h-5 transition-transform duration-200 ${
-                  activeTab === 'more_projects' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
-                }`}
-              />
+              <NavGallery2Icon active={activeTab === 'more_projects'} />
               <span
-                className={`text-[10.5px] font-sans tracking-wide leading-none ${
-                  activeTab === 'more_projects' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                className={`text-[10.5px] font-sans tracking-wide leading-none transition-colors ${
+                  activeTab === 'more_projects' ? 'font-bold text-white' : 'font-medium text-slate-400 group-hover:text-slate-300'
                 }`}
               >
                 {panelLang === 'es' ? 'Galería 2' : 'Gallery 2'}
               </span>
               {activeTab === 'more_projects' && (
-                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F0CF85] shadow-[0_0_8px_#F0CF85] -mb-1 animate-pulse" />
               )}
             </button>
 
@@ -4498,24 +4557,20 @@ export const EcuaplacPortal: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('ajustes')}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-1 relative transition-all select-none active:scale-95 cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1.5 py-1 relative transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'ajustes' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Settings
-                className={`w-5 h-5 transition-transform duration-200 ${
-                  activeTab === 'ajustes' ? 'text-[#F0CF85] scale-110' : 'text-slate-400'
-                }`}
-              />
+              <NavSettingsIcon active={activeTab === 'ajustes'} />
               <span
-                className={`text-[10.5px] font-sans tracking-wide leading-none ${
-                  activeTab === 'ajustes' ? 'font-bold text-white' : 'font-medium text-slate-400'
+                className={`text-[10.5px] font-sans tracking-wide leading-none transition-colors ${
+                  activeTab === 'ajustes' ? 'font-bold text-white' : 'font-medium text-slate-400 group-hover:text-slate-300'
                 }`}
               >
                 {panelLang === 'es' ? 'Ajustes' : 'Settings'}
               </span>
               {activeTab === 'ajustes' && (
-                <span className="w-1 h-1 rounded-full bg-[#F0CF85] -mb-1 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F0CF85] shadow-[0_0_8px_#F0CF85] -mb-1 animate-pulse" />
               )}
             </button>
           </nav>

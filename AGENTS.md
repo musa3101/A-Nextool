@@ -37,3 +37,29 @@ Siempre que Musa o el usuario solicite cerrar sesión (mediante **"cerrar sesió
    * **Si Musa responde SÍ**: Se incrementa la versión (SemVer patch o minor según el alcance) en `web/clientes/<app>/version.json`, `web/web v1/public/version.json`, portal y base de datos, registrándolo en `docs/SESSION_LATEST_ES.md`.
    * **Si Musa responde NO**: Se dejan registradas las mejoras y se cierra la sesión normalmente manteniendo intacto el número de versión actual.
 
+---
+
+## Protocolo Obligatorio de Verificación Real en Cloudflare tras Merge/Deploy (NUNCA darlo por hecho)
+
+Al recibir el OK de Musa para el merge a `main` o al realizar cualquier despliegue a producción en Cloudflare Pages (`nextool`):
+
+1. **PROHIBIDO dar por hecho el despliegue**:
+   - Nunca decir "ya está subido y desplegado" simplemente por haber hecho `git push` o `mini-merge.sh`.
+   - Cloudflare Pages compila de manera asíncrona y puede fallar silenciosamente en el paso de `build` (errores de Rollup, alias de Vite, paquetes no resueltos, etc.), dejando la web en la versión antigua sin que el usuario lo sepa.
+
+2. **Verificación en Cloudflare (Comprobación Activa Obligatoria)**:
+   - Esperar a que termine la compilación de Cloudflare Pages.
+   - Consultar el endpoint de versión en vivo:
+     ```bash
+     curl -s https://a-nextool.pages.dev/version.json
+     ```
+   - Validar que el campo `"version"` devuelto por Cloudflare coincida **exactamente** con la versión acordada en la sesión actual (ej. `3.0.0`).
+   - Validar que el cliente responda con `HTTP 200`:
+     ```bash
+     curl -sI https://a-nextool.pages.dev/ecuaplac
+     ```
+
+3. **Confirmación con Evidencia Técnica a Musa**:
+   - Mostrar a Musa el JSON real devuelto por los servidores de Cloudflare Pages antes de dar por completado el despliegue.
+   - Si la compilación falla (queda en rojo), investigar los logs de compilación de inmediato, aplicar el parche necesario y repetir la comprobación hasta obtener el despliegue en verde.
+

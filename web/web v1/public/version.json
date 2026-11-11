@@ -1,8 +1,8 @@
 {
-  "version": "2.0.2",
-  "buildTimestamp": 1794321600000,
+  "version": "3.0.0",
+  "buildTimestamp": 1794334800000,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
-  "updatedAt": "2026-11-10T14:40:00.000Z",
-  "notes": "Auditoría móvil y desktop completa, Floating Island Dock macOS, soporte WhatsApp Musa (+34 673 109 486), modal táctil de confirmación y blindaje de galería."
+  "updatedAt": "2026-11-10T18:20:00.000Z",
+  "notes": "Versión 3.0.0 Mayor: Tipografía híbrida Clash Display + Satoshi de Fontshare, paleta Negro Obsidiana Puro (#08090C), icono de cámara animado 21st en dock, corrección de jerarquías H1/H2 y blindaje de envío sin duplicados."
 }

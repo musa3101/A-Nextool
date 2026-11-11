@@ -2,7 +2,7 @@
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
   "owner": "Jose (José Rivadeneira)",
-  "version": "2.0.2",
+  "version": "3.0.0",
   "last_updated": "2026-11-10",
   "status": "active",
   "route": "/ecuaplac",
@@ -11,6 +11,9 @@
     "leads_presupuestos_gmail_style",
     "ajustes_perfil",
     "analytics_cloudflare_rum",
-    "desktop_floating_dock"
+    "desktop_floating_dock",
+    "fontshare_clash_satoshi",
+    "animated_21st_camera_dock",
+    "obsidian_black_theme"
   ]
 }
