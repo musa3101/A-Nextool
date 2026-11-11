@@ -23,6 +23,90 @@ export interface EcuaplacLeadItem {
   status: 'new' | 'contacted' | 'approved' | 'closed';
   date: string;
   notes?: string;
+  service?: string;
+  sqm?: string;
+  location?: string;
+  photo_url?: string;
+  client_message?: string;
+  raw_message?: string;
+  source_channel?: 'tally' | 'gmail' | 'web';
+}
+
+export interface ParsedLeadDetails {
+  service: string;
+  sqm?: string;
+  location?: string;
+  photoUrl?: string;
+  clientMessage?: string;
+  sourceChannel: 'tally' | 'gmail' | 'web';
+  rawMessage: string;
+}
+
+/**
+ * Analizador inteligente de mensajes de leads procedentes de Tally.so, Gmail o formularios web
+ */
+export function parseLeadDetails(rawMsg: string = '', rawProjectType: string = ''): ParsedLeadDetails {
+  const msg = rawMsg || '';
+  const isTally = msg.includes('TALLY.SO') || msg.includes('DETALLES DEL PROYECTO');
+  const isGmail = msg.toLowerCase().includes('gmail') || msg.toLowerCase().includes('enviado desde');
+  const sourceChannel: 'tally' | 'gmail' | 'web' = isTally ? 'tally' : isGmail ? 'gmail' : 'web';
+
+  const isUuid = (str: string) => /^[0-9a-fA-F-]{36}$/.test((str || '').trim());
+
+  let service = '';
+  const serviceMatch = msg.match(/¿Qué servicio necesitas\?:\s*([^\n\r]+)/i);
+  if (serviceMatch && !isUuid(serviceMatch[1])) {
+    service = serviceMatch[1].trim();
+  } else if (rawProjectType && !isUuid(rawProjectType)) {
+    service = rawProjectType.trim();
+  } else {
+    service = 'Reforma Integral';
+  }
+
+  let sqm: string | undefined = undefined;
+  const sqmMatch = msg.match(/Metros cuadrados aproximados[^:]*:\s*([^\n\r]+)/i);
+  if (sqmMatch) {
+    let s = sqmMatch[1].trim();
+    if (!s.endsWith('m²') && !s.toLowerCase().endsWith('m2')) {
+      s += ' m²';
+    }
+    sqm = s;
+  }
+
+  let location: string | undefined = undefined;
+  const locMatch = msg.match(/Municipio de Mallorca:\s*([^\n\r]+)/i);
+  if (locMatch) {
+    const val = locMatch[1].trim();
+    location = isUuid(val) ? 'Mallorca' : val;
+  } else {
+    location = 'Mallorca';
+  }
+
+  let photoUrl: string | undefined = undefined;
+  const photoMatch = msg.match(/Sube una foto o plano[^:]*:\s*(https?:\/\/[^\s\n\r]+)/i);
+  if (photoMatch) {
+    photoUrl = photoMatch[1].trim();
+  }
+
+  let clientMessage: string | undefined = undefined;
+  if (isTally) {
+    const noteMatch = msg.match(/Cuéntanos los detalles[^:]*:\s*([^\n\r]+)/i);
+    if (noteMatch) {
+      clientMessage = noteMatch[1].trim();
+    }
+  } else {
+    clientMessage = msg.trim();
+  }
+
+  return {
+    service,
+    sqm,
+    location,
+    photoUrl,
+    clientMessage,
+    sourceChannel,
+    rawMessage: msg,
+  };
 }
 
 export interface EcuaplacAuditLog {
@@ -479,24 +563,34 @@ export class EcuaplacConnector {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          const mapped: EcuaplacLeadItem[] = data.map((d: any) => ({
-            id: d.id,
-            name: d.name || d.client_name || 'Cliente sin nombre',
-            phone: d.phone || d.client_phone || '',
-            email: d.email || d.client_email || '',
-            work_type: d.message || d.work_type || d.service_type || 'Solicitud de presupuesto',
-            budget_estimate: d.budget_estimate || (d.budget_estimated ? `${d.budget_estimated} €` : ''),
-            status: d.status === 'aprobado' || d.status === 'approved' ? 'approved' : d.status === 'contactado' || d.status === 'contacted' ? 'contacted' : 'new',
-            date: d.created_at
-              ? new Date(d.created_at).toLocaleDateString([], {
-                day: '2-digit',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-              : 'Hoy',
-            notes: d.notes || '',
-          }));
+          const mapped: EcuaplacLeadItem[] = data.map((d: any) => {
+            const parsed = parseLeadDetails(d.message || d.work_type || '', d.project_type || '');
+            return {
+              id: d.id,
+              name: d.name || d.client_name || 'Cliente sin nombre',
+              phone: d.phone || d.client_phone || '',
+              email: d.email || d.client_email || '',
+              work_type: parsed.service,
+              budget_estimate: d.budget_estimate || (d.budget_estimated ? `${d.budget_estimated} €` : ''),
+              status: d.status === 'aprobado' || d.status === 'approved' ? 'approved' : d.status === 'contactado' || d.status === 'contacted' ? 'contacted' : 'new',
+              date: d.created_at
+                ? new Date(d.created_at).toLocaleDateString([], {
+                  day: '2-digit',
+                  month: 'short',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+                : 'Hoy',
+              notes: d.notes || '',
+              service: parsed.service,
+              sqm: parsed.sqm,
+              location: parsed.location,
+              photo_url: parsed.photoUrl,
+              client_message: parsed.clientMessage,
+              raw_message: d.message || '',
+              source_channel: parsed.sourceChannel,
+            };
+          });
           this.saveLeads(mapped);
           return mapped;
         }

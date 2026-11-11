@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Plus,
+  Briefcase,
   Star,
   Eye,
   EyeOff,
@@ -2113,11 +2114,7 @@ export const EcuaplacPortal: React.FC = () => {
                 <div className="flex items-baseline gap-2 mt-1">
                   <span className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight font-mono">
                     <AnimatedCounter
-                      value={
-                        cfPeriod === '30d'
-                          ? Math.max(leads.length, 3)
-                          : Math.max(leads.length * 2, 8)
-                      }
+                      value={leads.length}
                     />
                   </span>
                   <span className="text-xs font-semibold text-stone-500 font-sans">solicitudes</span>
@@ -3697,7 +3694,7 @@ export const EcuaplacPortal: React.FC = () => {
                   <div
                     key={lead.id}
                     onClick={() => setSelectedLeadId((prev) => (prev === lead.id ? null : lead.id))}
-                    className={`group relative rounded-2xl p-4 sm:p-5 transition-all duration-200 border cursor-pointer ${
+                    className={`group relative rounded-2xl p-4 sm:p-5 transition-all duration-200 border cursor-pointer w-full max-w-full min-w-0 overflow-hidden break-words [overflow-wrap:anywhere] ${
                       isSelected
                         ? 'bg-white border-[#C5A059] shadow-md ring-2 ring-[#C5A059]/15'
                         : 'bg-stone-50/70 hover:bg-white border-stone-200/90 hover:border-[#C5A059]/40 shadow-2xs hover:shadow-sm'
@@ -3748,12 +3745,72 @@ export const EcuaplacPortal: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Mensaje / Tipo de Obra */}
-                    <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-stone-200/80 border-l-[3px] border-l-[#C5A059] shadow-2xs">
-                      <p className="text-xs sm:text-sm text-stone-800 leading-relaxed font-medium">
-                        «{lead.work_type}»
-                      </p>
+                    {/* Fila de Metadatos Ejecutivos: Servicio, Municipio, m², Canal */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      {/* Servicio principal */}
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200 text-stone-900 text-xs font-bold font-sans">
+                        <Briefcase className="w-3.5 h-3.5 text-[#C5A059]" />
+                        <span>{lead.service || lead.work_type || 'Reforma'}</span>
+                      </span>
+
+                      {/* Ubicación / Municipio */}
+                      {lead.location && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-bold font-sans">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{lead.location}</span>
+                        </span>
+                      )}
+
+                      {/* Metros cuadrados (m²) */}
+                      {lead.sqm && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200/80 text-sky-800 text-xs font-bold font-mono">
+                          <span>📐 {lead.sqm}</span>
+                        </span>
+                      )}
+
+                      {/* Origen del formulario */}
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 text-stone-500 text-[10px] font-medium font-sans">
+                        {lead.source_channel === 'tally' ? '⚡ Tally' : lead.source_channel === 'gmail' ? '✉️ Gmail' : '🌐 Web'}
+                      </span>
                     </div>
+
+                    {/* Mensaje / Tipo de Obra */}
+                    {(lead.client_message || lead.work_type) && (
+                      <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-stone-200/80 border-l-[3px] border-l-[#C5A059] shadow-2xs w-full max-w-full overflow-hidden">
+                        <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                          <MessageSquare className="w-3 h-3 text-[#C5A059]" />
+                          <span>{panelLang === 'es' ? 'Mensaje o detalles:' : 'Client message:'}</span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-stone-800 leading-relaxed font-medium break-words [overflow-wrap:anywhere]">
+                          «{lead.client_message || lead.work_type}»
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Botón interactivo para ver foto o plano si fue adjuntado */}
+                    {lead.photo_url && (
+                      <div className="w-full">
+                        <a
+                          href={lead.photo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center justify-between w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-50/80 via-stone-50 to-amber-50/40 border border-[#C5A059]/40 hover:border-[#C5A059] text-stone-900 text-xs font-bold transition-all shadow-2xs hover:shadow-xs group/photo cursor-pointer"
+                          title="Abrir foto o plano adjunto por el cliente"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-[#08090C] text-[#F0CF85] flex items-center justify-center shrink-0 shadow-xs">
+                              <Camera className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="truncate">Foto o plano adjunto por el cliente</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[#C5A059] text-xs shrink-0 font-semibold">
+                            <span className="hidden sm:inline">Ver archivo</span>
+                            <ExternalLink className="w-3.5 h-3.5 group-hover/photo:translate-x-0.5 transition-transform" />
+                          </div>
+                        </a>
+                      </div>
+                    )}
 
                     {/* Fila de Datos: Presupuesto, Teléfono, Email */}
                     <div className="flex flex-wrap items-center gap-2">
@@ -3819,7 +3876,9 @@ export const EcuaplacPortal: React.FC = () => {
                         <div className="grid grid-cols-2 gap-2">
                           <a
                             href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone)}?text=${encodeURIComponent(
-                              `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto para: ${lead.work_type}.`
+                              `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto${
+                                lead.service ? ` para ${lead.service}` : lead.work_type ? ` para ${lead.work_type}` : ''
+                              }${lead.location ? ` en ${lead.location}` : ''}${lead.sqm ? ` (${lead.sqm})` : ''}.`
                             )}`}
                             target="_blank"
                             rel="noopener noreferrer"
