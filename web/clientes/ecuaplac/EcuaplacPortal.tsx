@@ -1944,7 +1944,7 @@ export const EcuaplacPortal: React.FC = () => {
         /* Pestaña 1: Inicio (Dashboard Ejecutivo Premium con Micro-Gradientes, Halos y Números Animados) */
         <div className="space-y-4 sm:space-y-5 animate-tab-enter">
           {/* Header de Bienvenida con Halos & Selector Táctil */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FAF7F0] to-[#F3ECE0] rounded-3xl p-5 sm:p-6 lg:p-7 border border-[#E6DECD] shadow-[0_10px_32px_-6px_rgba(20,25,35,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FAF7F0] to-[#F3ECE0] rounded-3xl p-5 sm:p-6 lg:p-7 border border-[#08090C]/15 shadow-[0_10px_32px_-6px_rgba(20,25,35,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* Halo de luz ámbar de fondo */}
             <div className="pointer-events-none absolute -right-10 -top-10 w-48 h-48 bg-[#C5A059]/15 rounded-full blur-3xl" />
 
@@ -1967,13 +1967,13 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
 
             {/* Selector de Período 30 Días / 3 Meses (Segmented Control Luxury) */}
-            <div className="relative z-10 w-full sm:w-auto p-1 bg-gradient-to-b from-stone-200/90 to-stone-200/60 rounded-2xl sm:rounded-full border border-stone-300/70 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-md grid grid-cols-2 sm:flex items-center gap-1 shrink-0">
+            <div className="relative z-10 w-full sm:w-auto p-1 bg-stone-200/80 rounded-2xl sm:rounded-full border border-stone-300/80 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-md grid grid-cols-2 sm:flex items-center gap-1 shrink-0">
               <button
                 type="button"
                 onClick={() => setCfPeriod('30d')}
                 className={`relative px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                   cfPeriod === '30d'
-                    ? 'bg-[#08090C] text-[#F0CF85] shadow-[0_3px_12px_-2px_rgba(8,9,12,0.4),0_1px_2px_rgba(8,9,12,0.2)] ring-1 ring-white/10 font-bold'
+                    ? 'bg-[#1E293B] hover:bg-slate-700 text-[#F0CF85] shadow-[0_3px_10px_-2px_rgba(30,41,59,0.35)] ring-1 ring-white/15 border border-slate-700/50 font-bold'
                     : 'text-stone-600 hover:text-slate-900 hover:bg-black/[0.03] font-medium'
                 }`}
               >
@@ -1986,7 +1986,7 @@ export const EcuaplacPortal: React.FC = () => {
                 onClick={() => setCfPeriod('3m')}
                 className={`relative px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                   cfPeriod === '3m'
-                    ? 'bg-[#08090C] text-[#F0CF85] shadow-[0_3px_12px_-2px_rgba(8,9,12,0.4),0_1px_2px_rgba(8,9,12,0.2)] ring-1 ring-white/10 font-bold'
+                    ? 'bg-[#1E293B] hover:bg-slate-700 text-[#F0CF85] shadow-[0_3px_10px_-2px_rgba(30,41,59,0.35)] ring-1 ring-white/15 border border-slate-700/50 font-bold'
                     : 'text-stone-600 hover:text-slate-900 hover:bg-black/[0.03] font-medium'
                 }`}
               >
@@ -1999,7 +1999,7 @@ export const EcuaplacPortal: React.FC = () => {
           {/* Bloque 1: Métricas Maestras (Visitantes y Presupuestos Reales de Ecuaplac) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             {/* KPI 1: Audiencia & Visitantes Reales */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-5 sm:p-6 border border-sky-100 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-4">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-5 sm:p-6 border border-[#08090C]/15 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-4">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-sky-400/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -2066,7 +2066,7 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
 
             {/* KPI 2: Solicitudes de Presupuesto (Leads de reformas de Ecuaplac) */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-emerald-100 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-[#08090C]/15 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -2108,7 +2108,7 @@ export const EcuaplacPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsLeadsModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold shadow-xs active:scale-95 transition-all group/btn font-sans cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold shadow-xs border border-slate-700/50 active:scale-95 transition-all group/btn font-sans cursor-pointer"
                   title="Abrir bandeja de presupuestos"
                 >
                   <span>Ver Bandeja</span>
@@ -2119,12 +2119,12 @@ export const EcuaplacPortal: React.FC = () => {
           </div>
 
           {/* Bloque: Facturas (Plegable / Escondidito por defecto con Scroll Suave Inteligente) */}
-          <div ref={facturasSectionRef} className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
+          <div ref={facturasSectionRef} className="bg-white/95 rounded-3xl border border-[#08090C]/15 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
             {/* Cabecera / Trigger de Facturas */}
             <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#0B111E] to-[#1E293B] text-[#C5A059] flex items-center justify-center border border-white/10 shadow-xs shrink-0">
-                  <Receipt className="w-5 h-5 text-[#C5A059]" />
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#1E293B] to-[#0F172A] text-[#C5A059] flex items-center justify-center border border-[#C5A059]/25 shadow-xs shrink-0">
+                  <FileText className="w-5 h-5 text-[#C5A059]" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -2147,7 +2147,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleToggleFacturas}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold active:scale-95 transition-all shadow-xs font-sans group cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold active:scale-95 transition-all shadow-xs border border-slate-700/50 font-sans group cursor-pointer shrink-0"
                 title={isFacturasOpen ? 'Ocultar panel de facturas' : 'Abrir facturas'}
               >
                 <span>{isFacturasOpen ? 'Ocultar Facturas' : 'Abrir Facturas'}</span>
@@ -2270,7 +2270,7 @@ export const EcuaplacPortal: React.FC = () => {
       ) : activeTab === 'obras' || activeTab === 'more_projects' ? (
         <div className="space-y-4 animate-tab-enter">
           {/* Cabecera Compacta y Elegante */}
-          <div className="bg-white/95 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.05)] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+          <div className="bg-white/95 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-[#08090C]/15 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.05)] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h2 className="text-xl sm:text-2xl font-semibold tracking-normal text-slate-950 font-display">
@@ -2318,7 +2318,7 @@ export const EcuaplacPortal: React.FC = () => {
 
           {/* Selector de Filtros iOS Style (Limpio y directo, sin buscador innecesario) */}
           <div className="flex items-center justify-between gap-2">
-            <div className="bg-stone-200/70 p-1 rounded-full flex items-center gap-1 border border-stone-300/50 shadow-inner">
+            <div className="bg-stone-200/70 p-1 rounded-full flex items-center gap-1 border border-[#08090C]/20 shadow-inner">
               <button
                 type="button"
                 onClick={() => setVisibilityFilter('all')}
@@ -2501,7 +2501,7 @@ export const EcuaplacPortal: React.FC = () => {
         /* Pestaña 4: Ajustes del Gestor (Diseño Pinterest After - Minimalista, iOS-Style y Elegante) */
         <div className="max-w-2xl mx-auto flex flex-col gap-4 pb-32 animate-tab-enter">
           {/* Card 1: Perfil Hero del Administrador */}
-          <div className="bg-white/95 rounded-3xl p-5 sm:p-6 border border-stone-200/80 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.06)] flex items-center gap-4 sm:gap-5">
+          <div className="bg-white/95 rounded-3xl p-5 sm:p-6 border border-[#08090C]/15 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.06)] flex items-center gap-4 sm:gap-5">
             {/* Avatar circular con badge de cámara */}
             <div
               onClick={() => avatarInputRef.current?.click()}
@@ -2549,7 +2549,7 @@ export const EcuaplacPortal: React.FC = () => {
                 {panelLang === 'es' ? 'Cuenta' : 'Account'}
               </h4>
             </div>
-            <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
+            <div className="bg-white/95 rounded-3xl border border-[#08090C]/15 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
               {/* Item 1: Gestionar Perfil */}
               <button
                 type="button"
@@ -2666,7 +2666,7 @@ export const EcuaplacPortal: React.FC = () => {
                 {panelLang === 'es' ? 'Sistema & Dispositivo' : 'System & Device'}
               </h4>
             </div>
-            <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
+            <div className="bg-white/95 rounded-3xl border border-[#08090C]/15 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
               {/* Item 1: Enviar Feedback o Reportar Problema a Musa */}
               <button
                 type="button"
