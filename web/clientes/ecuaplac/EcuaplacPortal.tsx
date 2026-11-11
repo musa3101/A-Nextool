@@ -64,6 +64,7 @@ import {
   Folder,
   FolderArchive,
   HardDrive,
+  Wrench,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
@@ -264,10 +265,6 @@ export const EcuaplacPortal: React.FC = () => {
     if (!res.success) {
       setLoginError(res.error || (panelLang === 'es' ? 'Error al iniciar sesión' : 'Sign in failed'));
     } else {
-      showSyncToast(
-        panelLang === 'es' ? 'Bienvenido a tu panel' : 'Welcome to your portal',
-        'success'
-      );
       addAuditLog('Sesión iniciada con éxito en el panel', 'Autenticación', 'success', 'auth');
     }
   };
@@ -689,13 +686,13 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '3.0.0';
+  const CURRENT_SYSTEM_VERSION = '3.0.1';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.0)
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.1)
     if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
@@ -955,6 +952,24 @@ export const EcuaplacPortal: React.FC = () => {
         if (facturasSectionRef.current) {
           const yOffset = -24;
           const y = facturasSectionRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 120);
+    }
+  };
+
+  // MyNext Care (Mantenimiento Web Plegable / Escondidito por defecto)
+  const [isCareOpen, setIsCareOpen] = useState(false);
+  const careSectionRef = useRef<HTMLDivElement>(null);
+
+  const handleToggleCare = () => {
+    const willOpen = !isCareOpen;
+    setIsCareOpen(willOpen);
+    if (willOpen) {
+      setTimeout(() => {
+        if (careSectionRef.current) {
+          const yOffset = -24;
+          const y = careSectionRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
           window.scrollTo({ top: y, behavior: 'smooth' });
         }
       }, 120);
@@ -1847,9 +1862,9 @@ export const EcuaplacPortal: React.FC = () => {
 
   return (
     <div className="w-full max-w-full min-w-0 bg-[#F4F1EA] min-h-screen text-slate-900 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-28">
-      {/* Toast Flotante de Sincronización en Tiempo Real */}
+      {/* Toast Flotante de Sincronización en Tiempo Real (Posicionado limpiamente bajo el header, sin tapar la cabecera) */}
       {syncToast && (
-        <div className="fixed top-3.5 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold font-sans border backdrop-blur-xl bg-[#08090C]/95 text-white border-[#C5A059]/40 select-none pointer-events-none">
+        <div className="fixed top-[calc(max(14px,env(safe-area-inset-top))+56px)] left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold font-sans border bg-[#08090C] text-white border-[#C5A059]/40 select-none pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
           {syncToast.type === 'syncing' ? (
             <RefreshCw className="w-3.5 h-3.5 text-[#F0CF85] animate-spin shrink-0" />
           ) : syncToast.type === 'success' ? (
@@ -1861,8 +1876,8 @@ export const EcuaplacPortal: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Header Oficial de Ecuaplac (Obsidian Black & Gold Trim - Safe Area Nítida) */}
-      <header className="sticky top-0 z-30 bg-[#08090C]/95 backdrop-blur-md border-b border-white/[0.08] shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(14px,env(safe-area-inset-top))] pb-3">
+      {/* 1. Header Oficial de Ecuaplac (Obsidian Black Sólido Puro 100% Nítido - Cero Difuminados) */}
+      <header className="sticky top-0 z-30 bg-[#08090C] border-b border-white/[0.08] shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(14px,env(safe-area-inset-top))] pb-3">
         <div className="w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10">
@@ -1948,7 +1963,7 @@ export const EcuaplacPortal: React.FC = () => {
         /* Pestaña 1: Inicio (Dashboard Ejecutivo Premium con Micro-Gradientes, Halos y Números Animados) */
         <div className="space-y-4 sm:space-y-5 animate-tab-enter">
           {/* Header de Bienvenida con Halos & Selector Táctil */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FAF7F0] to-[#F3ECE0] rounded-3xl p-5 sm:p-6 lg:p-7 border border-[#E6DECD] shadow-[0_10px_32px_-6px_rgba(20,25,35,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FAF7F0] to-[#F3ECE0] rounded-3xl p-5 sm:p-6 lg:p-7 border border-[#08090C]/30 shadow-[0_10px_32px_-6px_rgba(20,25,35,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* Halo de luz ámbar de fondo */}
             <div className="pointer-events-none absolute -right-10 -top-10 w-48 h-48 bg-[#C5A059]/15 rounded-full blur-3xl" />
 
@@ -1971,13 +1986,13 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
 
             {/* Selector de Período 30 Días / 3 Meses (Segmented Control Luxury) */}
-            <div className="relative z-10 w-full sm:w-auto p-1 bg-gradient-to-b from-stone-200/90 to-stone-200/60 rounded-2xl sm:rounded-full border border-stone-300/70 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-md grid grid-cols-2 sm:flex items-center gap-1 shrink-0">
+            <div className="relative z-10 w-full sm:w-auto p-1 bg-stone-200/80 rounded-2xl sm:rounded-full border border-stone-300/80 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(255,255,255,0.8)] backdrop-blur-md grid grid-cols-2 sm:flex items-center gap-1 shrink-0">
               <button
                 type="button"
                 onClick={() => setCfPeriod('30d')}
                 className={`relative px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                   cfPeriod === '30d'
-                    ? 'bg-[#08090C] text-[#F0CF85] shadow-[0_3px_12px_-2px_rgba(8,9,12,0.4),0_1px_2px_rgba(8,9,12,0.2)] ring-1 ring-white/10 font-bold'
+                    ? 'bg-[#1E293B] hover:bg-slate-700 text-[#F0CF85] shadow-[0_3px_10px_-2px_rgba(30,41,59,0.35)] ring-1 ring-white/15 border border-slate-700/50 font-bold'
                     : 'text-stone-600 hover:text-slate-900 hover:bg-black/[0.03] font-medium'
                 }`}
               >
@@ -1990,7 +2005,7 @@ export const EcuaplacPortal: React.FC = () => {
                 onClick={() => setCfPeriod('3m')}
                 className={`relative px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                   cfPeriod === '3m'
-                    ? 'bg-[#08090C] text-[#F0CF85] shadow-[0_3px_12px_-2px_rgba(8,9,12,0.4),0_1px_2px_rgba(8,9,12,0.2)] ring-1 ring-white/10 font-bold'
+                    ? 'bg-[#1E293B] hover:bg-slate-700 text-[#F0CF85] shadow-[0_3px_10px_-2px_rgba(30,41,59,0.35)] ring-1 ring-white/15 border border-slate-700/50 font-bold'
                     : 'text-stone-600 hover:text-slate-900 hover:bg-black/[0.03] font-medium'
                 }`}
               >
@@ -2003,7 +2018,7 @@ export const EcuaplacPortal: React.FC = () => {
           {/* Bloque 1: Métricas Maestras (Visitantes y Presupuestos Reales de Ecuaplac) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             {/* KPI 1: Audiencia & Visitantes Reales */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-5 sm:p-6 border border-sky-100 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-4">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-4">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-sky-400/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -2012,10 +2027,6 @@ export const EcuaplacPortal: React.FC = () => {
                   <Users className="w-6 h-6" />
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-[11px] font-semibold shadow-xs">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Real (sin bots)</span>
-                  </span>
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-800 text-[11px] font-semibold shadow-xs">
                     <TrendingUp className="w-3.5 h-3.5 text-sky-600" />
                     <span>{cfMetrics.trendPercentage}</span>
@@ -2043,9 +2054,9 @@ export const EcuaplacPortal: React.FC = () => {
                 </span>
               </div>
 
-              {/* Visualización de Actividad y Sello de Auditoría */}
-              <div className="pt-2 border-t border-sky-100/80 space-y-2 relative z-10">
-                <div className="flex items-end justify-between gap-1.5 h-6 lg:h-8">
+              {/* Visualización de Actividad con Espaciado Generoso */}
+              <div className="pt-2.5 border-t border-sky-100/80 space-y-1.5 relative z-10">
+                <div className="flex items-end justify-between gap-1.5 h-6 lg:h-7">
                   {[35, 60, 50, 75, 65, 90, 100].map((height, i) => (
                     <div
                       key={i}
@@ -2057,20 +2068,14 @@ export const EcuaplacPortal: React.FC = () => {
                     />
                   ))}
                 </div>
-                <div className="flex items-center justify-between text-[10.5px] text-stone-400 font-medium pt-1 border-t border-sky-50">
-                  <span className="flex items-center gap-1 text-slate-600">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                    <span>Humanos en ecuaplac.com</span>
-                  </span>
-                  <span className="font-mono text-[10px] text-stone-400">
-                    {cfMetrics.updatedAt ? formatLogTime(cfMetrics.updatedAt) : 'Verificado hoy'}
-                  </span>
+                <div className="flex items-center justify-end text-[10px] text-stone-400 font-mono pt-1">
+                  <span>{cfMetrics.updatedAt ? formatLogTime(cfMetrics.updatedAt) : 'Verificado hoy'}</span>
                 </div>
               </div>
             </div>
 
             {/* KPI 2: Solicitudes de Presupuesto (Leads de reformas de Ecuaplac) */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-emerald-100 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -2112,7 +2117,7 @@ export const EcuaplacPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsLeadsModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold shadow-xs active:scale-95 transition-all group/btn font-sans cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold shadow-xs border border-slate-700/50 active:scale-95 transition-all group/btn font-sans cursor-pointer"
                   title="Abrir bandeja de presupuestos"
                 >
                   <span>Ver Bandeja</span>
@@ -2123,12 +2128,12 @@ export const EcuaplacPortal: React.FC = () => {
           </div>
 
           {/* Bloque: Facturas (Plegable / Escondidito por defecto con Scroll Suave Inteligente) */}
-          <div ref={facturasSectionRef} className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
+          <div ref={facturasSectionRef} className="bg-white/95 rounded-3xl border border-[#08090C]/30 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
             {/* Cabecera / Trigger de Facturas */}
             <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#0B111E] to-[#1E293B] text-[#C5A059] flex items-center justify-center border border-white/10 shadow-xs shrink-0">
-                  <Receipt className="w-5 h-5 text-[#C5A059]" />
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#1E293B] to-[#0F172A] text-[#C5A059] flex items-center justify-center border border-[#C5A059]/25 shadow-xs shrink-0">
+                  <FileText className="w-5 h-5 text-[#C5A059]" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -2151,7 +2156,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleToggleFacturas}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold active:scale-95 transition-all shadow-xs font-sans group cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold active:scale-95 transition-all shadow-xs border border-slate-700/50 font-sans group cursor-pointer shrink-0"
                 title={isFacturasOpen ? 'Ocultar panel de facturas' : 'Abrir facturas'}
               >
                 <span>{isFacturasOpen ? 'Ocultar Facturas' : 'Abrir Facturas'}</span>
@@ -2270,11 +2275,115 @@ export const EcuaplacPortal: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Bloque: MyNext Care (Mantenimiento Web Plegable / Limpio y Responsive) */}
+          <div ref={careSectionRef} className="bg-white/95 rounded-3xl border border-[#08090C]/30 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
+            {/* Cabecera / Trigger de MyNext Care */}
+            <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-white border border-[#08090C]/15 shadow-xs flex items-center justify-center p-1.5 shrink-0 overflow-hidden">
+                  <img
+                    src="/icons/mynext-care-icon.png"
+                    alt="MyNext Care"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-950 font-display tracking-tight">
+                      MyNext Care
+                    </h3>
+                    <span className="shrink-0 whitespace-nowrap px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[10px] font-bold font-sans flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>{panelLang === 'es' ? 'Activo' : 'Active'}</span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-500 font-normal font-sans mt-0.5 truncate">
+                    {panelLang === 'es' ? 'Mantenimiento de web y estado del sistema' : 'Website maintenance and system health'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Botón Abrir / Ocultar MyNext Care */}
+              <button
+                type="button"
+                onClick={handleToggleCare}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold active:scale-95 transition-all shadow-xs border border-slate-700/50 font-sans group cursor-pointer shrink-0"
+                title={isCareOpen ? 'Ocultar detalles de MyNext Care' : 'Ver información de MyNext Care'}
+              >
+                <span>{isCareOpen ? (panelLang === 'es' ? 'Ocultar' : 'Hide') : (panelLang === 'es' ? 'Ver Detalles' : 'Ver Detalles')}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-[#C5A059] transition-transform duration-200 ${
+                    isCareOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Panel Desplegable de Mantenimiento */}
+            {isCareOpen && (
+              <div className="border-t border-stone-100 p-4 sm:p-5 pt-3.5 space-y-3 bg-stone-50/50 animate-in fade-in slide-in-from-top-2 duration-250">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Tarjeta A: Lanzamiento de Web */}
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-stone-200/80 shadow-xs flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-sky-50 border border-sky-200/70 flex items-center justify-center text-sky-600 shrink-0 mt-0.5">
+                      <Globe className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block font-sans">
+                        {panelLang === 'es' ? 'Lanzamiento de web' : 'Website Launch'}
+                      </span>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 block mt-0.5 font-display">
+                        07/06/2026
+                      </span>
+                      <span className="text-xs text-stone-500 font-normal font-sans mt-0.5 block">
+                        Web oficial en producción · Cloudflare CDN
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta B: Mantenimiento de Web */}
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-stone-200/80 shadow-xs flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-[#B38E46] shrink-0 mt-0.5">
+                      <Wrench className="w-4 h-4 text-[#C5A059]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block font-sans">
+                          {panelLang === 'es' ? 'Mantenimiento de web' : 'Web Maintenance'}
+                        </span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                          Trabajo
+                        </span>
+                      </div>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 block mt-0.5 font-display">
+                        11/11/2026
+                      </span>
+                      <span className="text-xs text-stone-500 font-normal font-sans mt-0.5 block">
+                        Optimización v3.0, Caché Edge & Seguridad PWA
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pie de Garantía MyNext */}
+                <div className="pt-2 flex items-center justify-between text-[11px] text-stone-500 font-medium px-1 flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>{panelLang === 'es' ? 'Garantía técnica y soporte continuo por Musa' : 'Technical warranty and continuous support by Musa'}</span>
+                  </div>
+                  <span className="font-mono text-[10.5px] text-stone-400">
+                    MyNext Care Plan
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       ) : activeTab === 'obras' || activeTab === 'more_projects' ? (
         <div className="space-y-4 animate-tab-enter">
           {/* Cabecera Compacta y Elegante */}
-          <div className="bg-white/95 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.05)] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+          <div className="bg-white/95 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-[#08090C]/30 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.05)] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h2 className="text-xl sm:text-2xl font-semibold tracking-normal text-slate-950 font-display">
@@ -2322,7 +2431,7 @@ export const EcuaplacPortal: React.FC = () => {
 
           {/* Selector de Filtros iOS Style (Limpio y directo, sin buscador innecesario) */}
           <div className="flex items-center justify-between gap-2">
-            <div className="bg-stone-200/70 p-1 rounded-full flex items-center gap-1 border border-stone-300/50 shadow-inner">
+            <div className="bg-stone-200/70 p-1 rounded-full flex items-center gap-1 border border-[#08090C]/35 shadow-inner">
               <button
                 type="button"
                 onClick={() => setVisibilityFilter('all')}
@@ -2505,7 +2614,7 @@ export const EcuaplacPortal: React.FC = () => {
         /* Pestaña 4: Ajustes del Gestor (Diseño Pinterest After - Minimalista, iOS-Style y Elegante) */
         <div className="max-w-2xl mx-auto flex flex-col gap-4 pb-32 animate-tab-enter">
           {/* Card 1: Perfil Hero del Administrador */}
-          <div className="bg-white/95 rounded-3xl p-5 sm:p-6 border border-stone-200/80 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.06)] flex items-center gap-4 sm:gap-5">
+          <div className="bg-white/95 rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.06)] flex items-center gap-4 sm:gap-5">
             {/* Avatar circular con badge de cámara */}
             <div
               onClick={() => avatarInputRef.current?.click()}
@@ -2553,7 +2662,7 @@ export const EcuaplacPortal: React.FC = () => {
                 {panelLang === 'es' ? 'Cuenta' : 'Account'}
               </h4>
             </div>
-            <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
+            <div className="bg-white/95 rounded-3xl border border-[#08090C]/30 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
               {/* Item 1: Gestionar Perfil */}
               <button
                 type="button"
@@ -2670,7 +2779,7 @@ export const EcuaplacPortal: React.FC = () => {
                 {panelLang === 'es' ? 'Sistema & Dispositivo' : 'System & Device'}
               </h4>
             </div>
-            <div className="bg-white/95 rounded-3xl border border-stone-200/80 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
+            <div className="bg-white/95 rounded-3xl border border-[#08090C]/30 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden divide-y divide-stone-100">
               {/* Item 1: Enviar Feedback o Reportar Problema a Musa */}
               <button
                 type="button"
