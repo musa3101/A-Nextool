@@ -264,10 +264,6 @@ export const EcuaplacPortal: React.FC = () => {
     if (!res.success) {
       setLoginError(res.error || (panelLang === 'es' ? 'Error al iniciar sesión' : 'Sign in failed'));
     } else {
-      showSyncToast(
-        panelLang === 'es' ? 'Bienvenido a tu panel' : 'Welcome to your portal',
-        'success'
-      );
       addAuditLog('Sesión iniciada con éxito en el panel', 'Autenticación', 'success', 'auth');
     }
   };
@@ -1847,9 +1843,9 @@ export const EcuaplacPortal: React.FC = () => {
 
   return (
     <div className="w-full max-w-full min-w-0 bg-[#F4F1EA] min-h-screen text-slate-900 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-28">
-      {/* Toast Flotante de Sincronización en Tiempo Real */}
+      {/* Toast Flotante de Sincronización en Tiempo Real (Posicionado limpiamente bajo el header, sin tapar la cabecera) */}
       {syncToast && (
-        <div className="fixed top-3.5 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold font-sans border backdrop-blur-xl bg-[#08090C]/95 text-white border-[#C5A059]/40 select-none pointer-events-none">
+        <div className="fixed top-[calc(max(14px,env(safe-area-inset-top))+56px)] left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold font-sans border bg-[#08090C] text-white border-[#C5A059]/40 select-none pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
           {syncToast.type === 'syncing' ? (
             <RefreshCw className="w-3.5 h-3.5 text-[#F0CF85] animate-spin shrink-0" />
           ) : syncToast.type === 'success' ? (
@@ -1861,8 +1857,8 @@ export const EcuaplacPortal: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Header Oficial de Ecuaplac (Obsidian Black & Gold Trim - Safe Area Nítida) */}
-      <header className="sticky top-0 z-30 bg-[#08090C]/95 backdrop-blur-md border-b border-white/[0.08] shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(14px,env(safe-area-inset-top))] pb-3">
+      {/* 1. Header Oficial de Ecuaplac (Obsidian Black Sólido Puro 100% Nítido - Cero Difuminados) */}
+      <header className="sticky top-0 z-30 bg-[#08090C] border-b border-white/[0.08] shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(14px,env(safe-area-inset-top))] pb-3">
         <div className="w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10">
