@@ -2,7 +2,7 @@
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
   "owner": "Jose (José Rivadeneira)",
-  "version": "3.0.1",
+  "version": "3.0.5",
   "last_updated": "2026-11-11",
   "status": "active",
   "route": "/ecuaplac",
@@ -10,12 +10,21 @@
     "galerias_obras",
     "leads_presupuestos_gmail_style",
     "ajustes_perfil",
+    "contacto_web_supabase",
     "analytics_cloudflare_rum",
     "desktop_floating_dock",
     "fontshare_clash_satoshi",
     "animated_21st_camera_dock",
     "obsidian_black_theme",
     "tactile_borders_30",
-    "mynext_care_status"
+    "mynext_care_status",
+    "notificaciones_sonido_chime",
+    "metricas_mensuales_rum"
+  ],
+  "changes": [
+    "Nuevo panel de Contacto de la Web sincronizado con Supabase",
+    "Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo",
+    "Notificaciones en tiempo real y sonido acústico para nuevos presupuestos",
+    "Sincronización mensual y trimestral de visitas reales en Inicio"
   ]
 }

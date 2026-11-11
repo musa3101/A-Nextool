@@ -23,6 +23,149 @@ export interface EcuaplacLeadItem {
   status: 'new' | 'contacted' | 'approved' | 'closed';
   date: string;
   notes?: string;
+  service?: string;
+  sqm?: string;
+  location?: string;
+  photo_url?: string;
+  client_message?: string;
+  raw_message?: string;
+  source_channel?: 'tally' | 'gmail' | 'web';
+}
+
+export interface ParsedLeadDetails {
+  service: string;
+  sqm?: string;
+  location?: string;
+  photoUrl?: string;
+  clientMessage?: string;
+  sourceChannel: 'tally' | 'gmail' | 'web';
+  rawMessage: string;
+}
+
+export interface EcuaplacContactItem {
+  id: string;
+  key: string;
+  name_es: string;
+  name_en?: string;
+  value_es: string;
+  value_en?: string;
+  icon?: string;
+  active?: boolean;
+  sort_order?: number;
+}
+
+export const DEFAULT_CONTACTS: EcuaplacContactItem[] = [
+  {
+    id: '943c15d2-d94b-4e9c-add9-c9c75e85f6ae',
+    key: 'goyo',
+    name_es: 'José Rivadeneira',
+    name_en: 'José Rivadeneira',
+    value_es: '+34 678 15 98 78',
+    value_en: '+34 678 15 98 78',
+    icon: 'phone',
+    active: true,
+    sort_order: 20,
+  },
+  {
+    id: 'ecb03840-43ef-418e-9a35-c597b871cb44',
+    key: 'Jofrre',
+    name_es: 'Joffre Méndez',
+    name_en: 'Joffre Méndez',
+    value_es: '+34 603 40 44 50',
+    value_en: '+34 603 40 44 50',
+    icon: 'phone',
+    active: true,
+    sort_order: 30,
+  },
+  {
+    id: '5c5fce03-e747-490c-9451-158a9ce5f6c2',
+    key: 'email',
+    name_es: 'Email',
+    name_en: 'Email',
+    value_es: 'ecuaplac.jyg.sl@gmail.com',
+    value_en: 'ecuaplac.jyg.sl@gmail.com',
+    icon: 'mail',
+    active: true,
+    sort_order: 40,
+  },
+  {
+    id: '2e7202f5-82bf-4b86-a319-34e3e09aeee0',
+    key: 'address',
+    name_es: 'Dirección de Proyectos',
+    name_en: 'Project Management',
+    value_es: 'Palma de Mallorca, Islas Baleares',
+    value_en: 'Palma de Mallorca, Balearic Islands',
+    icon: 'map-pin',
+    active: true,
+    sort_order: 10,
+  },
+];
+
+/**
+ * Analizador inteligente de mensajes de leads procedentes de Tally.so, Gmail o formularios web
+ */
+export function parseLeadDetails(rawMsg: string = '', rawProjectType: string = ''): ParsedLeadDetails {
+  const msg = rawMsg || '';
+  const isTally = msg.includes('TALLY.SO') || msg.includes('DETALLES DEL PROYECTO');
+  const isGmail = msg.toLowerCase().includes('gmail') || msg.toLowerCase().includes('enviado desde');
+  const sourceChannel: 'tally' | 'gmail' | 'web' = isTally ? 'tally' : isGmail ? 'gmail' : 'web';
+
+  const isUuid = (str: string) => /^[0-9a-fA-F-]{36}$/.test((str || '').trim());
+
+  let service = '';
+  const serviceMatch = msg.match(/¿Qué servicio necesitas\?:\s*([^\n\r]+)/i);
+  if (serviceMatch && !isUuid(serviceMatch[1])) {
+    service = serviceMatch[1].trim();
+  } else if (rawProjectType && !isUuid(rawProjectType)) {
+    service = rawProjectType.trim();
+  } else {
+    service = 'Reforma Integral';
+  }
+
+  let sqm: string | undefined = undefined;
+  const sqmMatch = msg.match(/Metros cuadrados aproximados[^:]*:\s*([^\n\r]+)/i);
+  if (sqmMatch) {
+    let s = sqmMatch[1].trim();
+    if (!s.endsWith('m²') && !s.toLowerCase().endsWith('m2')) {
+      s += ' m²';
+    }
+    sqm = s;
+  }
+
+  let location: string | undefined = undefined;
+  const locMatch = msg.match(/Municipio de Mallorca:\s*([^\n\r]+)/i);
+  if (locMatch) {
+    const val = locMatch[1].trim();
+    location = isUuid(val) ? 'Mallorca' : val;
+  } else {
+    location = 'Mallorca';
+  }
+
+  let photoUrl: string | undefined = undefined;
+  const photoMatch = msg.match(/Sube una foto o plano[^:]*:\s*(https?:\/\/[^\s\n\r]+)/i);
+  if (photoMatch) {
+    photoUrl = photoMatch[1].trim();
+  }
+
+  let clientMessage: string | undefined = undefined;
+  if (isTally) {
+    const noteMatch = msg.match(/Cuéntanos los detalles[^:]*:\s*([^\n\r]+)/i);
+    if (noteMatch) {
+      clientMessage = noteMatch[1].trim();
+    }
+  } else {
+    clientMessage = msg.trim();
+  }
+
+  return {
+    service,
+    sqm,
+    location,
+    photoUrl,
+    clientMessage,
+    sourceChannel,
+    rawMessage: msg,
+  };
 }
 
 export interface EcuaplacAuditLog {
@@ -82,6 +225,21 @@ export interface CloudflareMetrics {
   isPositiveTrend: boolean;
   status: 'optimal' | 'warning' | 'syncing';
   updatedAt?: string;
+  closingInfo?: {
+    type: 'official_month_close' | 'monthly_progress';
+    closedMonth: {
+      name: string;
+      visits: number;
+      pageViews: number;
+      period: string;
+    };
+    currentMonth: {
+      name: string;
+      visits: number;
+      pageViews: number;
+      period: string;
+    };
+  };
 }
 
 export const CLOUDFLARE_ANALYTICS_DATA: Record<'30d' | '3m', CloudflareMetrics> = {
@@ -147,8 +305,35 @@ export class EcuaplacConnector {
   private storageKeyWorks = 'ecuaplac_works_data';
   private storageKeyMoreProjects = 'ecuaplac_more_projects_data';
   private storageKeyLeads = 'ecuaplac_leads_data';
+  private storageKeyDismissedLeads = 'ecuaplac_dismissed_leads_ids';
   private storageKeyProfile = 'ecuaplac_profile_data';
+  private storageKeyContacts = 'ecuaplac_contacts_data';
   private storageKeyCloudflare = 'ecuaplac_cf_rum_v2';
+
+  getDismissedLeadIds(): string[] {
+    try {
+      const data = localStorage.getItem(this.storageKeyDismissedLeads);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  saveDismissedLeadIds(ids: string[]): void {
+    try {
+      localStorage.setItem(this.storageKeyDismissedLeads, JSON.stringify(ids));
+    } catch {
+      // ignore
+    }
+  }
+
+  clearDismissedLeadIds(): void {
+    try {
+      localStorage.removeItem(this.storageKeyDismissedLeads);
+    } catch {
+      // ignore
+    }
+  }
 
   private getHeaders(extraHeaders: Record<string, string> = {}) {
     return {
@@ -473,30 +658,44 @@ export class EcuaplacConnector {
   async fetchLeadsOnline(): Promise<EcuaplacLeadItem[]> {
     // 1. Intentar consultar Supabase (leads generados en la web pública ecuaplac.com)
     try {
-      const res = await fetch(`${this.url}/rest/v1/${this.tables.leads}?select=*&order=created_at.desc`, {
+      const res = await fetch(`${this.url}/rest/v1/${this.tables.leads}?select=*&order=created_at.desc&_t=${Date.now()}`, {
         headers: this.getHeaders(),
+        cache: 'no-store',
       });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const mapped: EcuaplacLeadItem[] = data.map((d: any) => ({
-            id: d.id,
-            name: d.name || d.client_name || 'Cliente sin nombre',
-            phone: d.phone || d.client_phone || '',
-            email: d.email || d.client_email || '',
-            work_type: d.message || d.work_type || d.service_type || 'Solicitud de presupuesto',
-            budget_estimate: d.budget_estimate || (d.budget_estimated ? `${d.budget_estimated} €` : ''),
-            status: d.status === 'aprobado' || d.status === 'approved' ? 'approved' : d.status === 'contactado' || d.status === 'contacted' ? 'contacted' : 'new',
-            date: d.created_at
-              ? new Date(d.created_at).toLocaleDateString([], {
-                day: '2-digit',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-              : 'Hoy',
-            notes: d.notes || '',
-          }));
+        if (Array.isArray(data)) {
+          const dismissed = this.getDismissedLeadIds();
+          const mapped: EcuaplacLeadItem[] = data
+            .filter((d: any) => !dismissed.includes(d.id))
+            .map((d: any) => {
+              const parsed = parseLeadDetails(d.message || d.work_type || '', d.project_type || '');
+              return {
+                id: d.id,
+                name: d.name || d.client_name || 'Cliente sin nombre',
+                phone: d.phone || d.client_phone || '',
+                email: d.email || d.client_email || '',
+                work_type: parsed.service,
+                budget_estimate: d.budget_estimate || (d.budget_estimated ? `${d.budget_estimated} €` : ''),
+                status: d.status === 'aprobado' || d.status === 'approved' ? 'approved' : d.status === 'contactado' || d.status === 'contacted' ? 'contacted' : 'new',
+                date: d.created_at
+                  ? new Date(d.created_at).toLocaleDateString([], {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                  : 'Hoy',
+                notes: d.notes || '',
+                service: parsed.service,
+                sqm: parsed.sqm,
+                location: parsed.location,
+                photo_url: parsed.photoUrl,
+                client_message: parsed.clientMessage,
+                raw_message: d.message || '',
+                source_channel: parsed.sourceChannel,
+              };
+            });
           this.saveLeads(mapped);
           return mapped;
         }
@@ -569,24 +768,100 @@ export class EcuaplacConnector {
   }
 
   /**
-   * Elimina un lead (local + Supabase + InsForge)
+   * Elimina un lead ÚNICAMENTE del panel de NexTool (protegiendo Supabase 100% intacto)
    */
   async deleteLead(leadId: string): Promise<boolean> {
+    const dismissed = this.getDismissedLeadIds();
+    if (!dismissed.includes(leadId)) {
+      dismissed.push(leadId);
+      this.saveDismissedLeadIds(dismissed);
+    }
+
     const leads = this.getLeads();
     const filtered = leads.filter((l) => l.id !== leadId);
     this.saveLeads(filtered);
 
-    try {
-      await fetch(`${this.url}/rest/v1/${this.tables.leads}?id=eq.${leadId}`, {
-        method: 'DELETE',
-        headers: this.getHeaders(),
-      });
-      await insforge.database.from('leads').delete().eq('id', leadId).eq('tenant_id', ECUAPLAC_TENANT_ID);
-      await this.addAuditLog('delete', `Lead eliminado con éxito (ID ${leadId})`);
-    } catch {
-      // Silencioso
-    }
+    // SEGURIDAD: CERO llamadas DELETE a Supabase.
+    // La base de datos de producción ecuaplac_leads queda inmutable y protegida como histórico.
+    await this.addAuditLog('delete', `Lead archivado localmente en el panel (ID ${leadId})`);
     return true;
+  }
+
+  /**
+   * Obtiene los contactos de la web oficial guardados localmente
+   */
+  getContacts(fallback: EcuaplacContactItem[] = DEFAULT_CONTACTS): EcuaplacContactItem[] {
+    try {
+      const cached = localStorage.getItem(this.storageKeyContacts);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Error al leer caché local de contactos:', e);
+    }
+    return fallback;
+  }
+
+  /**
+   * Guarda los contactos de la web en caché local
+   */
+  saveContacts(contacts: EcuaplacContactItem[]): void {
+    try {
+      localStorage.setItem(this.storageKeyContacts, JSON.stringify(contacts));
+    } catch (e) {
+      console.error('Error al persistir contactos:', e);
+    }
+  }
+
+  /**
+   * Consulta los contactos en vivo desde Supabase (tabla ecuaplac_contact)
+   */
+  async fetchContactsOnline(): Promise<EcuaplacContactItem[]> {
+    try {
+      const contactTable = this.tables.contact || 'ecuaplac_contact';
+      const res = await fetch(`${this.url}/rest/v1/${contactTable}?select=*&order=sort_order.asc&_t=${Date.now()}`, {
+        headers: this.getHeaders(),
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          this.saveContacts(data);
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('Fallo de red al consultar contactos en Supabase:', e);
+    }
+    return this.getContacts();
+  }
+
+  /**
+   * Actualiza un elemento de contacto en Supabase (ecuaplac_contact) y en local
+   */
+  async updateContactItem(id: string, updates: Partial<EcuaplacContactItem>): Promise<boolean> {
+    const contacts = this.getContacts();
+    const updated = contacts.map((c) => (c.id === id ? { ...c, ...updates } : c));
+    this.saveContacts(updated);
+
+    try {
+      const contactTable = this.tables.contact || 'ecuaplac_contact';
+      const res = await fetch(`${this.url}/rest/v1/${contactTable}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        await this.addAuditLog('update', `Contacto web actualizado para ID ${id}`);
+        return true;
+      }
+    } catch (e) {
+      console.error('Error al actualizar contacto en Supabase:', e);
+    }
+    return false;
   }
 
   /**

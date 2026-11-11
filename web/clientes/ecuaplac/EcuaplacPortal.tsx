@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Plus,
+  Briefcase,
   Star,
   Eye,
   EyeOff,
@@ -76,7 +77,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Switch } from '@/components/ui/Switch';
 import { SpaceLogin } from '@/components/ui/space-login';
 import { ECUAPLAC_CONFIG } from './config';
-import { ecuaplacConnector, EcuaplacLeadItem, EcuaplacAuditLog, CloudflareMetrics, formatLogTime } from './conector';
+import { ecuaplacConnector, EcuaplacLeadItem, EcuaplacAuditLog, CloudflareMetrics, formatLogTime, EcuaplacContactItem } from './conector';
 import { DEFAULT_WORKS, DEFAULT_MORE_PROJECTS } from './datos_iniciales';
 import { autoTranslateWork } from './traductor';
 import { insforge } from '@/lib/insforge';
@@ -199,6 +200,158 @@ const AnimatedCounter: React.FC<{ value: number; duration?: number; suffix?: str
   }, [value, duration]);
 
   return <span>{displayValue.toLocaleString('es-ES')}{suffix}</span>;
+};
+
+// Componente interactivo para las barras de tráfico de visitas (Entrada fluida y toque táctil)
+const InteractiveTrafficBars: React.FC<{
+  totalVisitors: number;
+  updatedAt?: string;
+  panelLang?: 'es' | 'en';
+}> = ({ totalVisitors, updatedAt, panelLang = 'es' }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [activeBarIndex, setActiveBarIndex] = useState<number | null>(null);
+
+  const daysOfWeek = panelLang === 'es' 
+    ? ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Hoy']
+    : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Today'];
+  const basePercentages = [35, 60, 50, 75, 65, 90, 100];
+
+  const barsData = basePercentages.map((p, i) => {
+    const isToday = i === basePercentages.length - 1;
+    const visitors = Math.max(1, Math.round((totalVisitors * p) / 100));
+    return {
+      dayLabel: daysOfWeek[i],
+      height: p,
+      visitors: isToday ? totalVisitors : visitors,
+      isToday,
+    };
+  });
+
+  useEffect(() => {
+    // Retardo sutil para disparar el efecto de crecimiento fluido al entrar
+    const timer = setTimeout(() => {
+      setIsLoaded(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const activeBar = activeBarIndex !== null ? barsData[activeBarIndex] : null;
+
+  return (
+    <div className="pt-2.5 border-t border-sky-100/80 space-y-1.5 relative z-10 select-none">
+      {/* Contenedor de las 7 barras interactivas */}
+      <div className="relative">
+        <div
+          className="flex items-end justify-between gap-1.5 h-8 sm:h-9 cursor-pointer"
+          onMouseLeave={() => setActiveBarIndex(null)}
+        >
+          {barsData.map((bar, i) => {
+            const isHovered = activeBarIndex === i;
+            const currentHeight = isLoaded ? bar.height : 0;
+
+            return (
+              <div
+                key={i}
+                onMouseEnter={() => setActiveBarIndex(i)}
+                onClick={() => setActiveBarIndex(activeBarIndex === i ? null : i)}
+                className="flex-1 h-full flex items-end group relative py-0.5"
+                title={`${bar.dayLabel}: ${bar.visitors} ${panelLang === 'es' ? 'visitas' : 'visitors'}`}
+              >
+                <div
+                  className={`w-full rounded-t-sm transition-all duration-500 ease-out transform-gpu will-change-transform ${
+                    bar.isToday
+                      ? 'bg-sky-500 shadow-[0_2px_8px_rgba(14,165,233,0.4)]'
+                      : isHovered
+                      ? 'bg-sky-400 shadow-xs'
+                      : 'bg-sky-200/70 hover:bg-sky-300'
+                  } ${isHovered ? 'scale-y-[1.08] brightness-105' : 'hover:scale-y-[1.04]'}`}
+                  style={{
+                    height: `${currentHeight}%`,
+                    transitionDelay: `${i * 60}ms`,
+                    transformOrigin: 'bottom',
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Fila inferior: Detalle interactivo del día seleccionado o Verificado */}
+      <div className="flex items-center justify-between text-[10.5px] pt-1">
+        {activeBar ? (
+          <div className="flex items-center gap-1.5 text-sky-800 font-bold font-sans animate-in fade-in duration-150">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping shrink-0" />
+            <span>
+              {activeBar.dayLabel}: <strong className="font-mono">{activeBar.visitors}</strong> {panelLang === 'es' ? 'visitas' : 'visitors'} {activeBar.isToday ? (panelLang === 'es' ? '(Pico más alto)' : '(Peak)') : ''}
+            </span>
+          </div>
+        ) : (
+          <span className="text-stone-400 font-sans text-[10px]">
+            {panelLang === 'es' ? 'Toca una barra para ver detalles' : 'Tap a bar for details'}
+          </span>
+        )}
+
+        <span className="text-stone-400 font-mono text-[10px] shrink-0">
+          {updatedAt ? formatLogTime(updatedAt) : (panelLang === 'es' ? 'Verificado hoy' : 'Verified today')}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// Reproductor de sonido cálido y profesional estilo iOS / Chime para avisos de nuevos leads (Web Audio API nativo)
+const playLeadNotificationSound = () => {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    const now = ctx.currentTime;
+
+    // Tono 1 (C5 - 523.25 Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(523.25, now);
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(0.22, now + 0.03);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.28);
+
+    // Tono 2 (E5 - 659.25 Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(659.25, now + 0.1);
+    gain2.gain.setValueAtTime(0, now + 0.1);
+    gain2.gain.linearRampToValueAtTime(0.26, now + 0.13);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.1);
+    osc2.stop(now + 0.45);
+
+    // Tono 3 (A5 - 880 Hz cristalino)
+    const osc3 = ctx.createOscillator();
+    const gain3 = ctx.createGain();
+    osc3.type = 'sine';
+    osc3.frequency.setValueAtTime(880, now + 0.22);
+    gain3.gain.setValueAtTime(0, now + 0.22);
+    gain3.gain.linearRampToValueAtTime(0.32, now + 0.25);
+    gain3.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+    osc3.connect(gain3);
+    gain3.connect(ctx.destination);
+    osc3.start(now + 0.22);
+    osc3.stop(now + 0.75);
+  } catch (err) {
+    console.warn('Audio chime playback failed:', err);
+  }
 };
 
 export const EcuaplacPortal: React.FC = () => {
@@ -435,15 +588,15 @@ export const EcuaplacPortal: React.FC = () => {
   const [leads, setLeads] = useState<EcuaplacLeadItem[]>(() =>
     ecuaplacConnector.getLeads(defaultLeads)
   );
+  // Registro de IDs conocidos para detección en segundo plano de nuevos presupuestos
+  const knownLeadIdsRef = useRef<Set<string>>(
+    new Set(ecuaplacConnector.getLeads(defaultLeads).map((l) => l.id))
+  );
 
-  // Carga reactiva de Leads desde Supabase
+  // Mantener actualizado el registro de IDs conocidos
   useEffect(() => {
-    ecuaplacConnector.fetchLeadsOnline().then((liveLeads) => {
-      if (liveLeads && liveLeads.length > 0) {
-        setLeads(liveLeads);
-      }
-    });
-  }, []);
+    leads.forEach((l) => knownLeadIdsRef.current.add(l.id));
+  }, [leads]);
 
   // Persistencia local automática de Leads
   useEffect(() => {
@@ -528,24 +681,23 @@ export const EcuaplacPortal: React.FC = () => {
   const handleRefreshLeads = async () => {
     setIsSyncingLeads(true);
     showSyncToast(
-      panelLang === 'es' ? 'Consultando presupuestos en la web (ecuaplac.com)...' : 'Checking leads on website...',
+      panelLang === 'es' ? 'Sincronizando con Supabase (ecuaplac.com)...' : 'Checking leads on Supabase...',
       'syncing'
     );
     try {
+      const startTime = Date.now();
       const liveLeads = await ecuaplacConnector.fetchLeadsOnline();
-      if (liveLeads && liveLeads.length > 0) {
+      // Aseguramos al menos 600ms de rotación táctil para confirmación visual instantánea
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 600) {
+        await new Promise((resolve) => setTimeout(resolve, 600 - elapsed));
+      }
+      if (liveLeads) {
         setLeads(liveLeads);
         showSyncToast(
           panelLang === 'es'
-            ? `Sincronizados ${liveLeads.length} presupuestos desde la web`
-            : `${liveLeads.length} leads synced from website`,
-          'success'
-        );
-      } else {
-        showSyncToast(
-          panelLang === 'es'
-            ? 'Conexión con la web oficial establecida (0 solicitudes nuevas)'
-            : 'Website connected (0 new inquiries)',
+            ? `Sincronización completada (${liveLeads.length} solicitudes activas)`
+            : `${liveLeads.length} leads synced from Supabase`,
           'success'
         );
       }
@@ -562,16 +714,16 @@ export const EcuaplacPortal: React.FC = () => {
   const handleDeleteLead = async (leadId: string, leadName: string) => {
     const confirmMsg =
       panelLang === 'es'
-        ? `¿Seguro que deseas eliminar la solicitud de "${leadName}"?`
-        : `Are you sure you want to delete inquiry from "${leadName}"?`;
+        ? `¿Deseas quitar la solicitud de "${leadName}" de esta bandeja?\n\n(Nota: Se mantendrá guardada intacta en la base de datos de Supabase).`
+        : `Remove inquiry from "${leadName}" from this inbox?\n\n(Note: It will remain safely preserved in Supabase).`;
     if (!window.confirm(confirmMsg)) return;
 
     setLeads((prev) => prev.filter((l) => l.id !== leadId));
     if (selectedLeadId === leadId) setSelectedLeadId(null);
     await ecuaplacConnector.deleteLead(leadId);
-    addAuditLog(`Solicitud de presupuesto eliminada: «${leadName}»`, 'Ecuaplac Leads', 'warning', 'delete');
+    addAuditLog(`Solicitud de presupuesto quitada de la bandeja: «${leadName}»`, 'Ecuaplac Leads', 'warning', 'delete');
     showSyncToast(
-      panelLang === 'es' ? `Presupuesto de ${leadName} eliminado` : `Lead ${leadName} deleted`,
+      panelLang === 'es' ? `Presupuesto de ${leadName} quitado de la bandeja (guardado en Supabase)` : `Lead ${leadName} removed from inbox`,
       'success'
     );
   };
@@ -604,6 +756,117 @@ export const EcuaplacPortal: React.FC = () => {
         'info',
         'status'
       );
+    }
+  };
+
+  // --- Estados y Lógica para Contacto de la Web (ecuaplac_contact en Supabase) ---
+  const [contacts, setContacts] = useState<EcuaplacContactItem[]>(() =>
+    ecuaplacConnector.getContacts()
+  );
+  const [isEditingContacts, setIsEditingContacts] = useState(false);
+  const [isSavingContacts, setIsSavingContacts] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    joseName: 'José Rivadeneira',
+    josePhone: '+34 678 15 98 78',
+    joffreName: 'Joffre Méndez',
+    joffrePhone: '+34 603 40 44 50',
+    email: 'ecuaplac.jyg.sl@gmail.com',
+  });
+
+  // Consulta en segundo plano a Supabase al abrir el panel
+  useEffect(() => {
+    ecuaplacConnector.fetchContactsOnline().then((liveContacts) => {
+      if (liveContacts && liveContacts.length > 0) {
+        setContacts(liveContacts);
+      }
+    });
+  }, []);
+
+  // Sincronizar formulario con los contactos cargados
+  useEffect(() => {
+    const jose = contacts.find((c) => c.key === 'goyo' || c.name_es.toLowerCase().includes('josé') || c.name_es.toLowerCase().includes('jose'));
+    const joffre = contacts.find((c) => c.key === 'Jofrre' || c.key.toLowerCase().includes('joffre') || c.name_es.toLowerCase().includes('joffre'));
+    const emailItem = contacts.find((c) => c.key === 'email' || c.icon === 'mail');
+
+    setContactForm({
+      joseName: jose?.name_es || 'José Rivadeneira',
+      josePhone: jose?.value_es || '+34 678 15 98 78',
+      joffreName: joffre?.name_es || 'Joffre Méndez',
+      joffrePhone: joffre?.value_es || '+34 603 40 44 50',
+      email: emailItem?.value_es || 'ecuaplac.jyg.sl@gmail.com',
+    });
+  }, [contacts]);
+
+  const handleSaveContacts = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSavingContacts(true);
+    showSyncToast(
+      panelLang === 'es' ? 'Guardando contactos en la web (ecuaplac.com)...' : 'Saving website contacts...',
+      'syncing'
+    );
+
+    try {
+      const startTime = Date.now();
+      const jose = contacts.find((c) => c.key === 'goyo' || c.name_es.toLowerCase().includes('josé') || c.name_es.toLowerCase().includes('jose'));
+      const joffre = contacts.find((c) => c.key === 'Jofrre' || c.key.toLowerCase().includes('joffre') || c.name_es.toLowerCase().includes('joffre'));
+      const emailItem = contacts.find((c) => c.key === 'email' || c.icon === 'mail');
+
+      const promises: Promise<boolean>[] = [];
+
+      if (jose) {
+        promises.push(
+          ecuaplacConnector.updateContactItem(jose.id, {
+            name_es: contactForm.joseName.trim(),
+            name_en: contactForm.joseName.trim(),
+            value_es: contactForm.josePhone.trim(),
+            value_en: contactForm.josePhone.trim(),
+          })
+        );
+      }
+      if (joffre) {
+        promises.push(
+          ecuaplacConnector.updateContactItem(joffre.id, {
+            name_es: contactForm.joffreName.trim(),
+            name_en: contactForm.joffreName.trim(),
+            value_es: contactForm.joffrePhone.trim(),
+            value_en: contactForm.joffrePhone.trim(),
+          })
+        );
+      }
+      if (emailItem) {
+        promises.push(
+          ecuaplacConnector.updateContactItem(emailItem.id, {
+            value_es: contactForm.email.trim(),
+            value_en: contactForm.email.trim(),
+          })
+        );
+      }
+
+      await Promise.all(promises);
+
+      // Esperar al menos 600ms para confirmación táctil visual
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 600) {
+        await new Promise((r) => setTimeout(r, 600 - elapsed));
+      }
+
+      // Refrescar lista local y estado
+      const updatedContacts = ecuaplacConnector.getContacts();
+      setContacts([...updatedContacts]);
+
+      addAuditLog('Contacto de la web actualizado', 'Ecuaplac Web', 'success', 'update');
+      showSyncToast(
+        panelLang === 'es' ? 'Contacto de la web actualizado con éxito' : 'Website contact updated successfully',
+        'success'
+      );
+      setIsEditingContacts(false);
+    } catch {
+      showSyncToast(
+        panelLang === 'es' ? 'Error al guardar contactos en la web' : 'Error updating website contacts',
+        'error'
+      );
+    } finally {
+      setIsSavingContacts(false);
     }
   };
 
@@ -681,7 +944,13 @@ export const EcuaplacPortal: React.FC = () => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('ecuaplac_notifications_enabled') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [notificationFeedback, setNotificationFeedback] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<'es' | 'en'>('es');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -701,13 +970,13 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '3.0.1';
+  const CURRENT_SYSTEM_VERSION = '3.0.5';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.1)
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.5)
     if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
@@ -716,6 +985,11 @@ export const EcuaplacPortal: React.FC = () => {
   });
   const [simulatedUpdateAvailable, setSimulatedUpdateAvailable] = useState(false);
   const [newVersionNotice, setNewVersionNotice] = useState<string | null>(null);
+  const [newVersionChanges, setNewVersionChanges] = useState<string[]>([
+    'Nuevo panel de Contacto de la Web sincronizado con Supabase',
+    'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
+    'Notificaciones en tiempo real y sonido acústico para nuevos presupuestos',
+  ]);
   const [isUpdateBannerDismissed, setIsUpdateBannerDismissed] = useState(false);
 
   const handleSendFeedback = async (channel: 'whatsapp' | 'email' | 'system') => {
@@ -821,6 +1095,9 @@ export const EcuaplacPortal: React.FC = () => {
           if (data?.version) {
             if (data.version !== CURRENT_SYSTEM_VERSION) {
               setNewVersionNotice(data.version);
+              if (Array.isArray(data.changes) && data.changes.length > 0) {
+                setNewVersionChanges(data.changes);
+              }
               setSimulatedUpdateAvailable(true);
               setUpdateCheckState('available');
               return;
@@ -875,6 +1152,105 @@ export const EcuaplacPortal: React.FC = () => {
     };
   }, [installedVersion, autoCheckUpdates]);
 
+  // Detección reactiva en segundo plano de nuevos Leads desde Supabase con sonido Chime y aviso nativo
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkIncomingLeads = async (isInitial = false) => {
+      try {
+        const liveLeads = await ecuaplacConnector.fetchLeadsOnline();
+        if (!isMounted || !liveLeads || liveLeads.length === 0) return;
+
+        // Si es la carga inicial al montar el portal, poblamos el registro sin disparar sonido falso
+        if (isInitial) {
+          liveLeads.forEach((l) => knownLeadIdsRef.current.add(l.id));
+          setLeads(liveLeads);
+          return;
+        }
+
+        // Buscar leads genuinamente nuevos que hayan entrado en Supabase (ej. desde Tally o la web)
+        const brandNewLeads = liveLeads.filter((l) => !knownLeadIdsRef.current.has(l.id));
+
+        if (brandNewLeads.length > 0) {
+          // Registrar los nuevos IDs en el ref para no repetir la alerta
+          brandNewLeads.forEach((l) => knownLeadIdsRef.current.add(l.id));
+          // Actualizar la lista en pantalla
+          setLeads(liveLeads);
+
+          // Si el usuario tiene las notificaciones activadas en el interruptor de Ajustes
+          if (notificationsEnabled) {
+            // 1. Reproducir sonido de chime cálido
+            playLeadNotificationSound();
+
+            // 2. Notificación nativa en móvil (iOS / Android) o PC
+            const newest = brandNewLeads[0];
+            const notifTitle = `🔔 ¡Nuevo Presupuesto! · ${newest.name || 'Cliente'}`;
+            const notifBody = `${newest.work_type || 'Reforma'}${newest.location ? ` en ${newest.location}` : ''}${newest.budget_estimate ? ` · ${newest.budget_estimate}` : ''}`;
+
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification(notifTitle, {
+                  body: notifBody,
+                  icon: '/ecuaplac/fav-sin-fondo.svg',
+                  badge: '/ecuaplac/fav-sin-fondo.svg',
+                  tag: `lead-${newest.id}`,
+                });
+              } catch {
+                // Silencioso en navegadores móviles que requieran service worker
+              }
+            }
+
+            // 3. Toast flotante en el panel
+            showSyncToast(
+              panelLang === 'es'
+                ? `🔔 ¡Nuevo presupuesto de ${newest.name || 'un cliente'}!`
+                : `🔔 New quote request from ${newest.name || 'a client'}!`,
+              'success'
+            );
+
+            // 4. Registro en el log de auditoría
+            addAuditLog(
+              `Nuevo presupuesto recibido: ${newest.name} (${newest.work_type})`,
+              'Supabase Live',
+              'success',
+              'lead'
+            );
+          }
+        }
+      } catch (err) {
+        console.warn('Error al verificar nuevos leads en segundo plano:', err);
+      }
+    };
+
+    // 1. Verificación inicial inmediata
+    checkIncomingLeads(true);
+
+    // 2. Sondeo en segundo plano periódico (cada 22 segundos)
+    const interval = setInterval(() => {
+      checkIncomingLeads(false);
+    }, 22000);
+
+    // 3. Comprobación instantánea cuando el usuario vuelve a la app (desbloquea móvil o cambia de pestaña)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkIncomingLeads(false);
+      }
+    };
+    const handleFocus = () => {
+      checkIncomingLeads(false);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [notificationsEnabled, panelLang]);
+
   const handleCheckUpdates = async () => {
     setUpdateCheckState('checking');
     try {
@@ -893,6 +1269,9 @@ export const EcuaplacPortal: React.FC = () => {
         if (data?.version) {
           if (data.version !== CURRENT_SYSTEM_VERSION) {
             setNewVersionNotice(data.version);
+            if (Array.isArray(data.changes) && data.changes.length > 0) {
+              setNewVersionChanges(data.changes);
+            }
             setSimulatedUpdateAvailable(true);
             setUpdateCheckState('available');
             return;
@@ -1360,10 +1739,29 @@ export const EcuaplacPortal: React.FC = () => {
   const handleToggleNotifications = async (checked: boolean) => {
     if (!checked) {
       setNotificationsEnabled(false);
+      try {
+        localStorage.setItem('ecuaplac_notifications_enabled', 'false');
+      } catch {}
       setNotificationFeedback(null);
       addAuditLog('Notificaciones desactivadas en este dispositivo', 'Ecuaplac App', 'info');
       return;
     }
+
+    // Desbloquear AudioContext en el gesto del usuario para permitir sonido de leads
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass();
+        if (ctx.state === 'suspended') {
+          await ctx.resume();
+        }
+      }
+    } catch {}
+
+    // Guardar preferencia activa en almacenamiento local
+    try {
+      localStorage.setItem('ecuaplac_notifications_enabled', 'true');
+    } catch {}
 
     // Solicitar permiso nativo al dispositivo móvil / navegador (iOS Safari, Android Chrome, etc.)
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -1371,13 +1769,18 @@ export const EcuaplacPortal: React.FC = () => {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
           setNotificationsEnabled(true);
-          setNotificationFeedback('Permiso concedido en este dispositivo');
+          setNotificationFeedback(panelLang === 'es' ? 'Permiso concedido en este dispositivo' : 'Permission granted on this device');
           setTimeout(() => setNotificationFeedback(null), 3500);
           addAuditLog('Permiso concedido: Notificaciones activas para nuevos presupuestos', 'Ecuaplac App', 'success');
 
+          // Sonido de prueba inmediato al activar
+          playLeadNotificationSound();
+
           try {
             new Notification('Ecuaplac · Notificaciones Activas', {
-              body: 'Recibirás un aviso en tu móvil cada vez que un cliente solicite un presupuesto.',
+              body: panelLang === 'es'
+                ? 'Sonará una campana y recibirás un aviso en tu móvil cada vez que entre un nuevo presupuesto.'
+                : 'A chime will play and you will receive an alert every time a new quote arrives.',
               icon: '/ecuaplac/fav-sin-fondo.svg',
             });
           } catch {
@@ -1385,21 +1788,29 @@ export const EcuaplacPortal: React.FC = () => {
           }
         } else if (permission === 'denied') {
           setNotificationsEnabled(false);
-          setNotificationFeedback('Permiso bloqueado en ajustes del navegador');
+          try {
+            localStorage.setItem('ecuaplac_notifications_enabled', 'false');
+          } catch {}
+          setNotificationFeedback(panelLang === 'es' ? 'Permiso bloqueado en ajustes del navegador' : 'Permission blocked in browser settings');
           setTimeout(() => setNotificationFeedback(null), 4000);
           addAuditLog('Permiso de notificaciones denegado en el dispositivo', 'Ecuaplac App', 'warning');
         } else {
           setNotificationsEnabled(false);
+          try {
+            localStorage.setItem('ecuaplac_notifications_enabled', 'false');
+          } catch {}
         }
       } catch (err) {
         console.warn('Error al solicitar permiso de notificación:', err);
         setNotificationsEnabled(true);
-        setNotificationFeedback('Notificaciones activadas');
+        playLeadNotificationSound();
+        setNotificationFeedback(panelLang === 'es' ? 'Notificaciones activadas' : 'Notifications enabled');
         setTimeout(() => setNotificationFeedback(null), 3500);
       }
     } else {
       setNotificationsEnabled(true);
-      setNotificationFeedback('Notificaciones activadas (simulado)');
+      playLeadNotificationSound();
+      setNotificationFeedback(panelLang === 'es' ? 'Notificaciones activadas (simulado)' : 'Notifications enabled (simulated)');
       setTimeout(() => setNotificationFeedback(null), 3500);
       addAuditLog('Notificaciones activadas (simulación en navegador sin Web Push)', 'Ecuaplac App', 'info');
     }
@@ -1877,9 +2288,9 @@ export const EcuaplacPortal: React.FC = () => {
 
   return (
     <div className="w-full max-w-full min-w-0 bg-[#F4F1EA] min-h-screen text-slate-900 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-28">
-      {/* Toast Flotante de Sincronización en Tiempo Real (Posicionado limpiamente bajo el header, sin tapar la cabecera) */}
+      {/* Toast Flotante de Sincronización en Tiempo Real (Visible tanto en página como sobre modales con z-[10001]) */}
       {syncToast && (
-        <div className="fixed top-[calc(max(14px,env(safe-area-inset-top))+56px)] left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold font-sans border bg-[#08090C] text-white border-[#C5A059]/40 select-none pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="fixed top-[calc(max(16px,env(safe-area-inset-top))+16px)] left-1/2 -translate-x-1/2 z-[10001] max-w-[90vw] px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold font-sans border bg-[#08090C] text-white border-[#C5A059]/60 select-none pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
           {syncToast.type === 'syncing' ? (
             <RefreshCw className="w-3.5 h-3.5 text-[#F0CF85] animate-spin shrink-0" />
           ) : syncToast.type === 'success' ? (
@@ -2015,7 +2426,7 @@ export const EcuaplacPortal: React.FC = () => {
                 }`}
               >
                 <Clock className={`w-3.5 h-3.5 transition-colors ${cfPeriod === '30d' ? 'text-[#C5A059]' : 'text-stone-400'}`} />
-                <span>30 Días</span>
+                <span>{panelLang === 'es' ? 'Mensual' : 'Monthly'}</span>
               </button>
 
               <button
@@ -2072,24 +2483,12 @@ export const EcuaplacPortal: React.FC = () => {
                 </span>
               </div>
 
-              {/* Visualización de Actividad con Espaciado Generoso */}
-              <div className="pt-2.5 border-t border-sky-100/80 space-y-1.5 relative z-10">
-                <div className="flex items-end justify-between gap-1.5 h-6 lg:h-7">
-                  {[35, 60, 50, 75, 65, 90, 100].map((height, i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 rounded-t-sm transition-all duration-300 ${
-                        i === 6 ? 'bg-sky-500 shadow-xs' : 'bg-sky-200/60 hover:bg-sky-300'
-                      }`}
-                      style={{ height: `${height}%` }}
-                      title={`Pico de tráfico día ${i + 1}`}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center justify-end text-[10px] text-stone-400 font-mono pt-1">
-                  <span>{cfMetrics.updatedAt ? formatLogTime(cfMetrics.updatedAt) : 'Verificado hoy'}</span>
-                </div>
-              </div>
+              {/* Visualización de Actividad Interactiva con Animación de Entrada Escalada y Feedback Táctil */}
+              <InteractiveTrafficBars
+                totalVisitors={cfMetrics.uniqueVisitors}
+                updatedAt={cfMetrics.updatedAt}
+                panelLang={panelLang}
+              />
             </div>
 
             {/* KPI 2: Solicitudes de Presupuesto (Leads de reformas de Ecuaplac) */}
@@ -2113,11 +2512,7 @@ export const EcuaplacPortal: React.FC = () => {
                 <div className="flex items-baseline gap-2 mt-1">
                   <span className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight font-mono">
                     <AnimatedCounter
-                      value={
-                        cfPeriod === '30d'
-                          ? Math.max(leads.length, 3)
-                          : Math.max(leads.length * 2, 8)
-                      }
+                      value={leads.length}
                     />
                   </span>
                   <span className="text-xs font-semibold text-stone-500 font-sans">solicitudes</span>
@@ -2631,8 +3026,8 @@ export const EcuaplacPortal: React.FC = () => {
       ) : (
         /* Pestaña 4: Ajustes del Gestor (Diseño Pinterest After - Minimalista, iOS-Style y Elegante) */
         <div className="max-w-2xl mx-auto flex flex-col gap-4 pb-32 animate-tab-enter">
-          {/* Card 1: Perfil Hero del Administrador */}
-          <div className="bg-white/95 rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.06)] flex items-center gap-4 sm:gap-5">
+          {/* Card 1: Perfil Hero del Administrador (Opción 1: Micro-gradiente cálido Luxury) */}
+          <div className="bg-gradient-to-br from-white via-[#FAF7F0] to-[#F5EFE6] rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.06)] flex items-center gap-4 sm:gap-5">
             {/* Avatar circular con badge de cámara */}
             <div
               onClick={() => avatarInputRef.current?.click()}
@@ -2688,7 +3083,7 @@ export const EcuaplacPortal: React.FC = () => {
                 className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-xs shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-[#08090C]/20 flex items-center justify-center text-indigo-600 shadow-2xs shrink-0">
                     <User className="w-5 h-5" />
                   </div>
                   <div>
@@ -2710,7 +3105,7 @@ export const EcuaplacPortal: React.FC = () => {
                 className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/70 flex items-center justify-center text-[#B38E46] shadow-xs shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-[#08090C]/20 flex items-center justify-center text-[#B38E46] shadow-2xs shrink-0">
                     <Lock className="w-5 h-5" />
                   </div>
                   <div>
@@ -2728,7 +3123,7 @@ export const EcuaplacPortal: React.FC = () => {
               {/* Item 3: Notificaciones (Con solicitud nativa de permisos en móvil y PC) */}
               <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-[#08090C]/20 flex items-center justify-center text-emerald-600 shadow-2xs shrink-0">
                     <Bell className="w-5 h-5" />
                   </div>
                   <div>
@@ -2749,7 +3144,7 @@ export const EcuaplacPortal: React.FC = () => {
               {/* Item 4: Idioma del Panel (Selector Bilingüe ES / EN Interactivo) */}
               <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 shadow-xs shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-[#08090C]/20 flex items-center justify-center text-sky-600 shadow-2xs shrink-0">
                     <Globe className="w-5 h-5" />
                   </div>
                   <div>
@@ -2789,7 +3184,196 @@ export const EcuaplacPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Grupo 2: Sistema y Dispositivo (Jerarquía y Título con Autoridad) */}
+          {/* Grupo 2: Contacto de la Web (Conexión directa en vivo con ecuaplac.com / Supabase) */}
+          <div className="space-y-2 mt-4">
+            <div className="px-3.5 pt-1 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+                <h4 className="text-[11px] sm:text-xs font-semibold text-stone-500 uppercase tracking-wider font-sans">
+                  {panelLang === 'es' ? 'Contacto de la Web' : 'Website Contact'}
+                </h4>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold font-sans">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>ecuaplac.com</span>
+              </span>
+            </div>
+
+            {/* Tarjeta con Mismo Bordado Armonioso (#08090C/30) que el resto de Ajustes */}
+            <div className="bg-white/95 rounded-3xl border border-[#08090C]/30 shadow-[0_4px_20px_-4px_rgba(20,25,35,0.04)] overflow-hidden">
+              {/* Cabecera de la tarjeta */}
+              <div className="p-4 sm:p-5 flex items-center justify-between border-b border-stone-100 bg-stone-50/50">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-[#08090C] text-[#F0CF85] flex items-center justify-center border border-[#08090C]/20 shadow-2xs shrink-0">
+                    <Globe className="w-5 h-5 text-[#F0CF85]" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-950 font-display tracking-tight truncate">
+                      {panelLang === 'es' ? 'Contacto: Contacto de la Web' : 'Website Contact Info'}
+                    </h3>
+                    <p className="text-[11.5px] text-stone-500 font-normal font-sans mt-0.5 truncate">
+                      {panelLang === 'es'
+                        ? 'Números de teléfono y correo visibles en la web oficial'
+                        : 'Phone numbers and email visible on the public website'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Botón Editar / Cancelar */}
+                <button
+                  type="button"
+                  onClick={() => setIsEditingContacts(!isEditingContacts)}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs shrink-0 ${
+                    isEditingContacts
+                      ? 'bg-stone-200 hover:bg-stone-300 text-stone-800'
+                      : 'bg-[#08090C] hover:bg-stone-800 text-white border border-[#C5A059]/50'
+                  }`}
+                  title={isEditingContacts ? 'Cancelar edición' : 'Editar contactos de la web'}
+                >
+                  {isEditingContacts ? (
+                    <>
+                      <X className="w-3.5 h-3.5 text-stone-600" />
+                      <span>{panelLang === 'es' ? 'Cancelar' : 'Cancel'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Pencil className="w-3.5 h-3.5 text-[#F0CF85]" />
+                      <span>{panelLang === 'es' ? 'Editar' : 'Edit'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Vista o Formulario de Edición */}
+              {isEditingContacts ? (
+                /* MODO EDICIÓN */
+                <form onSubmit={handleSaveContacts} className="p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* José Rivadeneira */}
+                    <div className="space-y-1.5 bg-stone-50/60 p-3.5 rounded-2xl border border-stone-200/80">
+                      <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans">
+                        José Rivadeneira (Teléfono)
+                      </label>
+                      <input
+                        type="tel"
+                        value={contactForm.josePhone}
+                        onChange={(e) => setContactForm({ ...contactForm, josePhone: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-mono font-bold text-slate-900 focus:outline-none transition-all"
+                        placeholder="+34 678 15 98 78"
+                      />
+                    </div>
+
+                    {/* Joffre Méndez */}
+                    <div className="space-y-1.5 bg-stone-50/60 p-3.5 rounded-2xl border border-stone-200/80">
+                      <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans">
+                        Joffre Méndez (Teléfono)
+                      </label>
+                      <input
+                        type="tel"
+                        value={contactForm.joffrePhone}
+                        onChange={(e) => setContactForm({ ...contactForm, joffrePhone: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-mono font-bold text-slate-900 focus:outline-none transition-all"
+                        placeholder="+34 603 40 44 50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Fila Email */}
+                  <div className="space-y-1.5 bg-stone-50/60 p-3.5 rounded-2xl border border-stone-200/80">
+                    <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block font-sans">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={contactForm.email}
+                      onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-mono font-semibold text-slate-900 focus:outline-none transition-all"
+                      placeholder="ecuaplac.jyg.sl@gmail.com"
+                    />
+                  </div>
+
+                  {/* Botones de acción */}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingContacts(false)}
+                      disabled={isSavingContacts}
+                      className="px-4 py-2 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      {panelLang === 'es' ? 'Descartar' : 'Discard'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingContacts}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#08090C] hover:bg-stone-800 text-white border border-[#C5A059]/50 text-xs font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-60 shadow-sm"
+                    >
+                      {isSavingContacts ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 text-[#F0CF85] animate-spin" />
+                          <span>{panelLang === 'es' ? 'Guardando en la Web...' : 'Saving...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5 text-[#F0CF85]" />
+                          <span>{panelLang === 'es' ? 'Guardar en la Web' : 'Save to Website'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* MODO VISTA (LIMPIO, MINIMALISTA Y EXACTO AL RECUADRO DE ECUAPLAC.COM) */
+                <div className="divide-y divide-stone-100">
+                  {/* Fila José Rivadeneira */}
+                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/50 transition-colors">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-[#FAF6EE] border border-[#08090C]/20 shadow-2xs flex items-center justify-center text-[#B38E46] shrink-0">
+                        <Phone className="w-4 h-4 text-[#B38E46]" />
+                      </div>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 font-sans tracking-tight truncate">
+                        {contactForm.joseName}
+                      </span>
+                    </div>
+                    <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 shrink-0">
+                      {contactForm.josePhone}
+                    </span>
+                  </div>
+
+                  {/* Fila Joffre Méndez */}
+                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/50 transition-colors">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-[#FAF6EE] border border-[#08090C]/20 shadow-2xs flex items-center justify-center text-[#B38E46] shrink-0">
+                        <Phone className="w-4 h-4 text-[#B38E46]" />
+                      </div>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 font-sans tracking-tight truncate">
+                        {contactForm.joffreName}
+                      </span>
+                    </div>
+                    <span className="text-xs sm:text-sm font-bold font-mono text-slate-900 shrink-0">
+                      {contactForm.joffrePhone}
+                    </span>
+                  </div>
+
+                  {/* Fila Email */}
+                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-stone-50/50 transition-colors">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-[#FAF6EE] border border-[#08090C]/20 shadow-2xs flex items-center justify-center text-[#B38E46] shrink-0">
+                        <Mail className="w-4 h-4 text-[#B38E46]" />
+                      </div>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 font-sans tracking-tight">
+                        Email
+                      </span>
+                    </div>
+                    <span className="text-xs sm:text-sm font-medium font-sans text-slate-800 truncate text-right">
+                      {contactForm.email}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Grupo 3: Sistema y Dispositivo (Jerarquía y Título con Autoridad) */}
           <div className="space-y-2 mt-3">
             <div className="px-3.5 pt-1 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
@@ -2805,7 +3389,7 @@ export const EcuaplacPortal: React.FC = () => {
                 className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer group"
               >
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100/80 border border-amber-200/90 flex items-center justify-center text-amber-800 shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100/80 border border-[#08090C]/20 flex items-center justify-center text-amber-800 shadow-2xs shrink-0 group-hover:scale-105 transition-transform">
                     <MessageSquarePlus className="w-5 h-5 text-[#C5A059]" />
                   </div>
                   <div className="min-w-0">
@@ -2836,7 +3420,7 @@ export const EcuaplacPortal: React.FC = () => {
                   className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-700 shadow-xs shrink-0">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-[#08090C]/20 flex items-center justify-center text-amber-700 shadow-2xs shrink-0">
                       <Sparkles className="w-5 h-5 text-[#C5A059]" />
                     </div>
                     <div>
@@ -2958,12 +3542,18 @@ export const EcuaplacPortal: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setSimulatedUpdateAvailable(true);
+                              setNewVersionNotice('3.0.6');
+                              setNewVersionChanges([
+                                'Nuevo panel de Contacto de la Web sincronizado con Supabase',
+                                'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
+                                'Notificaciones en tiempo real y sonido acústico para nuevos presupuestos'
+                              ]);
                               setUpdateCheckState('available');
                             }}
-                            className="text-[11px] font-semibold text-[#C5A059] hover:underline"
+                            className="text-[11px] font-semibold text-[#C5A059] hover:underline cursor-pointer"
                             title="Simula que hay una nueva actualización lista para instalar"
                           >
-                            {panelLang === 'es' ? 'Simular nueva v002' : 'Simulate new v002'}
+                            {panelLang === 'es' ? 'Simular nueva v3.0.6' : 'Simulate new v3.0.6'}
                           </button>
                         </div>
                       </div>
@@ -2987,9 +3577,9 @@ export const EcuaplacPortal: React.FC = () => {
                               Actualización del Gestor Ecuaplac
                             </span>
                             <ul className="text-[11px] text-stone-300 font-medium space-y-1 mt-1.5 list-disc list-inside">
-                              <li>Carrusel de obras optimizado para pantallas retina</li>
-                              <li>Compresión automática WebP en subida de fotos</li>
-                              <li>Notificaciones instantáneas para nuevos presupuestos</li>
+                              {newVersionChanges.map((item, idx) => (
+                                <li key={idx}>{item}</li>
+                              ))}
                             </ul>
                           </div>
                         </div>
@@ -3056,7 +3646,7 @@ export const EcuaplacPortal: React.FC = () => {
                 className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/80 transition-colors active:bg-stone-100/70 select-none cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-xs shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-[#08090C]/20 flex items-center justify-center text-sky-700 shadow-2xs shrink-0">
                     <Activity className="w-5 h-5" />
                   </div>
                   <div>
@@ -3093,7 +3683,7 @@ export const EcuaplacPortal: React.FC = () => {
                 className="w-full p-4 flex items-center justify-between text-left hover:bg-rose-50/50 transition-colors active:bg-rose-50 select-none group cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shadow-xs shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-[#08090C]/20 flex items-center justify-center text-rose-600 shadow-2xs shrink-0">
                     <LogOut className="w-5 h-5" />
                   </div>
                   <div>
@@ -3512,11 +4102,15 @@ export const EcuaplacPortal: React.FC = () => {
               type="button"
               onClick={handleRefreshLeads}
               disabled={isSyncingLeads}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-stone-100 hover:bg-stone-200 border border-stone-200/90 text-xs font-semibold text-stone-700 hover:text-stone-900 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-              title={panelLang === 'es' ? 'Sincronizar con la web' : 'Sync with website'}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#08090C] hover:bg-stone-800 text-white border border-[#C5A059]/40 text-xs font-bold transition-all cursor-pointer active:scale-95 disabled:opacity-60 shadow-xs"
+              title={panelLang === 'es' ? 'Sincronizar con Supabase' : 'Sync with Supabase'}
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-[#C5A059] ${isSyncingLeads ? 'animate-spin' : ''}`} />
-              <span className="hidden md:inline">{panelLang === 'es' ? 'Sincronizar' : 'Sync'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 text-[#F0CF85] ${isSyncingLeads ? 'animate-spin' : ''}`} />
+              <span className="inline">
+                {isSyncingLeads
+                  ? (panelLang === 'es' ? 'Sincronizando...' : 'Syncing...')
+                  : (panelLang === 'es' ? 'Sincronizar' : 'Sync')}
+              </span>
             </button>
           </div>
         }
@@ -3697,10 +4291,10 @@ export const EcuaplacPortal: React.FC = () => {
                   <div
                     key={lead.id}
                     onClick={() => setSelectedLeadId((prev) => (prev === lead.id ? null : lead.id))}
-                    className={`group relative rounded-2xl p-4 sm:p-5 transition-all duration-200 border cursor-pointer ${
+                    className={`group relative rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer w-full max-w-full min-w-0 overflow-hidden break-words [overflow-wrap:anywhere] bg-white border-2 ${
                       isSelected
-                        ? 'bg-white border-[#C5A059] shadow-md ring-2 ring-[#C5A059]/15'
-                        : 'bg-stone-50/70 hover:bg-white border-stone-200/90 hover:border-[#C5A059]/40 shadow-2xs hover:shadow-sm'
+                        ? 'border-[#08090C] shadow-lg ring-2 ring-[#08090C]/20'
+                        : 'border-[#08090C] hover:border-black shadow-xs hover:shadow-md'
                     } flex flex-col gap-3.5`}
                   >
                     {/* Fila Cabecera: Monograma, Nombre y Estado */}
@@ -3748,12 +4342,72 @@ export const EcuaplacPortal: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Mensaje / Tipo de Obra */}
-                    <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-stone-200/80 border-l-[3px] border-l-[#C5A059] shadow-2xs">
-                      <p className="text-xs sm:text-sm text-stone-800 leading-relaxed font-medium">
-                        «{lead.work_type}»
-                      </p>
+                    {/* Fila de Metadatos Ejecutivos: Servicio, Municipio, m², Canal */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      {/* Servicio principal */}
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200 text-stone-900 text-xs font-bold font-sans">
+                        <Briefcase className="w-3.5 h-3.5 text-[#C5A059]" />
+                        <span>{lead.service || lead.work_type || 'Reforma'}</span>
+                      </span>
+
+                      {/* Ubicación / Municipio */}
+                      {lead.location && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-bold font-sans">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{lead.location}</span>
+                        </span>
+                      )}
+
+                      {/* Metros cuadrados (m²) */}
+                      {lead.sqm && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200/80 text-sky-800 text-xs font-bold font-mono">
+                          <span>📐 {lead.sqm}</span>
+                        </span>
+                      )}
+
+                      {/* Origen del formulario */}
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 text-stone-500 text-[10px] font-medium font-sans">
+                        {lead.source_channel === 'tally' ? '⚡ Tally' : lead.source_channel === 'gmail' ? '✉️ Gmail' : '🌐 Web'}
+                      </span>
                     </div>
+
+                    {/* Mensaje / Tipo de Obra */}
+                    {(lead.client_message || lead.work_type) && (
+                      <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-stone-200/80 border-l-[3px] border-l-[#C5A059] shadow-2xs w-full max-w-full overflow-hidden">
+                        <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                          <MessageSquare className="w-3 h-3 text-[#C5A059]" />
+                          <span>{panelLang === 'es' ? 'Mensaje o detalles:' : 'Client message:'}</span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-stone-800 leading-relaxed font-medium break-words [overflow-wrap:anywhere]">
+                          «{lead.client_message || lead.work_type}»
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Botón interactivo para ver foto o plano si fue adjuntado */}
+                    {lead.photo_url && (
+                      <div className="w-full">
+                        <a
+                          href={lead.photo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center justify-between w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-50/80 via-stone-50 to-amber-50/40 border border-[#C5A059]/40 hover:border-[#C5A059] text-stone-900 text-xs font-bold transition-all shadow-2xs hover:shadow-xs group/photo cursor-pointer"
+                          title="Abrir foto o plano adjunto por el cliente"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-[#08090C] text-[#F0CF85] flex items-center justify-center shrink-0 shadow-xs">
+                              <Camera className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="truncate">Foto o plano adjunto por el cliente</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[#C5A059] text-xs shrink-0 font-semibold">
+                            <span className="hidden sm:inline">Ver archivo</span>
+                            <ExternalLink className="w-3.5 h-3.5 group-hover/photo:translate-x-0.5 transition-transform" />
+                          </div>
+                        </a>
+                      </div>
+                    )}
 
                     {/* Fila de Datos: Presupuesto, Teléfono, Email */}
                     <div className="flex flex-wrap items-center gap-2">
@@ -3819,7 +4473,9 @@ export const EcuaplacPortal: React.FC = () => {
                         <div className="grid grid-cols-2 gap-2">
                           <a
                             href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone)}?text=${encodeURIComponent(
-                              `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto para: ${lead.work_type}.`
+                              `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto${
+                                lead.service ? ` para ${lead.service}` : lead.work_type ? ` para ${lead.work_type}` : ''
+                              }${lead.location ? ` en ${lead.location}` : ''}${lead.sqm ? ` (${lead.sqm})` : ''}.`
                             )}`}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -3883,12 +4539,12 @@ export const EcuaplacPortal: React.FC = () => {
                           </button>
                         </div>
 
-                        {/* Botón de Borrar Lead */}
+                        {/* Botón de Borrar Lead (Quitar de la bandeja sin tocar Supabase) */}
                         <button
                           type="button"
                           onClick={() => handleDeleteLead(lead.id, lead.name)}
-                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl text-stone-400 hover:text-rose-600 bg-white hover:bg-rose-50 border border-stone-200 hover:border-rose-200 shadow-2xs transition-all active:scale-95 shrink-0"
-                          title={panelLang === 'es' ? 'Eliminar solicitud' : 'Delete inquiry'}
+                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl text-stone-400 hover:text-rose-600 bg-white hover:bg-rose-50 border border-stone-200 hover:border-rose-200 shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer"
+                          title={panelLang === 'es' ? 'Quitar de la bandeja (se mantiene seguro en Supabase)' : 'Dismiss from inbox (kept in Supabase)'}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

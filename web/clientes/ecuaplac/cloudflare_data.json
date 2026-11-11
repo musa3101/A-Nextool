@@ -1,25 +1,40 @@
 {
   "30d": {
     "period": "30d",
-    "periodLabel": "Últimos 30 días",
-    "totalVisits": 50,
-    "uniqueVisitors": 50,
-    "pageViews": 60,
+    "periodLabel": "Noviembre 2026 (11 días)",
+    "totalVisits": 40,
+    "uniqueVisitors": 40,
+    "pageViews": 40,
     "avgLoadTime": "0.65s",
     "uptime": "100%",
     "edgeHitRatio": "98.2%",
     "leadsCount": 3,
-    "trendPercentage": "+15.4%",
+    "trendPercentage": "+36.3%",
     "isPositiveTrend": true,
     "status": "optimal",
-    "updatedAt": "2026-11-09T20:45:34.800Z"
+    "updatedAt": "2026-11-11T20:42:33.962Z",
+    "closingInfo": {
+      "type": "monthly_progress",
+      "closedMonth": {
+        "name": "Octubre 2026",
+        "visits": 80,
+        "pageViews": 120,
+        "period": "2026-10-01 al 2026-10-31"
+      },
+      "currentMonth": {
+        "name": "Noviembre 2026",
+        "visits": 40,
+        "pageViews": 40,
+        "period": "2026-11-01 al 2026-11-11"
+      }
+    }
   },
   "3m": {
     "period": "3m",
     "periodLabel": "Últimos 3 meses",
-    "totalVisits": 280,
-    "uniqueVisitors": 280,
-    "pageViews": 350,
+    "totalVisits": 210,
+    "uniqueVisitors": 210,
+    "pageViews": 280,
     "avgLoadTime": "0.68s",
     "uptime": "99.99%",
     "edgeHitRatio": "97.5%",
@@ -27,6 +42,6 @@
     "trendPercentage": "+28.6%",
     "isPositiveTrend": true,
     "status": "optimal",
-    "updatedAt": "2026-11-09T20:45:34.801Z"
+    "updatedAt": "2026-11-11T20:42:33.962Z"
   }
 }
