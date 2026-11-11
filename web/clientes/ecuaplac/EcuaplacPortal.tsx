@@ -792,10 +792,15 @@ export const EcuaplacPortal: React.FC = () => {
     let isMounted = true;
     const checkVersion = async () => {
       try {
-        // 1. Chequeo directo a /version.json con cache: 'no-store' (burlar caché en móvil / PWA)
-        const res = await fetch(`/version.json?t=${Date.now()}`, {
+        // 1. Chequeo directo a /version.json con URL absoluta, timestamp anti-caché y cabeceras estrictas
+        const endpoint = `${window.location.origin}/version.json?_t=${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const res = await fetch(endpoint, {
           cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
         });
         if (res.ok) {
           const data = await res.json();
@@ -832,12 +837,12 @@ export const EcuaplacPortal: React.FC = () => {
     window.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', checkVersion);
 
-    // Intervalo de comprobación en segundo plano cada 30 segundos
+    // Intervalo de comprobación en segundo plano cada 20 segundos
     const interval = setInterval(() => {
       if (autoCheckUpdates) {
         checkVersion();
       }
-    }, 30000);
+    }, 20000);
 
     return () => {
       isMounted = false;
@@ -850,10 +855,15 @@ export const EcuaplacPortal: React.FC = () => {
   const handleCheckUpdates = async () => {
     setUpdateCheckState('checking');
     try {
-      // 1. Comprobar /version.json en servidor
-      const res = await fetch(`/version.json?t=${Date.now()}`, {
+      // 1. Comprobar /version.json en servidor con bypass de caché absoluto
+      const endpoint = `${window.location.origin}/version.json?_t=${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const res = await fetch(endpoint, {
         cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
       if (res.ok) {
         const data = await res.json();
@@ -1873,21 +1883,21 @@ export const EcuaplacPortal: React.FC = () => {
         </div>
       </header>
 
-      {/* Banner Notificación Auto-Actualización (Negro Obsidiana) */}
+      {/* Banner Notificación Auto-Actualización Flotante Global (Negro Obsidiana) */}
       {newVersionNotice && (
-        <div className="max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3">
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#08090C] border border-[#C5A059]/50 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center gap-3">
+        <div className="fixed top-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-50 animate-in fade-in slide-in-from-top-3 duration-300">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#08090C]/95 border border-[#C5A059]/60 shadow-[0_12px_40px_rgba(0,0,0,0.65)] flex items-center justify-between gap-3 backdrop-blur-md">
+            <div className="flex items-center gap-3 min-w-0">
               <span className="relative flex h-3 w-3 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-[#C5A059]"></span>
               </span>
-              <div>
-                <span className="text-xs sm:text-sm font-black text-white block font-display">
+              <div className="min-w-0">
+                <span className="text-xs sm:text-sm font-bold text-white block font-display truncate">
                   ¡Nueva versión v{newVersionNotice} lista!
                 </span>
-                <span className="text-[11px] text-stone-300 font-sans block mt-0.5">
-                  {panelLang === 'es' ? 'Hay mejoras publicadas en el sistema. Pulsa para aplicar.' : 'System improvements available. Tap to apply.'}
+                <span className="text-[11px] text-stone-300 font-sans block mt-0.5 truncate">
+                  {panelLang === 'es' ? 'Toca para aplicar las mejoras al instante.' : 'Tap to install updates instantly.'}
                 </span>
               </div>
             </div>
