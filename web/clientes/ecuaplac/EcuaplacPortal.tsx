@@ -529,24 +529,23 @@ export const EcuaplacPortal: React.FC = () => {
   const handleRefreshLeads = async () => {
     setIsSyncingLeads(true);
     showSyncToast(
-      panelLang === 'es' ? 'Consultando presupuestos en la web (ecuaplac.com)...' : 'Checking leads on website...',
+      panelLang === 'es' ? 'Sincronizando con Supabase (ecuaplac.com)...' : 'Checking leads on Supabase...',
       'syncing'
     );
     try {
+      const startTime = Date.now();
       const liveLeads = await ecuaplacConnector.fetchLeadsOnline();
-      if (liveLeads && liveLeads.length > 0) {
+      // Aseguramos al menos 600ms de rotación táctil para confirmación visual instantánea
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 600) {
+        await new Promise((resolve) => setTimeout(resolve, 600 - elapsed));
+      }
+      if (liveLeads) {
         setLeads(liveLeads);
         showSyncToast(
           panelLang === 'es'
-            ? `Sincronizados ${liveLeads.length} presupuestos desde la web`
-            : `${liveLeads.length} leads synced from website`,
-          'success'
-        );
-      } else {
-        showSyncToast(
-          panelLang === 'es'
-            ? 'Conexión con la web oficial establecida (0 solicitudes nuevas)'
-            : 'Website connected (0 new inquiries)',
+            ? `Sincronización completada (${liveLeads.length} solicitudes activas)`
+            : `${liveLeads.length} leads synced from Supabase`,
           'success'
         );
       }
@@ -563,16 +562,16 @@ export const EcuaplacPortal: React.FC = () => {
   const handleDeleteLead = async (leadId: string, leadName: string) => {
     const confirmMsg =
       panelLang === 'es'
-        ? `¿Seguro que deseas eliminar la solicitud de "${leadName}"?`
-        : `Are you sure you want to delete inquiry from "${leadName}"?`;
+        ? `¿Deseas quitar la solicitud de "${leadName}" de esta bandeja?\n\n(Nota: Se mantendrá guardada intacta en la base de datos de Supabase).`
+        : `Remove inquiry from "${leadName}" from this inbox?\n\n(Note: It will remain safely preserved in Supabase).`;
     if (!window.confirm(confirmMsg)) return;
 
     setLeads((prev) => prev.filter((l) => l.id !== leadId));
     if (selectedLeadId === leadId) setSelectedLeadId(null);
     await ecuaplacConnector.deleteLead(leadId);
-    addAuditLog(`Solicitud de presupuesto eliminada: «${leadName}»`, 'Ecuaplac Leads', 'warning', 'delete');
+    addAuditLog(`Solicitud de presupuesto quitada de la bandeja: «${leadName}»`, 'Ecuaplac Leads', 'warning', 'delete');
     showSyncToast(
-      panelLang === 'es' ? `Presupuesto de ${leadName} eliminado` : `Lead ${leadName} deleted`,
+      panelLang === 'es' ? `Presupuesto de ${leadName} quitado de la bandeja (guardado en Supabase)` : `Lead ${leadName} removed from inbox`,
       'success'
     );
   };
@@ -1878,9 +1877,9 @@ export const EcuaplacPortal: React.FC = () => {
 
   return (
     <div className="w-full max-w-full min-w-0 bg-[#F4F1EA] min-h-screen text-slate-900 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:pb-28">
-      {/* Toast Flotante de Sincronización en Tiempo Real (Posicionado limpiamente bajo el header, sin tapar la cabecera) */}
+      {/* Toast Flotante de Sincronización en Tiempo Real (Visible tanto en página como sobre modales con z-[10001]) */}
       {syncToast && (
-        <div className="fixed top-[calc(max(14px,env(safe-area-inset-top))+56px)] left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold font-sans border bg-[#08090C] text-white border-[#C5A059]/40 select-none pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="fixed top-[calc(max(16px,env(safe-area-inset-top))+16px)] left-1/2 -translate-x-1/2 z-[10001] max-w-[90vw] px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold font-sans border bg-[#08090C] text-white border-[#C5A059]/60 select-none pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
           {syncToast.type === 'syncing' ? (
             <RefreshCw className="w-3.5 h-3.5 text-[#F0CF85] animate-spin shrink-0" />
           ) : syncToast.type === 'success' ? (
@@ -3509,11 +3508,15 @@ export const EcuaplacPortal: React.FC = () => {
               type="button"
               onClick={handleRefreshLeads}
               disabled={isSyncingLeads}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-stone-100 hover:bg-stone-200 border border-stone-200/90 text-xs font-semibold text-stone-700 hover:text-stone-900 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-              title={panelLang === 'es' ? 'Sincronizar con la web' : 'Sync with website'}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#08090C] hover:bg-stone-800 text-white border border-[#C5A059]/40 text-xs font-bold transition-all cursor-pointer active:scale-95 disabled:opacity-60 shadow-xs"
+              title={panelLang === 'es' ? 'Sincronizar con Supabase' : 'Sync with Supabase'}
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-[#C5A059] ${isSyncingLeads ? 'animate-spin' : ''}`} />
-              <span className="hidden md:inline">{panelLang === 'es' ? 'Sincronizar' : 'Sync'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 text-[#F0CF85] ${isSyncingLeads ? 'animate-spin' : ''}`} />
+              <span className="inline">
+                {isSyncingLeads
+                  ? (panelLang === 'es' ? 'Sincronizando...' : 'Syncing...')
+                  : (panelLang === 'es' ? 'Sincronizar' : 'Sync')}
+              </span>
             </button>
           </div>
         }
@@ -3694,10 +3697,10 @@ export const EcuaplacPortal: React.FC = () => {
                   <div
                     key={lead.id}
                     onClick={() => setSelectedLeadId((prev) => (prev === lead.id ? null : lead.id))}
-                    className={`group relative rounded-2xl p-4 sm:p-5 transition-all duration-200 border cursor-pointer w-full max-w-full min-w-0 overflow-hidden break-words [overflow-wrap:anywhere] ${
+                    className={`group relative rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer w-full max-w-full min-w-0 overflow-hidden break-words [overflow-wrap:anywhere] bg-white border-2 ${
                       isSelected
-                        ? 'bg-white border-[#C5A059] shadow-md ring-2 ring-[#C5A059]/15'
-                        : 'bg-stone-50/70 hover:bg-white border-stone-200/90 hover:border-[#C5A059]/40 shadow-2xs hover:shadow-sm'
+                        ? 'border-[#08090C] shadow-lg ring-2 ring-[#08090C]/20'
+                        : 'border-[#08090C] hover:border-black shadow-xs hover:shadow-md'
                     } flex flex-col gap-3.5`}
                   >
                     {/* Fila Cabecera: Monograma, Nombre y Estado */}
@@ -3942,12 +3945,12 @@ export const EcuaplacPortal: React.FC = () => {
                           </button>
                         </div>
 
-                        {/* Botón de Borrar Lead */}
+                        {/* Botón de Borrar Lead (Quitar de la bandeja sin tocar Supabase) */}
                         <button
                           type="button"
                           onClick={() => handleDeleteLead(lead.id, lead.name)}
-                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl text-stone-400 hover:text-rose-600 bg-white hover:bg-rose-50 border border-stone-200 hover:border-rose-200 shadow-2xs transition-all active:scale-95 shrink-0"
-                          title={panelLang === 'es' ? 'Eliminar solicitud' : 'Delete inquiry'}
+                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-xl text-stone-400 hover:text-rose-600 bg-white hover:bg-rose-50 border border-stone-200 hover:border-rose-200 shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer"
+                          title={panelLang === 'es' ? 'Quitar de la bandeja (se mantiene seguro en Supabase)' : 'Dismiss from inbox (kept in Supabase)'}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

@@ -231,8 +231,34 @@ export class EcuaplacConnector {
   private storageKeyWorks = 'ecuaplac_works_data';
   private storageKeyMoreProjects = 'ecuaplac_more_projects_data';
   private storageKeyLeads = 'ecuaplac_leads_data';
+  private storageKeyDismissedLeads = 'ecuaplac_dismissed_leads_ids';
   private storageKeyProfile = 'ecuaplac_profile_data';
   private storageKeyCloudflare = 'ecuaplac_cf_rum_v2';
+
+  getDismissedLeadIds(): string[] {
+    try {
+      const data = localStorage.getItem(this.storageKeyDismissedLeads);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  saveDismissedLeadIds(ids: string[]): void {
+    try {
+      localStorage.setItem(this.storageKeyDismissedLeads, JSON.stringify(ids));
+    } catch {
+      // ignore
+    }
+  }
+
+  clearDismissedLeadIds(): void {
+    try {
+      localStorage.removeItem(this.storageKeyDismissedLeads);
+    } catch {
+      // ignore
+    }
+  }
 
   private getHeaders(extraHeaders: Record<string, string> = {}) {
     return {
@@ -557,40 +583,44 @@ export class EcuaplacConnector {
   async fetchLeadsOnline(): Promise<EcuaplacLeadItem[]> {
     // 1. Intentar consultar Supabase (leads generados en la web pública ecuaplac.com)
     try {
-      const res = await fetch(`${this.url}/rest/v1/${this.tables.leads}?select=*&order=created_at.desc`, {
+      const res = await fetch(`${this.url}/rest/v1/${this.tables.leads}?select=*&order=created_at.desc&_t=${Date.now()}`, {
         headers: this.getHeaders(),
+        cache: 'no-store',
       });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const mapped: EcuaplacLeadItem[] = data.map((d: any) => {
-            const parsed = parseLeadDetails(d.message || d.work_type || '', d.project_type || '');
-            return {
-              id: d.id,
-              name: d.name || d.client_name || 'Cliente sin nombre',
-              phone: d.phone || d.client_phone || '',
-              email: d.email || d.client_email || '',
-              work_type: parsed.service,
-              budget_estimate: d.budget_estimate || (d.budget_estimated ? `${d.budget_estimated} €` : ''),
-              status: d.status === 'aprobado' || d.status === 'approved' ? 'approved' : d.status === 'contactado' || d.status === 'contacted' ? 'contacted' : 'new',
-              date: d.created_at
-                ? new Date(d.created_at).toLocaleDateString([], {
-                  day: '2-digit',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-                : 'Hoy',
-              notes: d.notes || '',
-              service: parsed.service,
-              sqm: parsed.sqm,
-              location: parsed.location,
-              photo_url: parsed.photoUrl,
-              client_message: parsed.clientMessage,
-              raw_message: d.message || '',
-              source_channel: parsed.sourceChannel,
-            };
-          });
+        if (Array.isArray(data)) {
+          const dismissed = this.getDismissedLeadIds();
+          const mapped: EcuaplacLeadItem[] = data
+            .filter((d: any) => !dismissed.includes(d.id))
+            .map((d: any) => {
+              const parsed = parseLeadDetails(d.message || d.work_type || '', d.project_type || '');
+              return {
+                id: d.id,
+                name: d.name || d.client_name || 'Cliente sin nombre',
+                phone: d.phone || d.client_phone || '',
+                email: d.email || d.client_email || '',
+                work_type: parsed.service,
+                budget_estimate: d.budget_estimate || (d.budget_estimated ? `${d.budget_estimated} €` : ''),
+                status: d.status === 'aprobado' || d.status === 'approved' ? 'approved' : d.status === 'contactado' || d.status === 'contacted' ? 'contacted' : 'new',
+                date: d.created_at
+                  ? new Date(d.created_at).toLocaleDateString([], {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                  : 'Hoy',
+                notes: d.notes || '',
+                service: parsed.service,
+                sqm: parsed.sqm,
+                location: parsed.location,
+                photo_url: parsed.photoUrl,
+                client_message: parsed.clientMessage,
+                raw_message: d.message || '',
+                source_channel: parsed.sourceChannel,
+              };
+            });
           this.saveLeads(mapped);
           return mapped;
         }
@@ -663,23 +693,22 @@ export class EcuaplacConnector {
   }
 
   /**
-   * Elimina un lead (local + Supabase + InsForge)
+   * Elimina un lead ÚNICAMENTE del panel de NexTool (protegiendo Supabase 100% intacto)
    */
   async deleteLead(leadId: string): Promise<boolean> {
+    const dismissed = this.getDismissedLeadIds();
+    if (!dismissed.includes(leadId)) {
+      dismissed.push(leadId);
+      this.saveDismissedLeadIds(dismissed);
+    }
+
     const leads = this.getLeads();
     const filtered = leads.filter((l) => l.id !== leadId);
     this.saveLeads(filtered);
 
-    try {
-      await fetch(`${this.url}/rest/v1/${this.tables.leads}?id=eq.${leadId}`, {
-        method: 'DELETE',
-        headers: this.getHeaders(),
-      });
-      await insforge.database.from('leads').delete().eq('id', leadId).eq('tenant_id', ECUAPLAC_TENANT_ID);
-      await this.addAuditLog('delete', `Lead eliminado con éxito (ID ${leadId})`);
-    } catch {
-      // Silencioso
-    }
+    // SEGURIDAD: CERO llamadas DELETE a Supabase.
+    // La base de datos de producción ecuaplac_leads queda inmutable y protegida como histórico.
+    await this.addAuditLog('delete', `Lead archivado localmente en el panel (ID ${leadId})`);
     return true;
   }
 
