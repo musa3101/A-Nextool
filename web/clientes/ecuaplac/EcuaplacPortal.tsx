@@ -985,6 +985,11 @@ export const EcuaplacPortal: React.FC = () => {
   });
   const [simulatedUpdateAvailable, setSimulatedUpdateAvailable] = useState(false);
   const [newVersionNotice, setNewVersionNotice] = useState<string | null>(null);
+  const [newVersionChanges, setNewVersionChanges] = useState<string[]>([
+    'Nuevo panel de Contacto de la Web sincronizado con Supabase',
+    'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
+    'Notificaciones en tiempo real y sonido acústico para nuevos presupuestos',
+  ]);
   const [isUpdateBannerDismissed, setIsUpdateBannerDismissed] = useState(false);
 
   const handleSendFeedback = async (channel: 'whatsapp' | 'email' | 'system') => {
@@ -1090,6 +1095,9 @@ export const EcuaplacPortal: React.FC = () => {
           if (data?.version) {
             if (data.version !== CURRENT_SYSTEM_VERSION) {
               setNewVersionNotice(data.version);
+              if (Array.isArray(data.changes) && data.changes.length > 0) {
+                setNewVersionChanges(data.changes);
+              }
               setSimulatedUpdateAvailable(true);
               setUpdateCheckState('available');
               return;
@@ -1261,6 +1269,9 @@ export const EcuaplacPortal: React.FC = () => {
         if (data?.version) {
           if (data.version !== CURRENT_SYSTEM_VERSION) {
             setNewVersionNotice(data.version);
+            if (Array.isArray(data.changes) && data.changes.length > 0) {
+              setNewVersionChanges(data.changes);
+            }
             setSimulatedUpdateAvailable(true);
             setUpdateCheckState('available');
             return;
@@ -3531,6 +3542,12 @@ export const EcuaplacPortal: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setSimulatedUpdateAvailable(true);
+                              setNewVersionNotice('3.0.2');
+                              setNewVersionChanges([
+                                'Nuevo panel de Contacto de la Web sincronizado con Supabase',
+                                'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
+                                'Notificaciones en tiempo real y sonido acústico para nuevos presupuestos'
+                              ]);
                               setUpdateCheckState('available');
                             }}
                             className="text-[11px] font-semibold text-[#C5A059] hover:underline"
@@ -3560,9 +3577,9 @@ export const EcuaplacPortal: React.FC = () => {
                               Actualización del Gestor Ecuaplac
                             </span>
                             <ul className="text-[11px] text-stone-300 font-medium space-y-1 mt-1.5 list-disc list-inside">
-                              <li>Carrusel de obras optimizado para pantallas retina</li>
-                              <li>Compresión automática WebP en subida de fotos</li>
-                              <li>Notificaciones instantáneas para nuevos presupuestos</li>
+                              {newVersionChanges.map((item, idx) => (
+                                <li key={idx}>{item}</li>
+                              ))}
                             </ul>
                           </div>
                         </div>

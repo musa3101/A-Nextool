@@ -1,8 +1,13 @@
 {
   "version": "3.0.1",
-  "buildTimestamp": 1794410400000,
+  "buildTimestamp": 1794430600000,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
-  "updatedAt": "2026-11-11T16:20:00.000Z",
-  "notes": "Versión 3.0.1: Bordes negros táctiles al 30%, módulo oficial desplegable MyNext Care con lanzamiento 07/06/2026, solución de header en iPhone, botones suavizados y nuevo icono fiscal."
+  "updatedAt": "2026-11-11T21:00:00.000Z",
+  "notes": "Versión 3.0.1: Contacto web sincronizado con Supabase, bordes finos en iconos de ajustes y motor de notificaciones en tiempo real con sonido chime.",
+  "changes": [
+    "Nuevo panel de Contacto de la Web sincronizado con Supabase",
+    "Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo",
+    "Notificaciones en tiempo real y sonido acústico para nuevos presupuestos"
+  ]
 }
