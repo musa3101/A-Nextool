@@ -2278,8 +2278,12 @@ export const EcuaplacPortal: React.FC = () => {
             {/* Cabecera / Trigger de MyNext Care */}
             <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-[#0B1523] to-[#1E293B] text-[#C5A059] flex items-center justify-center border border-white/10 shadow-xs shrink-0">
-                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <div className="w-10 h-10 rounded-2xl bg-white border border-[#08090C]/15 shadow-xs flex items-center justify-center p-1.5 shrink-0 overflow-hidden">
+                  <img
+                    src="/icons/mynext-care-icon.png"
+                    alt="MyNext Care"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -2327,7 +2331,7 @@ export const EcuaplacPortal: React.FC = () => {
                         {panelLang === 'es' ? 'Lanzamiento de web' : 'Website Launch'}
                       </span>
                       <span className="text-sm sm:text-base font-bold text-slate-900 block mt-0.5 font-display">
-                        Octubre 2024
+                        07/06/2026
                       </span>
                       <span className="text-xs text-stone-500 font-normal font-sans mt-0.5 block">
                         Web oficial en producción · Cloudflare CDN
@@ -2350,7 +2354,7 @@ export const EcuaplacPortal: React.FC = () => {
                         </span>
                       </div>
                       <span className="text-sm sm:text-base font-bold text-slate-900 block mt-0.5 font-display">
-                        11 Noviembre 2026
+                        11/11/2026
                       </span>
                       <span className="text-xs text-stone-500 font-normal font-sans mt-0.5 block">
                         Optimización v3.0, Caché Edge & Seguridad PWA
