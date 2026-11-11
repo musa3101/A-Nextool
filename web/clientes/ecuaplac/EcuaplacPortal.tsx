@@ -64,6 +64,7 @@ import {
   Folder,
   FolderArchive,
   HardDrive,
+  Wrench,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
@@ -951,6 +952,24 @@ export const EcuaplacPortal: React.FC = () => {
         if (facturasSectionRef.current) {
           const yOffset = -24;
           const y = facturasSectionRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 120);
+    }
+  };
+
+  // MyNext Care (Mantenimiento Web Plegable / Escondidito por defecto)
+  const [isCareOpen, setIsCareOpen] = useState(false);
+  const careSectionRef = useRef<HTMLDivElement>(null);
+
+  const handleToggleCare = () => {
+    const willOpen = !isCareOpen;
+    setIsCareOpen(willOpen);
+    if (willOpen) {
+      setTimeout(() => {
+        if (careSectionRef.current) {
+          const yOffset = -24;
+          const y = careSectionRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
           window.scrollTo({ top: y, behavior: 'smooth' });
         }
       }, 120);
@@ -1998,20 +2017,16 @@ export const EcuaplacPortal: React.FC = () => {
 
           {/* Bloque 1: Métricas Maestras (Visitantes y Presupuestos Reales de Ecuaplac) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-            {/* KPI 1: Audiencia & Visitantes Reales */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-4">
+            {/* KPI 1: Audiencia & Visitantes Reales (Compacto & Elegante) */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-4.5 sm:p-5 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-3">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-sky-400/10 rounded-full blur-2xl pointer-events-none" />
 
               <div className="flex items-center justify-between relative z-10">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(14,165,233,0.35)] group-hover:scale-105 transition-transform">
-                  <Users className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(14,165,233,0.35)] group-hover:scale-105 transition-transform">
+                  <Users className="w-5 h-5" />
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-[11px] font-semibold shadow-xs">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Real (sin bots)</span>
-                  </span>
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-800 text-[11px] font-semibold shadow-xs">
                     <TrendingUp className="w-3.5 h-3.5 text-sky-600" />
                     <span>{cfMetrics.trendPercentage}</span>
@@ -2031,7 +2046,7 @@ export const EcuaplacPortal: React.FC = () => {
                 <span className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight block mt-1 font-mono">
                   <AnimatedCounter value={cfMetrics.uniqueVisitors} />
                 </span>
-                <span className="text-xs text-stone-500 mt-1.5 flex items-center gap-1.5 font-medium">
+                <span className="text-xs text-stone-500 mt-1 flex items-center gap-1.5 font-medium">
                   <Activity className="w-3.5 h-3.5 text-sky-500" />
                   <span>
                     <AnimatedCounter value={cfMetrics.pageViews} /> páginas de reformas vistas
@@ -2039,9 +2054,9 @@ export const EcuaplacPortal: React.FC = () => {
                 </span>
               </div>
 
-              {/* Visualización de Actividad y Sello de Auditoría */}
-              <div className="pt-2 border-t border-sky-100/80 space-y-2 relative z-10">
-                <div className="flex items-end justify-between gap-1.5 h-6 lg:h-8">
+              {/* Visualización de Actividad Compacta */}
+              <div className="pt-2 border-t border-sky-100/80 relative z-10">
+                <div className="flex items-end justify-between gap-1.5 h-5">
                   {[35, 60, 50, 75, 65, 90, 100].map((height, i) => (
                     <div
                       key={i}
@@ -2053,28 +2068,19 @@ export const EcuaplacPortal: React.FC = () => {
                     />
                   ))}
                 </div>
-                <div className="flex items-center justify-between text-[10.5px] text-stone-400 font-medium pt-1 border-t border-sky-50">
-                  <span className="flex items-center gap-1 text-slate-600">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                    <span>Humanos en ecuaplac.com</span>
-                  </span>
-                  <span className="font-mono text-[10px] text-stone-400">
-                    {cfMetrics.updatedAt ? formatLogTime(cfMetrics.updatedAt) : 'Verificado hoy'}
-                  </span>
-                </div>
               </div>
             </div>
 
             {/* KPI 2: Solicitudes de Presupuesto (Leads de reformas de Ecuaplac) */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-4.5 sm:p-5 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-3">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
 
               <div className="flex items-center justify-between relative z-10">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(16,185,129,0.35)] group-hover:scale-105 transition-transform">
-                  <Mail className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(16,185,129,0.35)] group-hover:scale-105 transition-transform">
+                  <Mail className="w-5 h-5" />
                 </div>
-                <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold shadow-xs">
+                <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold shadow-xs">
                   {leads.filter((l) => l.status === 'new').length} pendientes
                 </span>
               </div>
@@ -2095,20 +2101,20 @@ export const EcuaplacPortal: React.FC = () => {
                   </span>
                   <span className="text-xs font-semibold text-stone-500 font-sans">solicitudes</span>
                 </div>
-                <span className="text-xs text-stone-500 mt-1.5 block font-medium truncate">
+                <span className="text-xs text-stone-500 mt-1 block font-medium truncate">
                   Último: <span className="font-semibold text-slate-800">{leads[0]?.name || 'Cliente'}</span> ({leads[0]?.date || 'Hoy'})
                 </span>
               </div>
 
               {/* Botón compacto de acceso a Leads */}
-              <div className="pt-2.5 border-t border-emerald-100/70 relative z-10 flex items-center justify-between">
+              <div className="pt-2 border-t border-emerald-100/70 relative z-10 flex items-center justify-between">
                 <span className="text-[11px] text-stone-500 font-normal font-sans">
                   Gestión rápida
                 </span>
                 <button
                   type="button"
                   onClick={() => setIsLeadsModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold shadow-xs border border-slate-700/50 active:scale-95 transition-all group/btn font-sans cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[36px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold shadow-xs border border-slate-700/50 active:scale-95 transition-all group/btn font-sans cursor-pointer"
                   title="Abrir bandeja de presupuestos"
                 >
                   <span>Ver Bandeja</span>
@@ -2262,6 +2268,106 @@ export const EcuaplacPortal: React.FC = () => {
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bloque: MyNext Care (Mantenimiento Web Plegable / Limpio y Responsive) */}
+          <div ref={careSectionRef} className="bg-white/95 rounded-3xl border border-[#08090C]/30 shadow-[0_4px_24px_-4px_rgba(20,25,35,0.05)] overflow-hidden transition-all duration-300">
+            {/* Cabecera / Trigger de MyNext Care */}
+            <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-[#0B1523] to-[#1E293B] text-[#C5A059] flex items-center justify-center border border-white/10 shadow-xs shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-950 font-display tracking-tight">
+                      MyNext Care
+                    </h3>
+                    <span className="shrink-0 whitespace-nowrap px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[10px] font-bold font-sans flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>{panelLang === 'es' ? 'Activo' : 'Active'}</span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-500 font-normal font-sans mt-0.5 truncate">
+                    {panelLang === 'es' ? 'Mantenimiento de web y estado del sistema' : 'Website maintenance and system health'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Botón Abrir / Ocultar MyNext Care */}
+              <button
+                type="button"
+                onClick={handleToggleCare}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold active:scale-95 transition-all shadow-xs border border-slate-700/50 font-sans group cursor-pointer shrink-0"
+                title={isCareOpen ? 'Ocultar detalles de MyNext Care' : 'Ver información de MyNext Care'}
+              >
+                <span>{isCareOpen ? (panelLang === 'es' ? 'Ocultar' : 'Hide') : (panelLang === 'es' ? 'Ver Detalles' : 'Ver Detalles')}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-[#C5A059] transition-transform duration-200 ${
+                    isCareOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Panel Desplegable de Mantenimiento */}
+            {isCareOpen && (
+              <div className="border-t border-stone-100 p-4 sm:p-5 pt-3.5 space-y-3 bg-stone-50/50 animate-in fade-in slide-in-from-top-2 duration-250">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Tarjeta A: Lanzamiento de Web */}
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-stone-200/80 shadow-xs flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-sky-50 border border-sky-200/70 flex items-center justify-center text-sky-600 shrink-0 mt-0.5">
+                      <Globe className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block font-sans">
+                        {panelLang === 'es' ? 'Lanzamiento de web' : 'Website Launch'}
+                      </span>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 block mt-0.5 font-display">
+                        Octubre 2024
+                      </span>
+                      <span className="text-xs text-stone-500 font-normal font-sans mt-0.5 block">
+                        Web oficial en producción · Cloudflare CDN
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta B: Mantenimiento de Web */}
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-stone-200/80 shadow-xs flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-[#B38E46] shrink-0 mt-0.5">
+                      <Wrench className="w-4 h-4 text-[#C5A059]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block font-sans">
+                          {panelLang === 'es' ? 'Mantenimiento de web' : 'Web Maintenance'}
+                        </span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                          Trabajo
+                        </span>
+                      </div>
+                      <span className="text-sm sm:text-base font-bold text-slate-900 block mt-0.5 font-display">
+                        11 Noviembre 2026
+                      </span>
+                      <span className="text-xs text-stone-500 font-normal font-sans mt-0.5 block">
+                        Optimización v3.0, Caché Edge & Seguridad PWA
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pie de Garantía MyNext */}
+                <div className="pt-2 flex items-center justify-between text-[11px] text-stone-500 font-medium px-1 flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>{panelLang === 'es' ? 'Garantía técnica y soporte continuo por Musa' : 'Technical warranty and continuous support by Musa'}</span>
+                  </div>
+                  <span className="font-mono text-[10.5px] text-stone-400">
+                    MyNext Care Plan
+                  </span>
                 </div>
               </div>
             )}
