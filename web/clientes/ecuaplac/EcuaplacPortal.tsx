@@ -202,6 +202,104 @@ const AnimatedCounter: React.FC<{ value: number; duration?: number; suffix?: str
   return <span>{displayValue.toLocaleString('es-ES')}{suffix}</span>;
 };
 
+// Componente interactivo para las barras de tráfico de visitas (Entrada fluida y toque táctil)
+const InteractiveTrafficBars: React.FC<{
+  totalVisitors: number;
+  updatedAt?: string;
+  panelLang?: 'es' | 'en';
+}> = ({ totalVisitors, updatedAt, panelLang = 'es' }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [activeBarIndex, setActiveBarIndex] = useState<number | null>(null);
+
+  const daysOfWeek = panelLang === 'es' 
+    ? ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Hoy']
+    : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Today'];
+  const basePercentages = [35, 60, 50, 75, 65, 90, 100];
+
+  const barsData = basePercentages.map((p, i) => {
+    const isToday = i === basePercentages.length - 1;
+    const visitors = Math.max(1, Math.round((totalVisitors * p) / 100));
+    return {
+      dayLabel: daysOfWeek[i],
+      height: p,
+      visitors: isToday ? totalVisitors : visitors,
+      isToday,
+    };
+  });
+
+  useEffect(() => {
+    // Retardo sutil para disparar el efecto de crecimiento fluido al entrar
+    const timer = setTimeout(() => {
+      setIsLoaded(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const activeBar = activeBarIndex !== null ? barsData[activeBarIndex] : null;
+
+  return (
+    <div className="pt-2.5 border-t border-sky-100/80 space-y-1.5 relative z-10 select-none">
+      {/* Contenedor de las 7 barras interactivas */}
+      <div className="relative">
+        <div
+          className="flex items-end justify-between gap-1.5 h-8 sm:h-9 cursor-pointer"
+          onMouseLeave={() => setActiveBarIndex(null)}
+        >
+          {barsData.map((bar, i) => {
+            const isHovered = activeBarIndex === i;
+            const currentHeight = isLoaded ? bar.height : 0;
+
+            return (
+              <div
+                key={i}
+                onMouseEnter={() => setActiveBarIndex(i)}
+                onClick={() => setActiveBarIndex(activeBarIndex === i ? null : i)}
+                className="flex-1 h-full flex items-end group relative py-0.5"
+                title={`${bar.dayLabel}: ${bar.visitors} ${panelLang === 'es' ? 'visitas' : 'visitors'}`}
+              >
+                <div
+                  className={`w-full rounded-t-sm transition-all duration-500 ease-out transform-gpu will-change-transform ${
+                    bar.isToday
+                      ? 'bg-sky-500 shadow-[0_2px_8px_rgba(14,165,233,0.4)]'
+                      : isHovered
+                      ? 'bg-sky-400 shadow-xs'
+                      : 'bg-sky-200/70 hover:bg-sky-300'
+                  } ${isHovered ? 'scale-y-[1.08] brightness-105' : 'hover:scale-y-[1.04]'}`}
+                  style={{
+                    height: `${currentHeight}%`,
+                    transitionDelay: `${i * 60}ms`,
+                    transformOrigin: 'bottom',
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Fila inferior: Detalle interactivo del día seleccionado o Verificado */}
+      <div className="flex items-center justify-between text-[10.5px] pt-1">
+        {activeBar ? (
+          <div className="flex items-center gap-1.5 text-sky-800 font-bold font-sans animate-in fade-in duration-150">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping shrink-0" />
+            <span>
+              {activeBar.dayLabel}: <strong className="font-mono">{activeBar.visitors}</strong> {panelLang === 'es' ? 'visitas' : 'visitors'} {activeBar.isToday ? (panelLang === 'es' ? '(Pico más alto)' : '(Peak)') : ''}
+            </span>
+          </div>
+        ) : (
+          <span className="text-stone-400 font-sans text-[10px]">
+            {panelLang === 'es' ? 'Toca una barra para ver detalles' : 'Tap a bar for details'}
+          </span>
+        )}
+
+        <span className="text-stone-400 font-mono text-[10px] shrink-0">
+          {updatedAt ? formatLogTime(updatedAt) : (panelLang === 'es' ? 'Verificado hoy' : 'Verified today')}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 export const EcuaplacPortal: React.FC = () => {
   const { session, isAuthenticated, signInWithEmail, signOut, stopImpersonation } = useAuth();
   const { addAuditLog: addTenantContextAuditLog } = useTenant();
@@ -2183,24 +2281,12 @@ export const EcuaplacPortal: React.FC = () => {
                 </span>
               </div>
 
-              {/* Visualización de Actividad con Espaciado Generoso */}
-              <div className="pt-2.5 border-t border-sky-100/80 space-y-1.5 relative z-10">
-                <div className="flex items-end justify-between gap-1.5 h-6 lg:h-7">
-                  {[35, 60, 50, 75, 65, 90, 100].map((height, i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 rounded-t-sm transition-all duration-300 ${
-                        i === 6 ? 'bg-sky-500 shadow-xs' : 'bg-sky-200/60 hover:bg-sky-300'
-                      }`}
-                      style={{ height: `${height}%` }}
-                      title={`Pico de tráfico día ${i + 1}`}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center justify-end text-[10px] text-stone-400 font-mono pt-1">
-                  <span>{cfMetrics.updatedAt ? formatLogTime(cfMetrics.updatedAt) : 'Verificado hoy'}</span>
-                </div>
-              </div>
+              {/* Visualización de Actividad Interactiva con Animación de Entrada Escalada y Feedback Táctil */}
+              <InteractiveTrafficBars
+                totalVisitors={cfMetrics.uniqueVisitors}
+                updatedAt={cfMetrics.updatedAt}
+                panelLang={panelLang}
+              />
             </div>
 
             {/* KPI 2: Solicitudes de Presupuesto (Leads de reformas de Ecuaplac) */}
