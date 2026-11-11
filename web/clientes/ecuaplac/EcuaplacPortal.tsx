@@ -686,13 +686,13 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '3.0.0';
+  const CURRENT_SYSTEM_VERSION = '3.0.1';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.0)
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.1)
     if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
