@@ -279,6 +279,21 @@ export const EcuaplacPortal: React.FC = () => {
     }
   }, [isAuthenticated]);
 
+  // Garantizar nitidez absoluta del header en iOS / Safari sincronizando el status bar con #08090C
+  useEffect(() => {
+    try {
+      let metaThemeColor = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+      if (!metaThemeColor) {
+        metaThemeColor = document.createElement('meta');
+        metaThemeColor.name = 'theme-color';
+        document.head.appendChild(metaThemeColor);
+      }
+      metaThemeColor.content = '#08090C';
+    } catch {
+      // Ignorar en entornos donde document no esté disponible
+    }
+  }, []);
+
   const handleToggleLang = (lang: 'es' | 'en') => {
     setPanelLang(lang);
     try {
@@ -1877,10 +1892,13 @@ export const EcuaplacPortal: React.FC = () => {
       )}
 
       {/* 1. Header Oficial de Ecuaplac (Obsidian Black Sólido Puro 100% Nítido - Cero Difuminados) */}
-      <header className="sticky top-0 z-30 bg-[#08090C] border-b border-white/[0.08] shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(14px,env(safe-area-inset-top))] pb-3">
+      <header
+        className="sticky top-0 z-30 bg-[#08090C] border-b border-white/[0.08] shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(18px,calc(env(safe-area-inset-top)+6px))] pb-3 select-none"
+        style={{ WebkitBackdropFilter: 'none', backdropFilter: 'none', isolation: 'isolate' }}
+      >
         <div className="w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10">
+            <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10 transform-gpu will-change-transform">
               <img
                 src="/ecuaplac/fav-sin-fondo.svg"
                 alt="Logo Ecuaplac"
@@ -1891,7 +1909,7 @@ export const EcuaplacPortal: React.FC = () => {
               />
             </div>
             <div>
-              <span className="text-base font-bold text-white tracking-tight leading-none block font-display">
+              <span className="text-base font-bold text-white tracking-tight leading-none block font-display antialiased transform-gpu select-none">
                 ecuaplac.com
               </span>
             </div>
@@ -1902,7 +1920,7 @@ export const EcuaplacPortal: React.FC = () => {
             href="https://ecuaplac.com"
             target="_blank"
             rel="noreferrer"
-            className="group relative inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 min-h-[38px] sm:min-h-0 rounded-full bg-gradient-to-b from-white/12 to-white/6 hover:from-white/20 hover:to-white/10 active:scale-95 border border-white/15 backdrop-blur-md shadow-[0_2px_10px_-2px_rgba(0,0,0,0.3)] text-white hover:text-[#F0CF85] transition-all duration-200 text-xs font-bold cursor-pointer select-none"
+            className="group relative inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 min-h-[38px] sm:min-h-0 rounded-full bg-[#181A20] hover:bg-[#222630] active:scale-95 border border-white/15 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.3)] text-white hover:text-[#F0CF85] transition-all duration-200 text-xs font-bold cursor-pointer select-none"
             title={panelLang === 'es' ? 'Abrir ecuaplac.com en directo' : 'Open ecuaplac.com live'}
           >
             <WindowIcon
