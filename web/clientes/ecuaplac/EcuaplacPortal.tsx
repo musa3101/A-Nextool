@@ -695,8 +695,8 @@ export const EcuaplacPortal: React.FC = () => {
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // Si no hay versión o difiere de la empaquetada en el código, sincronizar de inmediato con CURRENT_SYSTEM_VERSION
-    if (!cached || cached === '000' || cached === '001' || cached === '1.0' || cached === '200' || cached === '2.0.0' || cached === 'v2.0.0' || cached === '2.0.1') {
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.0)
+    if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
     }
@@ -806,15 +806,23 @@ export const EcuaplacPortal: React.FC = () => {
         if (res.ok) {
           const data = await res.json();
           if (!isMounted) return;
-          if (data?.version && data.version !== CURRENT_SYSTEM_VERSION) {
-            setNewVersionNotice(data.version);
-            setSimulatedUpdateAvailable(true);
-            setUpdateCheckState('available');
-            return;
+          if (data?.version) {
+            if (data.version !== CURRENT_SYSTEM_VERSION) {
+              setNewVersionNotice(data.version);
+              setSimulatedUpdateAvailable(true);
+              setUpdateCheckState('available');
+              return;
+            } else {
+              // El servidor oficial certifica que estamos al día en 3.0.0
+              setNewVersionNotice(null);
+              setSimulatedUpdateAvailable(false);
+              setUpdateCheckState('up-to-date');
+              return;
+            }
           }
         }
 
-        // 2. Comprobación de respaldo contra InsForge Cloud
+        // 2. Comprobación de respaldo contra InsForge Cloud (solo si /version.json no respondió)
         const cloudVer = await ecuaplacConnector.fetchTenantVersion();
         if (!isMounted) return;
         if (cloudVer && cloudVer !== '000' && cloudVer !== CURRENT_SYSTEM_VERSION) {
@@ -823,6 +831,8 @@ export const EcuaplacPortal: React.FC = () => {
           setUpdateCheckState('available');
         } else {
           setNewVersionNotice(null);
+          setSimulatedUpdateAvailable(false);
+          setUpdateCheckState('up-to-date');
         }
       } catch {}
     };
@@ -868,11 +878,18 @@ export const EcuaplacPortal: React.FC = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data?.version && data.version !== CURRENT_SYSTEM_VERSION) {
-          setNewVersionNotice(data.version);
-          setSimulatedUpdateAvailable(true);
-          setUpdateCheckState('available');
-          return;
+        if (data?.version) {
+          if (data.version !== CURRENT_SYSTEM_VERSION) {
+            setNewVersionNotice(data.version);
+            setSimulatedUpdateAvailable(true);
+            setUpdateCheckState('available');
+            return;
+          } else {
+            setNewVersionNotice(null);
+            setSimulatedUpdateAvailable(false);
+            setUpdateCheckState('up-to-date');
+            return;
+          }
         }
       }
 
@@ -886,6 +903,7 @@ export const EcuaplacPortal: React.FC = () => {
         setUpdateCheckState('available');
       } else {
         setNewVersionNotice(null);
+        setSimulatedUpdateAvailable(false);
         setUpdateCheckState('up-to-date');
       }
     } catch {
