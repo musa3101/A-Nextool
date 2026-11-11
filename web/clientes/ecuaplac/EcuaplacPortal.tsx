@@ -704,6 +704,7 @@ export const EcuaplacPortal: React.FC = () => {
   });
   const [simulatedUpdateAvailable, setSimulatedUpdateAvailable] = useState(false);
   const [newVersionNotice, setNewVersionNotice] = useState<string | null>(null);
+  const [isUpdateBannerDismissed, setIsUpdateBannerDismissed] = useState(false);
 
   const handleSendFeedback = async (channel: 'whatsapp' | 'email' | 'system') => {
     if (!feedbackMessage.trim()) {
@@ -1883,10 +1884,10 @@ export const EcuaplacPortal: React.FC = () => {
         </div>
       </header>
 
-      {/* Banner Notificación Auto-Actualización Flotante Global (Negro Obsidiana) */}
-      {newVersionNotice && (
-        <div className="fixed top-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-50 animate-in fade-in slide-in-from-top-3 duration-300">
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#08090C]/95 border border-[#C5A059]/60 shadow-[0_12px_40px_rgba(0,0,0,0.65)] flex items-center justify-between gap-3 backdrop-blur-md">
+      {/* Banner Notificación Auto-Actualización (Negro Obsidiana Integrado con Borde Dorado) */}
+      {newVersionNotice && !isUpdateBannerDismissed && (
+        <div className="max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#08090C] border border-[#C5A059]/50 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-3 min-w-0">
               <span className="relative flex h-3 w-3 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -1897,17 +1898,27 @@ export const EcuaplacPortal: React.FC = () => {
                   ¡Nueva versión v{newVersionNotice} lista!
                 </span>
                 <span className="text-[11px] text-stone-300 font-sans block mt-0.5 truncate">
-                  {panelLang === 'es' ? 'Toca para aplicar las mejoras al instante.' : 'Tap to install updates instantly.'}
+                  {panelLang === 'es' ? 'Hay mejoras publicadas en el sistema. Toca para aplicar.' : 'System improvements available. Tap to apply.'}
                 </span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleInstallUpdate}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-[#C5A059] hover:from-amber-300 hover:to-amber-500 text-slate-950 text-xs font-black shadow-md active:scale-95 transition-all shrink-0 cursor-pointer"
-            >
-              {panelLang === 'es' ? 'Actualizar' : 'Update'}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleInstallUpdate}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-[#C5A059] hover:from-amber-300 hover:to-amber-500 text-slate-950 text-xs font-black shadow-md active:scale-95 transition-all shrink-0 cursor-pointer"
+              >
+                {panelLang === 'es' ? 'Actualizar' : 'Update'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsUpdateBannerDismissed(true)}
+                className="p-1 rounded-lg text-stone-400 hover:text-white transition-colors cursor-pointer"
+                title="Cerrar aviso"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}

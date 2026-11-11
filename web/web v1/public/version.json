@@ -1,8 +1,8 @@
 {
-  "version": "4.0.0",
-  "buildTimestamp": 1794406000000,
+  "version": "3.0.0",
+  "buildTimestamp": 1794334800000,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
-  "updatedAt": "2026-11-11T14:00:00.000Z",
-  "notes": "Test de auto-actualización proactiva: Detección automática en vivo de la versión 4.0.0"
+  "updatedAt": "2026-11-10T18:20:00.000Z",
+  "notes": "Versión 3.0.0 Mayor: Tipografía híbrida Clash Display + Satoshi de Fontshare, paleta Negro Obsidiana Puro (#08090C), icono de cámara animado 21st en dock, corrección de jerarquías H1/H2 y blindaje de envío sin duplicados."
 }
