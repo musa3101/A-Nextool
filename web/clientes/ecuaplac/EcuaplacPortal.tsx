@@ -695,8 +695,8 @@ export const EcuaplacPortal: React.FC = () => {
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // Si no hay versión o difiere de la empaquetada en el código, sincronizar de inmediato con CURRENT_SYSTEM_VERSION
-    if (!cached || cached === '000' || cached === '001' || cached === '1.0' || cached === '200' || cached === '2.0.0' || cached === 'v2.0.0' || cached === '2.0.1') {
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.0)
+    if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
     }
@@ -704,6 +704,7 @@ export const EcuaplacPortal: React.FC = () => {
   });
   const [simulatedUpdateAvailable, setSimulatedUpdateAvailable] = useState(false);
   const [newVersionNotice, setNewVersionNotice] = useState<string | null>(null);
+  const [isUpdateBannerDismissed, setIsUpdateBannerDismissed] = useState(false);
 
   const handleSendFeedback = async (channel: 'whatsapp' | 'email' | 'system') => {
     if (!feedbackMessage.trim()) {
@@ -792,23 +793,36 @@ export const EcuaplacPortal: React.FC = () => {
     let isMounted = true;
     const checkVersion = async () => {
       try {
-        // 1. Chequeo directo a /version.json con cache: 'no-store' (burlar caché en móvil / PWA)
-        const res = await fetch(`/version.json?t=${Date.now()}`, {
+        // 1. Chequeo directo a /version.json con URL absoluta, timestamp anti-caché y cabeceras estrictas
+        const endpoint = `${window.location.origin}/version.json?_t=${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const res = await fetch(endpoint, {
           cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
         });
         if (res.ok) {
           const data = await res.json();
           if (!isMounted) return;
-          if (data?.version && data.version !== CURRENT_SYSTEM_VERSION) {
-            setNewVersionNotice(data.version);
-            setSimulatedUpdateAvailable(true);
-            setUpdateCheckState('available');
-            return;
+          if (data?.version) {
+            if (data.version !== CURRENT_SYSTEM_VERSION) {
+              setNewVersionNotice(data.version);
+              setSimulatedUpdateAvailable(true);
+              setUpdateCheckState('available');
+              return;
+            } else {
+              // El servidor oficial certifica que estamos al día en 3.0.0
+              setNewVersionNotice(null);
+              setSimulatedUpdateAvailable(false);
+              setUpdateCheckState('up-to-date');
+              return;
+            }
           }
         }
 
-        // 2. Comprobación de respaldo contra InsForge Cloud
+        // 2. Comprobación de respaldo contra InsForge Cloud (solo si /version.json no respondió)
         const cloudVer = await ecuaplacConnector.fetchTenantVersion();
         if (!isMounted) return;
         if (cloudVer && cloudVer !== '000' && cloudVer !== CURRENT_SYSTEM_VERSION) {
@@ -817,6 +831,8 @@ export const EcuaplacPortal: React.FC = () => {
           setUpdateCheckState('available');
         } else {
           setNewVersionNotice(null);
+          setSimulatedUpdateAvailable(false);
+          setUpdateCheckState('up-to-date');
         }
       } catch {}
     };
@@ -832,12 +848,12 @@ export const EcuaplacPortal: React.FC = () => {
     window.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', checkVersion);
 
-    // Intervalo de comprobación en segundo plano cada 30 segundos
+    // Intervalo de comprobación en segundo plano cada 20 segundos
     const interval = setInterval(() => {
       if (autoCheckUpdates) {
         checkVersion();
       }
-    }, 30000);
+    }, 20000);
 
     return () => {
       isMounted = false;
@@ -850,18 +866,30 @@ export const EcuaplacPortal: React.FC = () => {
   const handleCheckUpdates = async () => {
     setUpdateCheckState('checking');
     try {
-      // 1. Comprobar /version.json en servidor
-      const res = await fetch(`/version.json?t=${Date.now()}`, {
+      // 1. Comprobar /version.json en servidor con bypass de caché absoluto
+      const endpoint = `${window.location.origin}/version.json?_t=${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const res = await fetch(endpoint, {
         cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
       if (res.ok) {
         const data = await res.json();
-        if (data?.version && data.version !== CURRENT_SYSTEM_VERSION) {
-          setNewVersionNotice(data.version);
-          setSimulatedUpdateAvailable(true);
-          setUpdateCheckState('available');
-          return;
+        if (data?.version) {
+          if (data.version !== CURRENT_SYSTEM_VERSION) {
+            setNewVersionNotice(data.version);
+            setSimulatedUpdateAvailable(true);
+            setUpdateCheckState('available');
+            return;
+          } else {
+            setNewVersionNotice(null);
+            setSimulatedUpdateAvailable(false);
+            setUpdateCheckState('up-to-date');
+            return;
+          }
         }
       }
 
@@ -875,6 +903,7 @@ export const EcuaplacPortal: React.FC = () => {
         setUpdateCheckState('available');
       } else {
         setNewVersionNotice(null);
+        setSimulatedUpdateAvailable(false);
         setUpdateCheckState('up-to-date');
       }
     } catch {
@@ -1873,31 +1902,41 @@ export const EcuaplacPortal: React.FC = () => {
         </div>
       </header>
 
-      {/* Banner Notificación Auto-Actualización (Negro Obsidiana) */}
-      {newVersionNotice && (
+      {/* Banner Notificación Auto-Actualización (Negro Obsidiana Integrado con Borde Dorado) */}
+      {newVersionNotice && !isUpdateBannerDismissed && (
         <div className="max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3">
           <div className="p-3.5 sm:p-4 rounded-2xl bg-[#08090C] border border-[#C5A059]/50 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <span className="relative flex h-3 w-3 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-[#C5A059]"></span>
               </span>
-              <div>
-                <span className="text-xs sm:text-sm font-black text-white block font-display">
+              <div className="min-w-0">
+                <span className="text-xs sm:text-sm font-bold text-white block font-display truncate">
                   ¡Nueva versión v{newVersionNotice} lista!
                 </span>
-                <span className="text-[11px] text-stone-300 font-sans block mt-0.5">
-                  {panelLang === 'es' ? 'Hay mejoras publicadas en el sistema. Pulsa para aplicar.' : 'System improvements available. Tap to apply.'}
+                <span className="text-[11px] text-stone-300 font-sans block mt-0.5 truncate">
+                  {panelLang === 'es' ? 'Hay mejoras publicadas en el sistema. Toca para aplicar.' : 'System improvements available. Tap to apply.'}
                 </span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleInstallUpdate}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-[#C5A059] hover:from-amber-300 hover:to-amber-500 text-slate-950 text-xs font-black shadow-md active:scale-95 transition-all shrink-0 cursor-pointer"
-            >
-              {panelLang === 'es' ? 'Actualizar' : 'Update'}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleInstallUpdate}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-[#C5A059] hover:from-amber-300 hover:to-amber-500 text-slate-950 text-xs font-black shadow-md active:scale-95 transition-all shrink-0 cursor-pointer"
+              >
+                {panelLang === 'es' ? 'Actualizar' : 'Update'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsUpdateBannerDismissed(true)}
+                className="p-1 rounded-lg text-stone-400 hover:text-white transition-colors cursor-pointer"
+                title="Cerrar aviso"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
