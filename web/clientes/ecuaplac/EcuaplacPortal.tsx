@@ -2017,14 +2017,14 @@ export const EcuaplacPortal: React.FC = () => {
 
           {/* Bloque 1: Métricas Maestras (Visitantes y Presupuestos Reales de Ecuaplac) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-            {/* KPI 1: Audiencia & Visitantes Reales (Compacto & Elegante) */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-4.5 sm:p-5 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-3">
+            {/* KPI 1: Audiencia & Visitantes Reales */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(14,165,233,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(14,165,233,0.18)] transition-all group flex flex-col justify-between gap-4">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-sky-400/10 rounded-full blur-2xl pointer-events-none" />
 
               <div className="flex items-center justify-between relative z-10">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(14,165,233,0.35)] group-hover:scale-105 transition-transform">
-                  <Users className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(14,165,233,0.35)] group-hover:scale-105 transition-transform">
+                  <Users className="w-6 h-6" />
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-800 text-[11px] font-semibold shadow-xs">
@@ -2046,7 +2046,7 @@ export const EcuaplacPortal: React.FC = () => {
                 <span className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight block mt-1 font-mono">
                   <AnimatedCounter value={cfMetrics.uniqueVisitors} />
                 </span>
-                <span className="text-xs text-stone-500 mt-1 flex items-center gap-1.5 font-medium">
+                <span className="text-xs text-stone-500 mt-1.5 flex items-center gap-1.5 font-medium">
                   <Activity className="w-3.5 h-3.5 text-sky-500" />
                   <span>
                     <AnimatedCounter value={cfMetrics.pageViews} /> páginas de reformas vistas
@@ -2054,9 +2054,9 @@ export const EcuaplacPortal: React.FC = () => {
                 </span>
               </div>
 
-              {/* Visualización de Actividad Compacta */}
-              <div className="pt-2 border-t border-sky-100/80 relative z-10">
-                <div className="flex items-end justify-between gap-1.5 h-5">
+              {/* Visualización de Actividad con Espaciado Generoso */}
+              <div className="pt-2.5 border-t border-sky-100/80 space-y-1.5 relative z-10">
+                <div className="flex items-end justify-between gap-1.5 h-6 lg:h-7">
                   {[35, 60, 50, 75, 65, 90, 100].map((height, i) => (
                     <div
                       key={i}
@@ -2068,19 +2068,22 @@ export const EcuaplacPortal: React.FC = () => {
                     />
                   ))}
                 </div>
+                <div className="flex items-center justify-end text-[10px] text-stone-400 font-mono pt-1">
+                  <span>{cfMetrics.updatedAt ? formatLogTime(cfMetrics.updatedAt) : 'Verificado hoy'}</span>
+                </div>
               </div>
             </div>
 
             {/* KPI 2: Solicitudes de Presupuesto (Leads de reformas de Ecuaplac) */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-4.5 sm:p-5 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-3">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F6FCF8] to-[#ECFDF5] rounded-3xl p-5 sm:p-6 border border-[#08090C]/30 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.12)] hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.18)] transition-all group flex flex-col justify-between gap-4">
               {/* Resplandor suave */}
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
 
               <div className="flex items-center justify-between relative z-10">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(16,185,129,0.35)] group-hover:scale-105 transition-transform">
-                  <Mail className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(16,185,129,0.35)] group-hover:scale-105 transition-transform">
+                  <Mail className="w-6 h-6" />
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold shadow-xs">
+                <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold shadow-xs">
                   {leads.filter((l) => l.status === 'new').length} pendientes
                 </span>
               </div>
@@ -2101,20 +2104,20 @@ export const EcuaplacPortal: React.FC = () => {
                   </span>
                   <span className="text-xs font-semibold text-stone-500 font-sans">solicitudes</span>
                 </div>
-                <span className="text-xs text-stone-500 mt-1 block font-medium truncate">
+                <span className="text-xs text-stone-500 mt-1.5 block font-medium truncate">
                   Último: <span className="font-semibold text-slate-800">{leads[0]?.name || 'Cliente'}</span> ({leads[0]?.date || 'Hoy'})
                 </span>
               </div>
 
               {/* Botón compacto de acceso a Leads */}
-              <div className="pt-2 border-t border-emerald-100/70 relative z-10 flex items-center justify-between">
+              <div className="pt-2.5 border-t border-emerald-100/70 relative z-10 flex items-center justify-between">
                 <span className="text-[11px] text-stone-500 font-normal font-sans">
                   Gestión rápida
                 </span>
                 <button
                   type="button"
                   onClick={() => setIsLeadsModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[36px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold shadow-xs border border-slate-700/50 active:scale-95 transition-all group/btn font-sans cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold shadow-xs border border-slate-700/50 active:scale-95 transition-all group/btn font-sans cursor-pointer"
                   title="Abrir bandeja de presupuestos"
                 >
                   <span>Ver Bandeja</span>
