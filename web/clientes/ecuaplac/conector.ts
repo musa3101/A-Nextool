@@ -1110,7 +1110,7 @@ export class EcuaplacConnector {
       const updatedProjects = isNew
         ? [savedProject, ...currentProjects.filter((p) => p.id !== savedProject.id && p.id !== project.id)]
         : currentProjects.map((p) => (p.id === savedProject.id ? savedProject : p));
-      this.saveProjects(updatedProjects);
+      this.saveMoreProjects(updatedProjects);
     } catch {
       // Ignorar si hay fallo de storage local
     }
