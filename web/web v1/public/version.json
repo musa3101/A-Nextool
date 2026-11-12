@@ -1,10 +1,10 @@
 {
-  "version": "3.0.5",
+  "version": "3.0.6",
   "buildTimestamp": 1794486988658,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
   "updatedAt": "2026-11-12T12:36:28.658Z",
-  "notes": "Versión 3.0.5: Panel de Contacto de la Web sincronizado con Supabase, bordes finos sutiles en Ajustes, motor reactivo de notificaciones con sonido acústico chime y sincronización mensual de visitas Cloudflare RUM.",
+  "notes": "Versión 3.0.6: Galerías 1 y 2 guardan fotos nuevas de forma permanente, la bandeja de presupuestos sincroniza los leads reales de Tally desde Supabase y el contacto de la web se valida contra la base de datos.",
   "changes": [
     "Corrección crítica de persistencia en Supabase para Carrusel 1 y Galería 2 (POST)",
     "Sincronización y desbloqueo de leads de Tally en la bandeja de Inicio",

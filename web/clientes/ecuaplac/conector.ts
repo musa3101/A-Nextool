@@ -658,7 +658,7 @@ export class EcuaplacConnector {
   async fetchLeadsOnline(): Promise<EcuaplacLeadItem[]> {
     // 1. Intentar consultar Supabase (leads generados en la web pública ecuaplac.com)
     try {
-      const res = await fetch(`${this.url}/rest/v1/${this.tables.leads}?select=*&order=created_at.desc&_t=${Date.now()}`, {
+      const res = await fetch(`${this.url}/rest/v1/${this.tables.leads}?select=*&order=created_at.desc`, {
         headers: this.getHeaders(),
         cache: 'no-store',
       });
@@ -830,7 +830,7 @@ export class EcuaplacConnector {
   async fetchContactsOnline(): Promise<EcuaplacContactItem[]> {
     try {
       const contactTable = this.tables.contact || 'ecuaplac_contact';
-      const res = await fetch(`${this.url}/rest/v1/${contactTable}?select=*&order=sort_order.asc&_t=${Date.now()}`, {
+      const res = await fetch(`${this.url}/rest/v1/${contactTable}?select=*&order=sort_order.asc`, {
         headers: this.getHeaders(),
         cache: 'no-store',
       });
