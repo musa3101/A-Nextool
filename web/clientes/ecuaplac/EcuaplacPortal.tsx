@@ -354,6 +354,32 @@ const playLeadNotificationSound = () => {
   }
 };
 
+// Versión que tenía instalada este dispositivo ANTES de cargar el código actual.
+// Se lee una sola vez al cargar el módulo (antes de que el portal la sobrescriba).
+const PREVIOUS_INSTALLED_VERSION: string | null = (() => {
+  try {
+    return localStorage.getItem('nextool_app_version');
+  } catch {
+    return null;
+  }
+})();
+const LS_DISMISSED_UPDATE = 'ecuaplac_dismissed_update_version';
+const LS_NOTIFIED_VERSION = 'ecuaplac_notified_version';
+const readLS = (k: string): string | null => {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+};
+const writeLS = (k: string, v: string) => {
+  try {
+    localStorage.setItem(k, v);
+  } catch {
+    // ignore
+  }
+};
+
 export const EcuaplacPortal: React.FC = () => {
   const { session, isAuthenticated, signInWithEmail, signOut, stopImpersonation } = useAuth();
   const { addAuditLog: addTenantContextAuditLog } = useTenant();
@@ -978,13 +1004,13 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '3.0.6';
+  const CURRENT_SYSTEM_VERSION = '3.0.7';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.6)
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.7)
     if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
@@ -998,7 +1024,42 @@ export const EcuaplacPortal: React.FC = () => {
     'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
     'Notificaciones en tiempo real y sonido acústico para nuevos presupuestos',
   ]);
-  const [isUpdateBannerDismissed, setIsUpdateBannerDismissed] = useState(false);
+  // Versión de aviso ya descartada/instalada (persistente: no se vuelve a mostrar el mismo aviso)
+  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<string | null>(() => readLS(LS_DISMISSED_UPDATE));
+  // Aviso único "Se actualizó a la versión X" cuando la app se autoactualiza sola
+  const [justUpdatedTo, setJustUpdatedTo] = useState<string | null>(() => {
+    const prev = PREVIOUS_INSTALLED_VERSION;
+    if (prev && prev !== CURRENT_SYSTEM_VERSION && readLS(LS_NOTIFIED_VERSION) !== CURRENT_SYSTEM_VERSION) {
+      return CURRENT_SYSTEM_VERSION;
+    }
+    return null;
+  });
+  const dismissUpdateBanner = (version: string) => {
+    writeLS(LS_DISMISSED_UPDATE, version);
+    setDismissedUpdateVersion(version);
+  };
+  const dismissJustUpdated = () => {
+    writeLS(LS_NOTIFIED_VERSION, CURRENT_SYSTEM_VERSION);
+    setJustUpdatedTo(null);
+  };
+  // Cargar las novedades de la versión recién autoinstalada
+  useEffect(() => {
+    if (!justUpdatedTo) return;
+    writeLS(LS_NOTIFIED_VERSION, CURRENT_SYSTEM_VERSION);
+    (async () => {
+      try {
+        const res = await fetch(`${window.location.origin}/version.json`, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.version === CURRENT_SYSTEM_VERSION && Array.isArray(data.changes) && data.changes.length > 0) {
+            setNewVersionChanges(data.changes);
+          }
+        }
+      } catch {
+        // sin novedades remotas: se usa el texto por defecto
+      }
+    })();
+  }, [justUpdatedTo]);
 
   const handleSendFeedback = async (channel: 'whatsapp' | 'email' | 'system') => {
     if (!feedbackMessage.trim()) {
@@ -1313,6 +1374,10 @@ export const EcuaplacPortal: React.FC = () => {
   const handleInstallUpdate = async () => {
     setUpdateCheckState('installing');
     const targetVer = newVersionNotice || CURRENT_SYSTEM_VERSION;
+    // Recordar que ya se atendió este aviso para que no vuelva a salir tras recargar
+    writeLS(LS_DISMISSED_UPDATE, targetVer);
+    writeLS(LS_NOTIFIED_VERSION, targetVer);
+    setDismissedUpdateVersion(targetVer);
     try {
       await ecuaplacConnector.updateTenantVersion(targetVer);
     } catch {}
@@ -2355,7 +2420,33 @@ export const EcuaplacPortal: React.FC = () => {
       </header>
 
       {/* Banner Notificación Auto-Actualización (Negro Obsidiana Integrado con Borde Dorado) */}
-      {newVersionNotice && !isUpdateBannerDismissed && (
+      {/* Aviso único tras autoactualización */}
+      {justUpdatedTo && !(newVersionNotice && dismissedUpdateVersion !== newVersionNotice) && (
+        <div className="max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#08090C] border border-[#C5A059]/50 shadow-xl flex items-start justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+            <div className="min-w-0">
+              <span className="text-xs sm:text-sm font-bold text-white block font-display">
+                {panelLang === 'es' ? `¡Tu app se ha actualizado a la v${justUpdatedTo}!` : `Your app was updated to v${justUpdatedTo}!`}
+              </span>
+              <ul className="mt-1 space-y-0.5">
+                {newVersionChanges.slice(0, 3).map((c, i) => (
+                  <li key={i} className="text-[11px] text-stone-300 font-sans leading-snug">• {c}</li>
+                ))}
+              </ul>
+            </div>
+            <button
+              type="button"
+              onClick={dismissJustUpdated}
+              className="p-1 rounded-lg text-stone-400 hover:text-white transition-colors cursor-pointer shrink-0"
+              title="Cerrar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {newVersionNotice && dismissedUpdateVersion !== newVersionNotice && (
         <div className="max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3">
           <div className="p-3.5 sm:p-4 rounded-2xl bg-[#08090C] border border-[#C5A059]/50 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-3 min-w-0">
@@ -2382,7 +2473,7 @@ export const EcuaplacPortal: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setIsUpdateBannerDismissed(true)}
+                onClick={() => dismissUpdateBanner(newVersionNotice)}
                 className="p-1 rounded-lg text-stone-400 hover:text-white transition-colors cursor-pointer"
                 title="Cerrar aviso"
               >
@@ -3550,7 +3641,7 @@ export const EcuaplacPortal: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setSimulatedUpdateAvailable(true);
-                              setNewVersionNotice('3.0.6');
+                              setNewVersionNotice('3.0.7');
                               setNewVersionChanges([
                                 'Nuevo panel de Contacto de la Web sincronizado con Supabase',
                                 'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
@@ -3561,7 +3652,7 @@ export const EcuaplacPortal: React.FC = () => {
                             className="text-[11px] font-semibold text-[#C5A059] hover:underline cursor-pointer"
                             title="Simula que hay una nueva actualización lista para instalar"
                           >
-                            {panelLang === 'es' ? 'Simular nueva v3.0.6' : 'Simulate new v3.0.6'}
+                            {panelLang === 'es' ? 'Simular nueva v3.0.7' : 'Simulate new v3.0.7'}
                           </button>
                         </div>
                       </div>
