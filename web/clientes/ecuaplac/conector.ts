@@ -666,8 +666,16 @@ export class EcuaplacConnector {
         const data = await res.json();
         if (Array.isArray(data)) {
           const dismissed = this.getDismissedLeadIds();
-          const mapped: EcuaplacLeadItem[] = data
-            .filter((d: any) => !dismissed.includes(d.id))
+          
+          // Si todos los leads de Supabase estaban descartados localmente (ej. por pruebas anteriores),
+          // limpiamos el descarte para que el gestor siempre vea las solicitudes reales de la web
+          let activeRows = data.filter((d: any) => !dismissed.includes(d.id));
+          if (activeRows.length === 0 && data.length > 0) {
+            this.clearDismissedLeadIds();
+            activeRows = data;
+          }
+
+          const mapped: EcuaplacLeadItem[] = activeRows
             .map((d: any) => {
               const parsed = parseLeadDetails(d.message || d.work_type || '', d.project_type || '');
               return {
@@ -843,10 +851,6 @@ export class EcuaplacConnector {
    * Actualiza un elemento de contacto en Supabase (ecuaplac_contact) y en local
    */
   async updateContactItem(id: string, updates: Partial<EcuaplacContactItem>): Promise<boolean> {
-    const contacts = this.getContacts();
-    const updated = contacts.map((c) => (c.id === id ? { ...c, ...updates } : c));
-    this.saveContacts(updated);
-
     try {
       const contactTable = this.tables.contact || 'ecuaplac_contact';
       const res = await fetch(`${this.url}/rest/v1/${contactTable}?id=eq.${id}`, {
@@ -855,8 +859,15 @@ export class EcuaplacConnector {
         body: JSON.stringify(updates),
       });
       if (res.ok) {
-        await this.addAuditLog('update', `Contacto web actualizado para ID ${id}`);
-        return true;
+        const data = await res.json();
+        // Verificar que Supabase realmente modificó la fila en la base de datos
+        if (Array.isArray(data) && data.length > 0) {
+          const contacts = this.getContacts();
+          const updated = contacts.map((c) => (c.id === id ? { ...c, ...updates } : c));
+          this.saveContacts(updated);
+          await this.addAuditLog('update', `Contacto web actualizado para ID ${id}`);
+          return true;
+        }
       }
     } catch (e) {
       console.error('Error al actualizar contacto en Supabase:', e);
@@ -950,13 +961,13 @@ export class EcuaplacConnector {
   /**
    * Guarda o actualiza una obra de portada (Dual: Supabase para ecuaplac.com + InsForge para NexTool)
    */
-  async saveWork(work: Partial<EcuaplacWorkItem>): Promise<EcuaplacWorkItem> {
-    const isNew = !work.id || !this.isUUID(work.id);
-    const existing = (!isNew && work.id) ? this.getWorks().find((w) => w.id === work.id) : undefined;
+  async saveWork(work: Partial<EcuaplacWorkItem>, isNewOverride?: boolean): Promise<EcuaplacWorkItem> {
+    const existing = work.id ? this.getWorks().find((w) => w.id === work.id) : undefined;
+    const isNew = isNewOverride !== undefined ? isNewOverride : (!work.id || !existing);
     const fullWork = { ...existing, ...work };
     let savedWork = { ...fullWork } as EcuaplacWorkItem;
 
-    // 1. Guardar en Supabase (ecuaplac_carousel) -> La web viva ecuaplac.com se actualiza
+    // 1. Guardar en Supabase (ecuaplac_galeria_1) -> La web viva ecuaplac.com se actualiza
     try {
       const endpoint = isNew
         ? `${this.url}/rest/v1/${this.tables.carousel}`
@@ -965,7 +976,6 @@ export class EcuaplacConnector {
       const method = isNew ? 'POST' : 'PATCH';
       const supabasePayload: Record<string, any> = isNew
         ? {
-          ...(this.isUUID(work.id) ? { id: work.id } : {}),
           title_es: fullWork.title_es || 'Nueva Obra',
           title_en: fullWork.title_en || fullWork.title_es || 'New Project',
           location_es: fullWork.location_es || 'Mallorca',
@@ -1003,6 +1013,17 @@ export class EcuaplacConnector {
       console.warn('Fallo al guardar obra en Supabase:', e);
     }
 
+    // Persistir de inmediato en la caché local para que nunca desaparezca al recargar o forzar sync
+    try {
+      const currentWorks = this.getWorks();
+      const updatedWorks = isNew
+        ? [savedWork, ...currentWorks.filter((w) => w.id !== savedWork.id && w.id !== work.id)]
+        : currentWorks.map((w) => (w.id === savedWork.id ? savedWork : w));
+      this.saveWorks(updatedWorks);
+    } catch {
+      // Ignorar si hay fallo de storage local
+    }
+
     // 2. Sincronizar en InsForge Cloud (obras) + Auditoría en NexTool
     try {
       const insforgePayload = {
@@ -1035,13 +1056,13 @@ export class EcuaplacConnector {
   /**
    * Guarda o actualiza un proyecto en Más Reformas (Dual: Supabase + InsForge)
    */
-  async saveProject(project: Partial<EcuaplacWorkItem>): Promise<EcuaplacWorkItem> {
-    const isNew = !project.id || !this.isUUID(project.id);
-    const existing = (!isNew && project.id) ? this.getMoreProjects().find((p) => p.id === project.id) : undefined;
+  async saveProject(project: Partial<EcuaplacWorkItem>, isNewOverride?: boolean): Promise<EcuaplacWorkItem> {
+    const existing = project.id ? this.getMoreProjects().find((p) => p.id === project.id) : undefined;
+    const isNew = isNewOverride !== undefined ? isNewOverride : (!project.id || !existing);
     const fullProject = { ...existing, ...project };
     let savedProject = { ...fullProject } as EcuaplacWorkItem;
 
-    // 1. Guardar en Supabase (ecuaplac_more_projects) -> La web viva ecuaplac.com se actualiza
+    // 1. Guardar en Supabase (ecuaplac_galeria_2) -> La web viva ecuaplac.com se actualiza
     try {
       const endpoint = isNew
         ? `${this.url}/rest/v1/${this.tables.moreProjects}`
@@ -1050,7 +1071,6 @@ export class EcuaplacConnector {
       const method = isNew ? 'POST' : 'PATCH';
       const supabasePayload: Record<string, any> = isNew
         ? {
-          ...(this.isUUID(project.id) ? { id: project.id } : {}),
           title_es: fullProject.title_es || 'Nuevo Proyecto',
           title_en: fullProject.title_en || fullProject.title_es || 'New Project',
           image_url: fullProject.image_url || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c',
@@ -1082,6 +1102,17 @@ export class EcuaplacConnector {
       }
     } catch (e) {
       console.warn('Fallo al guardar proyecto en Supabase:', e);
+    }
+
+    // Persistir de inmediato en la caché local para que nunca desaparezca al recargar o forzar sync
+    try {
+      const currentProjects = this.getMoreProjects();
+      const updatedProjects = isNew
+        ? [savedProject, ...currentProjects.filter((p) => p.id !== savedProject.id && p.id !== project.id)]
+        : currentProjects.map((p) => (p.id === savedProject.id ? savedProject : p));
+      this.saveProjects(updatedProjects);
+    } catch {
+      // Ignorar si hay fallo de storage local
     }
 
     // 2. Sincronizar en InsForge Cloud (obras type: gallery) + Auditoría en NexTool

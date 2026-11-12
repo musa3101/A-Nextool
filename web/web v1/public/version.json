@@ -1,11 +1,14 @@
 {
   "version": "3.0.5",
-  "buildTimestamp": 1794431150000,
+  "buildTimestamp": 1794486988658,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
-  "updatedAt": "2026-11-11T21:05:00.000Z",
+  "updatedAt": "2026-11-12T12:36:28.658Z",
   "notes": "Versión 3.0.5: Panel de Contacto de la Web sincronizado con Supabase, bordes finos sutiles en Ajustes, motor reactivo de notificaciones con sonido acústico chime y sincronización mensual de visitas Cloudflare RUM.",
   "changes": [
+    "Corrección crítica de persistencia en Supabase para Carrusel 1 y Galería 2 (POST)",
+    "Sincronización y desbloqueo de leads de Tally en la bandeja de Inicio",
+    "Blindaje de actualización de contactos en Supabase con RLS",
     "Nuevo panel de Contacto de la Web sincronizado con Supabase",
     "Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo",
     "Notificaciones en tiempo real y sonido acústico para nuevos presupuestos",
