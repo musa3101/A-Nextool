@@ -3,7 +3,7 @@
   "name": "Ecuaplac Reformas Integrales",
   "owner": "Jose (José Rivadeneira)",
   "version": "3.0.5",
-  "last_updated": "2026-11-11",
+  "last_updated": "2026-11-12",
   "status": "active",
   "route": "/ecuaplac",
   "modules": [
@@ -22,6 +22,9 @@
     "metricas_mensuales_rum"
   ],
   "changes": [
+    "Corrección crítica de persistencia en Supabase para Carrusel 1 y Galería 2 (POST)",
+    "Sincronización y desbloqueo de leads de Tally en la bandeja de Inicio",
+    "Blindaje de actualización de contactos en Supabase con RLS",
     "Nuevo panel de Contacto de la Web sincronizado con Supabase",
     "Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo",
     "Notificaciones en tiempo real y sonido acústico para nuevos presupuestos",

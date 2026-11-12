@@ -842,7 +842,8 @@ export const EcuaplacPortal: React.FC = () => {
         );
       }
 
-      await Promise.all(promises);
+      const results = await Promise.all(promises);
+      const allSuccess = results.every(Boolean);
 
       // Esperar al menos 600ms para confirmación táctil visual
       const elapsed = Date.now() - startTime;
@@ -850,16 +851,23 @@ export const EcuaplacPortal: React.FC = () => {
         await new Promise((r) => setTimeout(r, 600 - elapsed));
       }
 
-      // Refrescar lista local y estado
-      const updatedContacts = ecuaplacConnector.getContacts();
-      setContacts([...updatedContacts]);
+      if (allSuccess) {
+        // Refrescar lista local y estado
+        const updatedContacts = ecuaplacConnector.getContacts();
+        setContacts([...updatedContacts]);
 
-      addAuditLog('Contacto de la web actualizado', 'Ecuaplac Web', 'success', 'update');
-      showSyncToast(
-        panelLang === 'es' ? 'Contacto de la web actualizado con éxito' : 'Website contact updated successfully',
-        'success'
-      );
-      setIsEditingContacts(false);
+        addAuditLog('Contacto de la web actualizado', 'Ecuaplac Web', 'success', 'update');
+        showSyncToast(
+          panelLang === 'es' ? 'Contacto de la web actualizado con éxito' : 'Website contact updated successfully',
+          'success'
+        );
+        setIsEditingContacts(false);
+      } else {
+        showSyncToast(
+          panelLang === 'es' ? 'Error al guardar contactos en Supabase' : 'Error updating website contacts on Supabase',
+          'error'
+        );
+      }
     } catch {
       showSyncToast(
         panelLang === 'es' ? 'Error al guardar contactos en la web' : 'Error updating website contacts',
@@ -2213,9 +2221,9 @@ export const EcuaplacPortal: React.FC = () => {
         if (isCarousel) {
           setWorks((prev) => [newItem, ...prev]);
           try {
-            const saved = await ecuaplacConnector.saveWork(newItem);
+            const saved = await ecuaplacConnector.saveWork(newItem, true);
             if (saved && saved.id) {
-              setWorks((prev) => prev.map((i) => (i.id === newItem.id ? { ...newItem, ...saved } : i)));
+              setWorks((prev) => [saved, ...prev.filter((i) => i.id !== newItem.id && i.id !== saved.id)]);
             }
             showSyncToast(
               panelLang === 'es' ? '¡Foto publicada en ecuaplac.com!' : 'Photo published on ecuaplac.com!',
@@ -2232,9 +2240,9 @@ export const EcuaplacPortal: React.FC = () => {
         } else {
           setMoreProjects((prev) => [newItem, ...prev]);
           try {
-            const saved = await ecuaplacConnector.saveProject(newItem);
+            const saved = await ecuaplacConnector.saveProject(newItem, true);
             if (saved && saved.id) {
-              setMoreProjects((prev) => prev.map((i) => (i.id === newItem.id ? { ...newItem, ...saved } : i)));
+              setMoreProjects((prev) => [saved, ...prev.filter((i) => i.id !== newItem.id && i.id !== saved.id)]);
             }
             showSyncToast(
               panelLang === 'es' ? '¡Proyecto publicado en ecuaplac.com!' : 'Project published on ecuaplac.com!',
@@ -4125,6 +4133,24 @@ export const EcuaplacPortal: React.FC = () => {
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-[#C5A059]" />
                   <span>{panelLang === 'es' ? 'Restaurar Ejemplos' : 'Restore Demo Leads'}</span>
+                </button>
+              )}
+              {ecuaplacConnector.getDismissedLeadIds().length > 0 && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    ecuaplacConnector.clearDismissedLeadIds();
+                    await handleRefreshLeads();
+                    showSyncToast(
+                      panelLang === 'es' ? 'Solicitudes archivadas recuperadas de Supabase' : 'Archived leads recovered from Supabase',
+                      'success'
+                    );
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-all active:scale-95"
+                  title={panelLang === 'es' ? 'Mostrar todas las solicitudes de la base de datos' : 'Show all leads from database'}
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{panelLang === 'es' ? 'Recuperar Archivadas' : 'Recover Archived'}</span>
                 </button>
               )}
               {copiedField && (
