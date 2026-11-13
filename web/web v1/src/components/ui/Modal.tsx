@@ -14,6 +14,8 @@ export interface ModalProps {
   theme?: 'light' | 'dark';
   panelClassName?: string;
   headerExtra?: React.ReactNode;
+  /** Opt-in: en móvil (< sm) ocupa toda la pantalla (100dvh). Desktop intacto. */
+  mobileFullscreen?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -27,6 +29,7 @@ export const Modal: React.FC<ModalProps> = ({
   theme = 'light',
   panelClassName = '',
   headerExtra,
+  mobileFullscreen = false,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -87,10 +90,19 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   const isDark = theme === 'dark';
+  const fs = mobileFullscreen;
+
+  const containerLayout = fs
+    ? 'items-stretch sm:items-center p-0 sm:px-4 sm:pt-[max(48px,calc(env(safe-area-inset-top)+12px))] sm:pb-[max(20px,env(safe-area-inset-bottom))]'
+    : 'items-start sm:items-center px-2 sm:px-4 pt-[max(48px,calc(env(safe-area-inset-top)+12px))] pb-[max(20px,env(safe-area-inset-bottom))]';
+
+  const panelLayout = fs
+    ? `h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-3xl px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-[max(14px,calc(env(safe-area-inset-top)+8px))] sm:p-6 animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200`
+    : 'max-h-[86vh] sm:max-h-[90vh] rounded-3xl p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-150';
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain flex min-h-full items-start sm:items-center justify-center px-2 sm:px-4 pt-[max(48px,calc(env(safe-area-inset-top)+12px))] pb-[max(20px,env(safe-area-inset-bottom))] text-center select-none"
+      className={`fixed inset-0 z-[9999] overflow-y-auto overscroll-contain flex min-h-full justify-center text-center select-none ${containerLayout}`}
       style={{ touchAction: 'pan-y' }}
     >
       {/* Backdrop Oscuro Sólido Nítido (Sin blur que interfiera con la barra de estado de iOS) */}
@@ -102,12 +114,14 @@ export const Modal: React.FC<ModalProps> = ({
 
       {/* Modal Dialog Card */}
       <div
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className={`w-full ${maxWidthClasses[maxWidth]} max-h-[86vh] sm:max-h-[90vh] flex flex-col transform overflow-hidden rounded-3xl ${
+        className={`w-full ${maxWidthClasses[maxWidth]} ${panelLayout} flex flex-col transform overflow-hidden ${
           isDark
             ? 'bg-[#0B111E] border border-white/10 ring-1 ring-white/5 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85)] text-slate-100'
             : 'bg-white border border-stone-200 shadow-2xl text-slate-900'
-        } p-4 sm:p-6 text-left transition-all z-10 relative overscroll-contain animate-in fade-in zoom-in-95 duration-150 select-text my-0 sm:my-auto ${panelClassName}`}
+        } text-left transition-all z-10 relative overscroll-contain select-text my-0 sm:my-auto ${panelClassName}`}
       >
         <div
           className={`shrink-0 flex items-start justify-between pb-3.5 border-b ${
@@ -134,7 +148,8 @@ export const Modal: React.FC<ModalProps> = ({
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className={`p-1.5 -mr-2 rounded-full cursor-pointer transition-colors ${
+              aria-label="Cerrar"
+              className={`${fs ? 'p-2.5 -mr-1 sm:p-1.5 sm:-mr-2 bg-stone-100 sm:bg-transparent' : 'p-1.5 -mr-2'} rounded-full cursor-pointer transition-colors ${
                 isDark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-stone-400 hover:text-slate-900 hover:bg-stone-100'
               }`}
             >

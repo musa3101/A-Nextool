@@ -2,8 +2,8 @@
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
   "owner": "Jose (José Rivadeneira)",
-  "version": "3.0.7",
-  "last_updated": "2026-11-12",
+  "version": "3.0.8",
+  "last_updated": "2026-11-13",
   "status": "active",
   "route": "/ecuaplac",
   "modules": [
@@ -22,8 +22,8 @@
     "metricas_mensuales_rum"
   ],
   "changes": [
-    "Aviso único cuando la app se actualiza sola, con las novedades",
-    "El aviso de actualización ya no se repite tras instalar o cerrar",
-    "Leads y contactos sincronizan correctamente con Supabase"
+    "Bandeja de presupuestos a pantalla completa en el móvil",
+    "Lista de solicitudes más fluida, sin quedarse pillada",
+    "Diseño más limpio y legible de la bandeja de presupuestos"
   ]
 }
