@@ -2,7 +2,7 @@
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
   "owner": "Jose (José Rivadeneira)",
-  "version": "3.0.8",
+  "version": "3.0.9",
   "last_updated": "2026-11-13",
   "status": "active",
   "route": "/ecuaplac",
@@ -22,8 +22,8 @@
     "metricas_mensuales_rum"
   ],
   "changes": [
-    "Bandeja de presupuestos a pantalla completa en el móvil",
-    "Lista de solicitudes más fluida, sin quedarse pillada",
-    "Diseño más limpio y legible de la bandeja de presupuestos"
+    "Automatización de analíticas Cloudflare RUM 100% en la nube",
+    "Paginación y conteo total en el historial de Últimos Movimientos",
+    "Aterrizaje fijo en Inicio y cabecera al volver a la app o cambiar de sección"
   ]
 }
