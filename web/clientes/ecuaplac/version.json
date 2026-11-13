@@ -2,7 +2,7 @@
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
   "owner": "Jose (José Rivadeneira)",
-  "version": "3.0.9",
+  "version": "3.1.0",
   "last_updated": "2026-11-13",
   "status": "active",
   "route": "/ecuaplac",
@@ -19,9 +19,13 @@
     "tactile_borders_30",
     "mynext_care_status",
     "notificaciones_sonido_chime",
-    "metricas_mensuales_rum"
+    "metricas_mensuales_rum",
+    "smart_autohide_header",
+    "header_logo_fade_in"
   ],
   "changes": [
+    "Animación suave de entrada (fade-in desde la izquierda) para el logo y nombre en la cabecera",
+    "Smart Header con auto-hide (fade-out al hacer scroll hacia abajo y reaparición inmediata al subir)",
     "Automatización de analíticas Cloudflare RUM 100% en la nube",
     "Paginación y conteo total en el historial de Últimos Movimientos",
     "Aterrizaje fijo en Inicio y cabecera al volver a la app o cambiar de sección"

@@ -254,7 +254,9 @@ const InteractiveTrafficBars: React.FC<{
                 key={i}
                 onMouseEnter={() => setActiveBarIndex(i)}
                 onClick={() => setActiveBarIndex(activeBarIndex === i ? null : i)}
+                onTouchStart={() => setActiveBarIndex(activeBarIndex === i ? null : i)}
                 className="flex-1 h-full flex items-end group relative py-0.5"
+                style={{ touchAction: 'manipulation' }}
                 title={`${bar.dayLabel}: ${bar.visitors} ${panelLang === 'es' ? 'visitas' : 'visitors'}`}
               >
                 <div
@@ -454,13 +456,34 @@ export const EcuaplacPortal: React.FC = () => {
   // Tab: 'inicio' | 'obras' (Galería 1) | 'more_projects' (Galería 2) | 'ajustes'
   const [activeTab, setActiveTab] = useState<'inicio' | 'obras' | 'more_projects' | 'ajustes'>('inicio');
 
+  // Fade-out suave del header al hacer scroll (IntersectionObserver — fiable en iOS Safari)
+  const [isHeaderFaded, setIsHeaderFaded] = useState(false);
+  const headerSentinelRef = useRef<HTMLDivElement | null>(null);
+
   // Función unificada de cambio de pestaña con reseteo instantáneo de scroll a la cabecera
   const switchTab = (tab: 'inicio' | 'obras' | 'more_projects' | 'ajustes') => {
     setActiveTab(tab);
+    setIsHeaderFaded(false);
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }
   };
+
+  // IntersectionObserver: cuando el sentinela sale de la pantalla (scroll > ~80px) → fade out
+  useEffect(() => {
+    const sentinel = headerSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // entry.isIntersecting = true → el sentinela es visible → header visible
+        // entry.isIntersecting = false → has scrolleado lo suficiente → fade out
+        setIsHeaderFaded(!entry.isIntersecting);
+      },
+      { threshold: 0, rootMargin: '0px 0px 0px 0px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [isAuthenticated]);
 
   // 1. Desactivar scrollRestoration automático de Safari/iOS para evitar caídas a mitad de página
   useEffect(() => {
@@ -1063,13 +1086,18 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '3.0.9';
+  const CURRENT_SYSTEM_VERSION = '3.1.0';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
-  const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
+  const [autoCheckUpdates, setAutoCheckUpdates] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ecuaplac_auto_check_updates');
+      return saved === null ? true : saved === 'true';
+    } catch { return true; }
+  });
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.9)
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.1.0)
     if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
@@ -2451,13 +2479,15 @@ export const EcuaplacPortal: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Header Oficial de Ecuaplac (Obsidian Black Sólido Puro 100% Nítido - Cero Difuminados) */}
+      {/* 1. Header Oficial de Ecuaplac (Obsidian Black Sólido Puro - Fade-in al entrar, Fade-out suave al scroll) */}
       <header
-        className="sticky top-0 z-30 bg-[#08090C] border-b border-white/[0.08] shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(18px,calc(env(safe-area-inset-top)+6px))] pb-3 select-none"
+        className={`sticky top-0 z-30 bg-[#08090C] border-b border-white/[0.08] shadow-sm px-4 sm:px-6 lg:px-8 pt-[max(18px,calc(env(safe-area-inset-top)+6px))] pb-3 select-none transition-opacity duration-300 ease-in-out ${
+          isHeaderFaded ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
         style={{ WebkitBackdropFilter: 'none', backdropFilter: 'none', isolation: 'isolate' }}
       >
         <div className="w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 animate-logo-fade-in">
             <div className="h-9 w-9 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-md border border-white/20 ring-1 ring-white/10 transform-gpu will-change-transform">
               <img
                 src="/ecuaplac/fav-sin-fondo.svg"
@@ -2494,6 +2524,9 @@ export const EcuaplacPortal: React.FC = () => {
           </a>
         </div>
       </header>
+
+      {/* Sentinela invisible para IntersectionObserver — cuando sale de pantalla, el header hace fade-out */}
+      <div ref={headerSentinelRef} className="w-full h-0" aria-hidden="true" />
 
       {/* Banner Notificación Auto-Actualización (Negro Obsidiana Integrado con Borde Dorado) */}
       {/* Aviso único tras autoactualización */}
@@ -3648,7 +3681,11 @@ export const EcuaplacPortal: React.FC = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setAutoCheckUpdates(!autoCheckUpdates)}
+                        onClick={() => {
+                          const next = !autoCheckUpdates;
+                          setAutoCheckUpdates(next);
+                          try { localStorage.setItem('ecuaplac_auto_check_updates', String(next)); } catch {}
+                        }}
                         className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 cursor-pointer shrink-0 ${
                           autoCheckUpdates ? 'bg-[#0B111E]' : 'bg-stone-300'
                         }`}
