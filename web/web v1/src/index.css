@@ -102,4 +102,20 @@
   display: inline-block;
 }
 
+/* Animación de entrada suave del logo y marca Ecuaplac (Fade-in desde la izquierda) */
+@keyframes logoFadeInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-logo-fade-in {
+  animation: logoFadeInLeft 1200ms cubic-bezier(0.16, 1, 0.3, 1) 250ms both;
+}
+
 
