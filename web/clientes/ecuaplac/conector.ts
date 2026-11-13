@@ -1203,19 +1203,22 @@ export class EcuaplacConnector {
   }
 
   /**
-   * Consulta los logs reales de auditoría desde InsForge Cloud
+   * Consulta los logs reales de auditoría desde InsForge Cloud con conteo total y paginación
    */
-  async fetchAuditLogsOnline(limit = 50): Promise<EcuaplacAuditLog[]> {
+  async fetchAuditLogsOnline(
+    limit = 50,
+    offset = 0
+  ): Promise<{ logs: EcuaplacAuditLog[]; totalCount: number }> {
     try {
-      const { data, error } = await insforge.database
+      const { data, error, count } = await insforge.database
         .from('audit_logs')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('tenant_id', ECUAPLAC_TENANT_ID)
         .order('created_at', { ascending: false })
-        .limit(limit);
+        .range(offset, offset + limit - 1);
 
       if (!error && Array.isArray(data)) {
-        return data.map((d: any) => ({
+        const logs = data.map((d: any) => ({
           id: d.id || String(Date.now()),
           tenant_id: d.tenant_id,
           user_email: d.user_email || 'ecuaplacbyjyg@gmail.com',
@@ -1225,11 +1228,12 @@ export class EcuaplacConnector {
           created_at: d.created_at || new Date().toISOString(),
           time: formatLogTime(d.created_at || new Date().toISOString()),
         }));
+        return { logs, totalCount: typeof count === 'number' ? count : logs.length };
       }
     } catch (e) {
       console.warn('Error al consultar logs en InsForge:', e);
     }
-    return [];
+    return { logs: [], totalCount: 0 };
   }
 
   /**

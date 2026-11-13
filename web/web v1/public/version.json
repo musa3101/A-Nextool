@@ -1,13 +1,13 @@
 {
-  "version": "3.0.8",
-  "buildTimestamp": 1794599552367,
+  "version": "3.0.9",
+  "buildTimestamp": 1794602880000,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
-  "updatedAt": "2026-11-13T19:52:32.000Z",
-  "notes": "Versión 3.0.8: bandeja de presupuestos rediseñada, a pantalla completa y más fluida en móvil.",
+  "updatedAt": "2026-11-13T20:48:00.000Z",
+  "notes": "Versión 3.0.9: analíticas RUM automáticas en nube, paginación completa de logs y aterrizaje fijo en cabecera de Inicio.",
   "changes": [
-    "Bandeja de presupuestos a pantalla completa en el móvil",
-    "Lista de solicitudes más fluida, sin quedarse pillada",
-    "Diseño más limpio y legible de la bandeja de presupuestos"
+    "Automatización de analíticas Cloudflare RUM 100% en la nube",
+    "Paginación y conteo total en el historial de Últimos Movimientos",
+    "Aterrizaje fijo en Inicio y cabecera al volver a la app o cambiar de sección"
   ]
 }

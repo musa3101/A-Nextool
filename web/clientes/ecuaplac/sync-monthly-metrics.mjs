@@ -60,6 +60,12 @@ for (const envPath of possibleEnvPaths) {
   }
 }
 
+// Soporte nativo para variables de entorno directas (ej. GitHub Actions / CI-CD)
+token = process.env.CLOUDFLARE_API_TOKEN || process.env.VITE_CLOUDFLARE_API_TOKEN || token;
+zoneId = process.env.CLOUDFLARE_ECUAPLAC_ZONE_ID || process.env.VITE_CLOUDFLARE_ECUAPLAC_ZONE_ID || zoneId;
+insforgeUrl = process.env.INSFORGE_URL || process.env.VITE_INSFORGE_URL || insforgeUrl;
+insforgeKey = process.env.INSFORGE_ANON_KEY || process.env.VITE_INSFORGE_ANON_KEY || insforgeKey;
+
 if (!token) {
   console.error('❌ Error: VITE_CLOUDFLARE_API_TOKEN no encontrado en .env.local');
   process.exit(1);

@@ -395,6 +395,8 @@ export const EcuaplacPortal: React.FC = () => {
 
   // Auditoría & Logs en vivo desde InsForge Cloud
   const [logs, setLogs] = useState<EcuaplacAuditLog[]>([]);
+  const [totalLogsCount, setTotalLogsCount] = useState<number>(0);
+  const [isLoadingMoreLogs, setIsLoadingMoreLogs] = useState(false);
   const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
 
   const addAuditLog = (
@@ -413,6 +415,7 @@ export const EcuaplacPortal: React.FC = () => {
       details: { target, ...details },
     };
     setLogs((prev) => [tempLog, ...prev]);
+    setTotalLogsCount((prev) => (prev > 0 ? prev + 1 : 1));
 
     ecuaplacConnector.addAuditLog(tempLog.entity, action, details).then((saved) => {
       if (saved && saved.id) {
@@ -451,12 +454,67 @@ export const EcuaplacPortal: React.FC = () => {
   // Tab: 'inicio' | 'obras' (Galería 1) | 'more_projects' (Galería 2) | 'ajustes'
   const [activeTab, setActiveTab] = useState<'inicio' | 'obras' | 'more_projects' | 'ajustes'>('inicio');
 
-  // Garantizar que al iniciar sesión o acceder al portal la pestaña activa sea siempre 'inicio'
+  // Función unificada de cambio de pestaña con reseteo instantáneo de scroll a la cabecera
+  const switchTab = (tab: 'inicio' | 'obras' | 'more_projects' | 'ajustes') => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  };
+
+  // 1. Desactivar scrollRestoration automático de Safari/iOS para evitar caídas a mitad de página
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if ('scrollRestoration' in window.history) {
+        window.history.scrollRestoration = 'manual';
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, []);
+
+  // 2. Garantizar que al iniciar sesión o acceder al portal la pestaña activa sea siempre 'inicio' arriba del todo
   useEffect(() => {
     if (isAuthenticated) {
       setActiveTab('inicio');
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
     }
   }, [isAuthenticated]);
+
+  // 3. Si el usuario vuelve a la app tras estar fuera más de 15 minutos, volver a Inicio arriba con la cabecera
+  useEffect(() => {
+    let lastActiveTime = Date.now();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const diffMinutes = (Date.now() - lastActiveTime) / 60000;
+        if (diffMinutes >= 15) {
+          setActiveTab('inicio');
+          if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+          }
+        }
+        lastActiveTime = Date.now();
+      } else {
+        lastActiveTime = Date.now();
+      }
+    };
+
+    const handlePageShow = () => {
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, []);
 
   // Garantizar nitidez absoluta del header en iOS / Safari sincronizando el status bar con #08090C
   useEffect(() => {
@@ -551,9 +609,10 @@ export const EcuaplacPortal: React.FC = () => {
       }
     });
 
-    ecuaplacConnector.fetchAuditLogsOnline().then((liveLogs) => {
-      if (liveLogs && liveLogs.length > 0) {
-        setLogs(liveLogs);
+    ecuaplacConnector.fetchAuditLogsOnline(50, 0).then((res) => {
+      if (res && res.logs && res.logs.length > 0) {
+        setLogs(res.logs);
+        setTotalLogsCount(res.totalCount);
       }
     });
 
@@ -1004,13 +1063,13 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '3.0.8';
+  const CURRENT_SYSTEM_VERSION = '3.0.9';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.8)
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.0.9)
     if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
@@ -1892,8 +1951,9 @@ export const EcuaplacPortal: React.FC = () => {
   const handleRefreshLogs = async () => {
     setIsRefreshingLogs(true);
     try {
-      const liveLogs = await ecuaplacConnector.fetchAuditLogsOnline(50);
-      setLogs(liveLogs);
+      const res = await ecuaplacConnector.fetchAuditLogsOnline(50, 0);
+      setLogs(res.logs);
+      setTotalLogsCount(res.totalCount);
       showSyncToast(
         panelLang === 'es' ? 'Historial sincronizado con el servidor' : 'History synced with server',
         'success'
@@ -1905,6 +1965,22 @@ export const EcuaplacPortal: React.FC = () => {
       );
     } finally {
       setIsRefreshingLogs(false);
+    }
+  };
+
+  const handleLoadMoreLogs = async () => {
+    if (isLoadingMoreLogs) return;
+    setIsLoadingMoreLogs(true);
+    try {
+      const res = await ecuaplacConnector.fetchAuditLogsOnline(50, logs.length);
+      if (res.logs && res.logs.length > 0) {
+        setLogs((prev) => [...prev, ...res.logs]);
+        setTotalLogsCount(res.totalCount);
+      }
+    } catch (e) {
+      console.warn('Error al cargar más movimientos:', e);
+    } finally {
+      setIsLoadingMoreLogs(false);
     }
   };
 
@@ -2301,7 +2377,7 @@ export const EcuaplacPortal: React.FC = () => {
               'error'
             );
           }
-          setActiveTab('obras');
+          switchTab('obras');
         } else {
           setMoreProjects((prev) => [newItem, ...prev]);
           try {
@@ -2320,7 +2396,7 @@ export const EcuaplacPortal: React.FC = () => {
               'error'
             );
           }
-          setActiveTab('more_projects');
+          switchTab('more_projects');
         }
 
         addAuditLog(
@@ -2352,7 +2428,7 @@ export const EcuaplacPortal: React.FC = () => {
             setLoginError(res.error || (panelLang === 'es' ? 'Error al iniciar sesión' : 'Sign in failed'));
             throw new Error(res.error || 'Login failed');
           } else {
-            setActiveTab('inicio');
+            switchTab('inicio');
           }
         }}
       />
@@ -3761,7 +3837,7 @@ export const EcuaplacPortal: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-mono text-[11px] font-semibold">
-                    {logs.length}
+                    {totalLogsCount || logs.length}
                   </span>
                   <ChevronRight className="w-4 h-4 text-stone-400" />
                 </div>
@@ -3771,7 +3847,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={async () => {
-                  setActiveTab('inicio');
+                  switchTab('inicio');
                   await signOut();
                   showSyncToast(
                     panelLang === 'es' ? 'Sesión cerrada correctamente' : 'Signed out successfully',
@@ -4935,13 +5011,13 @@ export const EcuaplacPortal: React.FC = () => {
           <div className="flex items-center justify-between">
             <span className="text-xs text-stone-500 font-medium">
               {panelLang === 'es'
-                ? `Actividad en tiempo real (${logs.length})`
-                : `Real-time activity (${logs.length})`}
+                ? `Mostrando ${logs.length} de ${totalLogsCount || logs.length} movimientos`
+                : `Showing ${logs.length} of ${totalLogsCount || logs.length} events`}
             </span>
             <button
               type="button"
               onClick={handleRefreshLogs}
-              className="text-xs font-bold text-slate-900 hover:text-[#C5A059] flex items-center gap-1.5 bg-stone-100 active:scale-95 px-3 py-1.5 rounded-xl border border-stone-200 transition-all"
+              className="text-xs font-bold text-slate-900 hover:text-[#C5A059] flex items-center gap-1.5 bg-stone-100 active:scale-95 px-3 py-1.5 rounded-xl border border-stone-200 transition-all cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[#C5A059] ${isRefreshingLogs ? 'animate-spin' : ''}`} />
               <span>{panelLang === 'es' ? 'Refrescar' : 'Refresh'}</span>
@@ -5000,6 +5076,30 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                 );
               })
+            )}
+
+            {totalLogsCount > logs.length && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleLoadMoreLogs}
+                  disabled={isLoadingMoreLogs}
+                  className="w-full py-2.5 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 hover:text-stone-900 text-xs font-bold transition-all border border-stone-200 flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-60"
+                >
+                  {isLoadingMoreLogs ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#C5A059]" />
+                      <span>{panelLang === 'es' ? 'Cargando más movimientos...' : 'Loading more activity...'}</span>
+                    </>
+                  ) : (
+                    <span>
+                      {panelLang === 'es'
+                        ? `Cargar más movimientos (+50 de ${totalLogsCount - logs.length} restantes)`
+                        : `Load more (+50 of ${totalLogsCount - logs.length} remaining)`}
+                    </span>
+                  )}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -5416,7 +5516,7 @@ export const EcuaplacPortal: React.FC = () => {
             {/* Tab 1: Inicio */}
             <button
               type="button"
-              onClick={() => setActiveTab('inicio')}
+              onClick={() => switchTab('inicio')}
               className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'inicio' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
@@ -5437,7 +5537,7 @@ export const EcuaplacPortal: React.FC = () => {
             {/* Tab 2: Galería 1 (Carrusel Portada) */}
             <button
               type="button"
-              onClick={() => setActiveTab('obras')}
+              onClick={() => switchTab('obras')}
               className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'obras' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
@@ -5474,7 +5574,7 @@ export const EcuaplacPortal: React.FC = () => {
             {/* Tab 3: Galería 2 (Catálogo / Más Reformas con Icono Distintivo) */}
             <button
               type="button"
-              onClick={() => setActiveTab('more_projects')}
+              onClick={() => switchTab('more_projects')}
               className={`flex-1 flex flex-col items-center gap-1.5 py-1 transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'more_projects' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
@@ -5495,7 +5595,7 @@ export const EcuaplacPortal: React.FC = () => {
             {/* Tab 4: Ajustes */}
             <button
               type="button"
-              onClick={() => setActiveTab('ajustes')}
+              onClick={() => switchTab('ajustes')}
               className={`flex-1 flex flex-col items-center gap-1.5 py-1 relative transition-all select-none active:scale-95 cursor-pointer group ${
                 activeTab === 'ajustes' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
               }`}

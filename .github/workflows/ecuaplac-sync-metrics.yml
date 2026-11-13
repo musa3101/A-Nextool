@@ -1,0 +1,46 @@
+name: Sincronización Diaria Cloudflare RUM Ecuaplac
+
+on:
+  schedule:
+    # Todos los días a las 08:00 UTC (09:00 hora España)
+    - cron: '0 8 * * *'
+  # Permite ejecutarlo manualmente desde GitHub (web o móvil) con 1 clic
+  workflow_dispatch:
+
+jobs:
+  sync-metrics:
+    name: Sincronizar Métricas RUM con InsForge
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Ejecutar sincronización de métricas
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.VITE_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ECUAPLAC_ZONE_ID: ${{ secrets.CLOUDFLARE_ECUAPLAC_ZONE_ID || secrets.VITE_CLOUDFLARE_ECUAPLAC_ZONE_ID }}
+          INSFORGE_URL: ${{ secrets.INSFORGE_URL || secrets.VITE_INSFORGE_URL }}
+          INSFORGE_ANON_KEY: ${{ secrets.INSFORGE_ANON_KEY || secrets.VITE_INSFORGE_ANON_KEY }}
+        run: |
+          node web/clientes/ecuaplac/sync-monthly-metrics.mjs
+
+      - name: Actualizar cloudflare_data.json en el repositorio si hay cambios
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain web/clientes/ecuaplac/cloudflare_data.json)" ]; then
+            git add web/clientes/ecuaplac/cloudflare_data.json
+            git commit -m "chore(ecuaplac): actualizadas métricas Cloudflare RUM [skip ci]"
+            git push
+          else
+            echo "Sin cambios en cloudflare_data.json."
+          fi
+
