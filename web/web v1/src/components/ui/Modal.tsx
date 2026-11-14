@@ -16,6 +16,8 @@ export interface ModalProps {
   headerExtra?: React.ReactNode;
   /** Opt-in: en móvil (< sm) ocupa toda la pantalla (100dvh). Desktop intacto. */
   mobileFullscreen?: boolean;
+  /** Opt-in: Pantalla completa total (100% de la ventana de esquina a esquina, sin bordes alrededor) */
+  fullscreen?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -30,6 +32,7 @@ export const Modal: React.FC<ModalProps> = ({
   panelClassName = '',
   headerExtra,
   mobileFullscreen = false,
+  fullscreen = false,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -90,13 +93,18 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   const isDark = theme === 'dark';
-  const fs = mobileFullscreen;
+  const isFull = fullscreen;
+  const fs = mobileFullscreen || isFull;
 
-  const containerLayout = fs
+  const containerLayout = isFull
+    ? 'items-stretch p-0'
+    : fs
     ? 'items-stretch sm:items-center p-0 sm:px-4 sm:pt-[max(48px,calc(env(safe-area-inset-top)+12px))] sm:pb-[max(20px,env(safe-area-inset-bottom))]'
     : 'items-start sm:items-center px-2 sm:px-4 pt-[max(48px,calc(env(safe-area-inset-top)+12px))] pb-[max(20px,env(safe-area-inset-bottom))]';
 
-  const panelLayout = fs
+  const panelLayout = isFull
+    ? 'h-[100dvh] max-h-[100dvh] w-full max-w-full !rounded-none px-4 sm:px-10 pb-[max(16px,env(safe-area-inset-bottom))] pt-[max(16px,calc(env(safe-area-inset-top)+8px))] sm:pt-6 sm:pb-8 animate-in fade-in duration-150'
+    : fs
     ? `h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-3xl px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-[max(14px,calc(env(safe-area-inset-top)+8px))] sm:p-6 animate-in fade-in slide-in-from-bottom-6 sm:zoom-in-95 sm:slide-in-from-bottom-0 duration-200`
     : 'max-h-[86vh] sm:max-h-[90vh] rounded-3xl p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-150';
 
@@ -117,7 +125,7 @@ export const Modal: React.FC<ModalProps> = ({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className={`w-full ${maxWidthClasses[maxWidth]} ${panelLayout} flex flex-col transform overflow-hidden ${
+        className={`w-full ${isFull ? 'max-w-full !rounded-none !border-none !shadow-none' : maxWidthClasses[maxWidth]} ${panelLayout} flex flex-col transform overflow-hidden ${
           isDark
             ? 'bg-[#0B111E] border border-white/10 ring-1 ring-white/5 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85)] text-slate-100'
             : 'bg-white border border-stone-200 shadow-2xl text-slate-900'
@@ -125,8 +133,8 @@ export const Modal: React.FC<ModalProps> = ({
       >
         <div
           className={`shrink-0 flex items-start justify-between pb-3.5 border-b ${
-            isDark ? 'border-white/10' : 'border-stone-100'
-          }`}
+            isDark ? 'border-white/10' : 'border-stone-900/15'
+          } ${isFull ? 'w-full max-w-5xl xl:max-w-6xl mx-auto' : ''}`}
         >
           <div className="min-w-0 pr-3">
             <h2
@@ -165,8 +173,8 @@ export const Modal: React.FC<ModalProps> = ({
         {footer && (
           <div
             className={`shrink-0 pt-3 border-t flex items-center justify-end gap-2.5 ${
-              isDark ? 'border-white/10' : 'border-stone-100'
-            }`}
+              isDark ? 'border-white/10' : 'border-stone-900/15'
+            } ${isFull ? 'w-full max-w-5xl xl:max-w-6xl mx-auto' : ''}`}
           >
             {footer}
           </div>
