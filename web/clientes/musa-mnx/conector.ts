@@ -4,7 +4,7 @@
  */
 
 import { MUSA_ADMIN_CONFIG, ManagedClientConfig } from './config';
-import { insforge } from '../../web v1/src/lib/insforge';
+import { insforge } from '@/lib/insforge';
 
 export interface HealthCheckResult {
   service: 'supabase' | 'insforge' | 'cloudflare';

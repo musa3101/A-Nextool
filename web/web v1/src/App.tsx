@@ -36,15 +36,14 @@ export const App: React.FC = () => {
 
               {/* Direct Client Access URLs */}
               <Route path="ecuaplac" element={<EcuaplacPortal />} />
-              <Route path="buon-appetito" element={<Navigate to="/app/buon-appetito" replace />} />
 
               {/* MYNEXT MUSA PERSONAL ADMIN Routes */}
               <Route path="admin" element={<MusaAdminPortal />} />
               <Route path="musa-mnx" element={<MusaAdminPortal />} />
-              <Route path="admin/clientes" element={<ClientList />} />
-              <Route path="admin/modulos" element={<ModulesCatalog />} />
-              <Route path="admin/auditoria" element={<AuditLogs />} />
-              <Route path="admin/ajustes" element={<GlobalSettings />} />
+              <Route path="admin/clientes" element={<Navigate to="/admin" replace />} />
+              <Route path="admin/modulos" element={<Navigate to="/admin" replace />} />
+              <Route path="admin/auditoria" element={<Navigate to="/admin" replace />} />
+              <Route path="admin/ajustes" element={<Navigate to="/admin" replace />} />
 
               {/* CLIENT PANEL Dynamic Routes */}
               <Route path="app/:clientSlug" element={<ClientDashboard />} />
