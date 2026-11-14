@@ -1,15 +1,14 @@
 {
-  "version": "3.1.0",
-  "buildTimestamp": 1794603660000,
+  "version": "3.1.1",
+  "buildTimestamp": 1794665200000,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
-  "updatedAt": "2026-11-13T21:01:00.000Z",
-  "notes": "Versión 3.1.0: animación de logo fade-in de entrada y cabecera inteligente con auto-hide (fade-out) en scroll.",
+  "updatedAt": "2026-11-14T13:07:00.000Z",
+  "notes": "Versión 3.1.1: Bandeja de presupuestos en pantalla completa nativa, rediseño con bordes negros de precisión, White-Label estricto y desactivación de subida de facturas desde panel de cliente.",
   "changes": [
-    "Animación suave de entrada (fade-in desde la izquierda) para el logo y nombre en la cabecera",
-    "Smart Header con auto-hide (fade-out al hacer scroll hacia abajo y reaparición inmediata al subir)",
-    "Automatización de analíticas Cloudflare RUM 100% en la nube",
-    "Paginación y conteo total en el historial de Últimos Movimientos",
-    "Aterrizaje fijo en Inicio y cabecera al volver a la app o cambiar de sección"
+    "Bandeja de presupuestos en pantalla completa nativa para Mac, iPad y móvil",
+    "Rediseño sobrio con bordes negros de precisión y cajas de mensaje con relieve",
+    "Blindaje estricto de White-Label sin menciones de infraestructura en la interfaz",
+    "Desactivación segura del botón de subida de facturas desde el panel de cliente"
   ]
 }

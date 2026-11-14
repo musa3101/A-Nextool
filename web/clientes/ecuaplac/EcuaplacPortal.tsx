@@ -789,7 +789,7 @@ export const EcuaplacPortal: React.FC = () => {
   const handleRefreshLeads = async () => {
     setIsSyncingLeads(true);
     showSyncToast(
-      panelLang === 'es' ? 'Sincronizando con Supabase (ecuaplac.com)...' : 'Checking leads on Supabase...',
+      panelLang === 'es' ? 'Sincronizando con la web oficial...' : 'Checking leads on official website...',
       'syncing'
     );
     try {
@@ -805,7 +805,7 @@ export const EcuaplacPortal: React.FC = () => {
         showSyncToast(
           panelLang === 'es'
             ? `Sincronización completada (${liveLeads.length} solicitudes activas)`
-            : `${liveLeads.length} leads synced from Supabase`,
+            : `${liveLeads.length} leads synced successfully`,
           'success'
         );
       }
@@ -822,8 +822,8 @@ export const EcuaplacPortal: React.FC = () => {
   const handleDeleteLead = async (leadId: string, leadName: string) => {
     const confirmMsg =
       panelLang === 'es'
-        ? `¿Deseas quitar la solicitud de "${leadName}" de esta bandeja?\n\n(Nota: Se mantendrá guardada intacta en la base de datos de Supabase).`
-        : `Remove inquiry from "${leadName}" from this inbox?\n\n(Note: It will remain safely preserved in Supabase).`;
+        ? `¿Deseas quitar la solicitud de "${leadName}" de esta bandeja?\n\n(Nota: Se mantendrá guardada intacta en la base de datos del servidor).`
+        : `Remove inquiry from "${leadName}" from this inbox?\n\n(Note: It will remain safely preserved on the server).`;
     if (!window.confirm(confirmMsg)) return;
 
     setLeads((prev) => prev.filter((l) => l.id !== leadId));
@@ -831,7 +831,7 @@ export const EcuaplacPortal: React.FC = () => {
     await ecuaplacConnector.deleteLead(leadId);
     addAuditLog(`Solicitud de presupuesto quitada de la bandeja: «${leadName}»`, 'Ecuaplac Leads', 'warning', 'delete');
     showSyncToast(
-      panelLang === 'es' ? `Presupuesto de ${leadName} quitado de la bandeja (guardado en Supabase)` : `Lead ${leadName} removed from inbox`,
+      panelLang === 'es' ? `Presupuesto de ${leadName} quitado de la bandeja (archivado)` : `Lead ${leadName} removed from inbox`,
       'success'
     );
   };
@@ -972,7 +972,7 @@ export const EcuaplacPortal: React.FC = () => {
         setIsEditingContacts(false);
       } else {
         showSyncToast(
-          panelLang === 'es' ? 'Error al guardar contactos en Supabase' : 'Error updating website contacts on Supabase',
+          panelLang === 'es' ? 'Error al guardar contactos en el servidor' : 'Error updating website contacts on server',
           'error'
         );
       }
@@ -1086,7 +1086,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '3.1.0';
+  const CURRENT_SYSTEM_VERSION = '3.1.1';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState<boolean>(() => {
     try {
@@ -1097,7 +1097,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.1.0)
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.1.1)
     if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
@@ -1107,7 +1107,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [simulatedUpdateAvailable, setSimulatedUpdateAvailable] = useState(false);
   const [newVersionNotice, setNewVersionNotice] = useState<string | null>(null);
   const [newVersionChanges, setNewVersionChanges] = useState<string[]>([
-    'Nuevo panel de Contacto de la Web sincronizado con Supabase',
+    'Nuevo panel de Contacto sincronizado en vivo con ecuaplac.com',
     'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
     'Notificaciones en tiempo real y sonido acústico para nuevos presupuestos',
   ]);
@@ -1367,7 +1367,7 @@ export const EcuaplacPortal: React.FC = () => {
             // 4. Registro en el log de auditoría
             addAuditLog(
               `Nuevo presupuesto recibido: ${newest.name} (${newest.work_type})`,
-              'Supabase Live',
+              'Web Oficial',
               'success',
               'lead'
             );
@@ -1796,6 +1796,8 @@ export const EcuaplacPortal: React.FC = () => {
   };
 
   const handleUploadInvoice = handleUploadDoc;
+  // Permiso de subida de facturas desde el panel de cliente (desactivado: las facturas las sube el Administrador)
+  const CAN_CLIENT_UPLOAD_INVOICES = false;
   const handleDeleteInvoice = handleDeleteDoc;
   const handleViewInvoice = handleViewDoc;
   const invoices = projectDocs;
@@ -2796,31 +2798,35 @@ export const EcuaplacPortal: React.FC = () => {
                   <span className="text-xs font-bold text-slate-700 font-sans">
                     Documentos en PDF ({invoices.length})
                   </span>
-                  <div>
-                    <input
-                      type="file"
-                      ref={invoiceFileInputRef}
-                      accept=".pdf,application/pdf"
-                      onChange={handleUploadInvoice}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => invoiceFileInputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-stone-100 text-slate-900 text-xs font-bold active:scale-95 transition-all border border-stone-200 shadow-2xs font-sans cursor-pointer group"
-                      title="Subir factura en PDF"
-                    >
-                      <Upload className="w-3.5 h-3.5 text-[#C5A059] group-hover:-translate-y-0.5 transition-transform" />
-                      <span>Subir Factura (PDF)</span>
-                    </button>
-                  </div>
+                  {CAN_CLIENT_UPLOAD_INVOICES && (
+                    <div>
+                      <input
+                        type="file"
+                        ref={invoiceFileInputRef}
+                        accept=".pdf,application/pdf"
+                        onChange={handleUploadInvoice}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => invoiceFileInputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-stone-100 text-slate-900 text-xs font-bold active:scale-95 transition-all border border-stone-200 shadow-2xs font-sans cursor-pointer group"
+                        title="Subir factura en PDF"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-[#C5A059] group-hover:-translate-y-0.5 transition-transform" />
+                        <span>Subir Factura (PDF)</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Listado de Facturas */}
                 <div className="divide-y divide-stone-100 rounded-2xl border border-stone-200/80 bg-white shadow-xs overflow-hidden">
                   {invoices.length === 0 ? (
                     <div className="p-6 text-center text-xs text-stone-500 font-sans">
-                      No hay facturas archivadas. Pulsa «Subir Factura (PDF)» para añadir una.
+                      {CAN_CLIENT_UPLOAD_INVOICES
+                        ? 'No hay facturas archivadas. Pulsa «Subir Factura (PDF)» para añadir una.'
+                        : 'No hay facturas archivadas actualmente en el servidor.'}
                     </div>
                   ) : (
                     invoices.map((inv) => (
@@ -2958,7 +2964,7 @@ export const EcuaplacPortal: React.FC = () => {
                         07/06/2026
                       </span>
                       <span className="text-xs text-stone-500 font-normal font-sans mt-0.5 block">
-                        Web oficial en producción · Cloudflare CDN
+                        Web oficial en producción · Servidor de Alta Velocidad
                       </span>
                     </div>
                   </div>
@@ -3756,7 +3762,7 @@ export const EcuaplacPortal: React.FC = () => {
                               setSimulatedUpdateAvailable(true);
                               setNewVersionNotice('3.0.8');
                               setNewVersionChanges([
-                                'Nuevo panel de Contacto de la Web sincronizado con Supabase',
+                                'Nuevo panel de Contacto sincronizado en vivo con ecuaplac.com',
                                 'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
                                 'Notificaciones en tiempo real y sonido acústico para nuevos presupuestos'
                               ]);
@@ -4292,13 +4298,13 @@ export const EcuaplacPortal: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 5. Modal Dedicado de Bandeja de Presupuestos (CRM Leads de ecuaplac.com — Estilo Executive Luxury) */}
+      {/* 5. Modal Dedicado de Bandeja de Presupuestos (CRM Leads de ecuaplac.com — Pantalla Completa Total 100vw x 100vh) */}
       <Modal
         isOpen={isLeadsModalOpen}
         onClose={() => setIsLeadsModalOpen(false)}
         theme="light"
-        maxWidth="3xl"
-        mobileFullscreen
+        fullscreen
+        panelClassName="!bg-[#F4F1EA]"
         title={panelLang === 'es' ? 'Bandeja de Presupuestos' : 'Inquiries & Quotes Inbox'}
         subtitle={
           panelLang === 'es'
@@ -4316,7 +4322,7 @@ export const EcuaplacPortal: React.FC = () => {
               onClick={handleRefreshLeads}
               disabled={isSyncingLeads}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#08090C] hover:bg-stone-800 text-white border border-[#C5A059]/40 text-xs font-bold transition-all cursor-pointer active:scale-95 disabled:opacity-60 shadow-xs"
-              title={panelLang === 'es' ? 'Sincronizar con Supabase' : 'Sync with Supabase'}
+              title={panelLang === 'es' ? 'Sincronizar con la web oficial' : 'Sync with live website'}
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[#F0CF85] ${isSyncingLeads ? 'animate-spin' : ''}`} />
               <span className="inline">
@@ -4347,7 +4353,7 @@ export const EcuaplacPortal: React.FC = () => {
                     ecuaplacConnector.clearDismissedLeadIds();
                     await handleRefreshLeads();
                     showSyncToast(
-                      panelLang === 'es' ? 'Solicitudes archivadas recuperadas de Supabase' : 'Archived leads recovered from Supabase',
+                      panelLang === 'es' ? 'Solicitudes archivadas recuperadas' : 'Archived leads recovered successfully',
                       'success'
                     );
                   }}
@@ -4377,103 +4383,105 @@ export const EcuaplacPortal: React.FC = () => {
           </div>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-4 max-w-5xl xl:max-w-6xl mx-auto w-full">
           {/* Cabecera fija: Buscador + Filtros (siempre visibles al hacer scroll) */}
-          <div className="sticky -top-3.5 z-20 -mx-1 px-1 pt-1 pb-2 bg-white/95 backdrop-blur-sm space-y-3">
-          {/* Barra de Búsqueda Ejecutiva */}
-          <div className="relative">
-            <div className="flex items-center bg-stone-50 border border-stone-200/90 focus-within:bg-white focus-within:border-[#C5A059] focus-within:ring-2 focus-within:ring-[#C5A059]/15 rounded-2xl px-3.5 py-2.5 transition-all shadow-2xs">
-              <Search className="w-4 h-4 text-stone-400 shrink-0 mr-2.5" />
-              <input
-                type="search"
-                inputMode="search"
-                enterKeyHint="search"
-                autoCapitalize="none"
-                autoCorrect="off"
-                value={leadSearchQuery}
-                onChange={(e) => setLeadSearchQuery(e.target.value)}
-                placeholder={
-                  panelLang === 'es'
-                    ? 'Buscar por cliente, teléfono, email o descripción...'
-                    : 'Search by client, phone, email or work description...'
-                }
-                className="w-full bg-transparent text-base sm:text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none"
-              />
-              {leadSearchQuery && (
+          <div className="sticky -top-3.5 z-20 -mx-1 px-1 pt-1 pb-3 bg-white/95 sm:bg-[#F4F1EA]/95 backdrop-blur-md space-y-3 sm:space-y-0 sm:border-b sm:border-stone-900/15">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+              {/* Barra de Búsqueda Ejecutiva con Borde Negro */}
+              <div className="relative flex-1">
+                <div className="flex items-center bg-white border-2 border-stone-900/60 focus-within:border-stone-950 focus-within:ring-2 focus-within:ring-stone-900/10 rounded-xl px-3.5 py-2 transition-all shadow-2xs">
+                  <Search className="w-4 h-4 text-stone-500 shrink-0 mr-2.5" />
+                  <input
+                    type="search"
+                    inputMode="search"
+                    enterKeyHint="search"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    value={leadSearchQuery}
+                    onChange={(e) => setLeadSearchQuery(e.target.value)}
+                    placeholder={
+                      panelLang === 'es'
+                        ? 'Buscar por cliente, teléfono, email o descripción...'
+                        : 'Search by client, phone, email or work description...'
+                    }
+                    className="w-full bg-transparent text-base sm:text-xs text-stone-950 font-medium placeholder:text-stone-400 focus:outline-none"
+                  />
+                  {leadSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setLeadSearchQuery('')}
+                      className="p-1 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Filtros rápidos con Borde Negro y Conteo Dinámico */}
+              <div className="flex items-center gap-0.5 p-1 rounded-xl bg-stone-200/80 border border-stone-900/20 overflow-x-auto no-scrollbar shrink-0">
                 <button
                   type="button"
-                  onClick={() => setLeadSearchQuery('')}
-                  className="p-1 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors"
+                  onClick={() => setLeadFilter('all')}
+                  className={`flex-1 sm:flex-initial min-h-[36px] sm:min-h-[32px] px-3.5 py-1.5 sm:py-1 rounded-lg text-[13px] sm:text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                    leadFilter === 'all'
+                      ? 'bg-[#08090C] text-white shadow-sm'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <span>{panelLang === 'es' ? 'Todos' : 'All'}</span>
+                  <span className={`text-[11px] tabular-nums px-1.5 rounded-md font-semibold ${leadFilter === 'all' ? 'bg-white/20 text-white' : 'bg-transparent text-stone-500'}`}>
+                    {leads.length}
+                  </span>
                 </button>
-              )}
+
+                <button
+                  type="button"
+                  onClick={() => setLeadFilter('new')}
+                  className={`flex-1 sm:flex-initial min-h-[36px] sm:min-h-[32px] px-3.5 py-1.5 sm:py-1 rounded-lg text-[13px] sm:text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                    leadFilter === 'new'
+                      ? 'bg-[#08090C] text-white shadow-sm'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  {leads.some((l) => l.status === 'new') && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
+                  <span>{panelLang === 'es' ? 'No contestados' : 'Unanswered'}</span>
+                  <span className={`text-[11px] tabular-nums px-1.5 rounded-md font-semibold ${leadFilter === 'new' ? 'bg-white/20 text-white' : 'bg-transparent text-stone-500'}`}>
+                    {leads.filter((l) => l.status === 'new').length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLeadFilter('contacted')}
+                  className={`flex-1 sm:flex-initial min-h-[36px] sm:min-h-[32px] px-3.5 py-1.5 sm:py-1 rounded-lg text-[13px] sm:text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                    leadFilter === 'contacted'
+                      ? 'bg-[#08090C] text-white shadow-sm'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  <span>{panelLang === 'es' ? 'En contacto' : 'Contacted'}</span>
+                  <span className={`text-[11px] tabular-nums px-1.5 rounded-md font-semibold ${leadFilter === 'contacted' ? 'bg-white/20 text-white' : 'bg-transparent text-stone-500'}`}>
+                    {leads.filter((l) => l.status === 'contacted').length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLeadFilter('approved')}
+                  className={`flex-1 sm:flex-initial min-h-[36px] sm:min-h-[32px] px-3.5 py-1.5 sm:py-1 rounded-lg text-[13px] sm:text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                    leadFilter === 'approved'
+                      ? 'bg-[#08090C] text-white shadow-sm'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  <span>{panelLang === 'es' ? 'Aprobados' : 'Accepted'}</span>
+                  <span className={`text-[11px] tabular-nums px-1.5 rounded-md font-semibold ${leadFilter === 'approved' ? 'bg-white/20 text-white' : 'bg-transparent text-stone-500'}`}>
+                    {leads.filter((l) => l.status === 'approved').length}
+                  </span>
+                </button>
+              </div>
             </div>
-          </div>
-
-          {/* Filtros rápidos con Conteo Dinámico */}
-          <div className="flex items-center gap-0.5 p-1 rounded-xl bg-stone-100 overflow-x-auto no-scrollbar">
-            <button
-              type="button"
-              onClick={() => setLeadFilter('all')}
-              className={`flex-1 min-h-[36px] px-3 py-1.5 rounded-lg text-[13px] sm:text-xs font-semibold transition-all shrink-0 flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                leadFilter === 'all'
-                  ? 'bg-white text-stone-900 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-900'
-              }`}
-            >
-              <span>{panelLang === 'es' ? 'Todos' : 'All'}</span>
-              <span className={`text-[11px] tabular-nums px-1.5 rounded-md font-medium ${leadFilter === 'all' ? 'bg-stone-100 text-stone-700' : 'bg-transparent text-stone-400'}`}>
-                {leads.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setLeadFilter('new')}
-              className={`flex-1 min-h-[36px] px-3 py-1.5 rounded-lg text-[13px] sm:text-xs font-semibold transition-all shrink-0 flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                leadFilter === 'new'
-                  ? 'bg-white text-stone-900 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-900'
-              }`}
-            >
-              {leads.some((l) => l.status === 'new') && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
-              <span>{panelLang === 'es' ? 'No contestados' : 'Unanswered'}</span>
-              <span className={`text-[11px] tabular-nums px-1.5 rounded-md font-medium ${leadFilter === 'new' ? 'bg-stone-100 text-stone-700' : 'bg-transparent text-stone-400'}`}>
-                {leads.filter((l) => l.status === 'new').length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setLeadFilter('contacted')}
-              className={`flex-1 min-h-[36px] px-3 py-1.5 rounded-lg text-[13px] sm:text-xs font-semibold transition-all shrink-0 flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                leadFilter === 'contacted'
-                  ? 'bg-white text-stone-900 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-900'
-              }`}
-            >
-                            <span>{panelLang === 'es' ? 'En contacto' : 'Contacted'}</span>
-              <span className={`text-[11px] tabular-nums px-1.5 rounded-md font-medium ${leadFilter === 'contacted' ? 'bg-stone-100 text-stone-700' : 'bg-transparent text-stone-400'}`}>
-                {leads.filter((l) => l.status === 'contacted').length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setLeadFilter('approved')}
-              className={`flex-1 min-h-[36px] px-3 py-1.5 rounded-lg text-[13px] sm:text-xs font-semibold transition-all shrink-0 flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                leadFilter === 'approved'
-                  ? 'bg-white text-stone-900 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-900'
-              }`}
-            >
-                            <span>{panelLang === 'es' ? 'Aprobados' : 'Accepted'}</span>
-              <span className={`text-[11px] tabular-nums px-1.5 rounded-md font-medium ${leadFilter === 'approved' ? 'bg-stone-100 text-stone-700' : 'bg-transparent text-stone-400'}`}>
-                {leads.filter((l) => l.status === 'approved').length}
-              </span>
-            </button>
-          </div>
           </div>
 
           {/* Lista de Solicitudes / Leads (un único scroll: el del modal) */}
@@ -4522,49 +4530,49 @@ export const EcuaplacPortal: React.FC = () => {
                   <div
                     key={lead.id}
                     onClick={() => setSelectedLeadId((prev) => (prev === lead.id ? null : lead.id))}
-                    className={`group relative rounded-2xl p-4 sm:p-5 transition-all duration-200 cursor-pointer w-full max-w-full min-w-0 overflow-hidden break-words [overflow-wrap:anywhere] bg-white border ${
+                    className={`group relative rounded-2xl p-4 sm:p-6 transition-all duration-200 cursor-pointer w-full max-w-full min-w-0 overflow-hidden break-words [overflow-wrap:anywhere] bg-white border-2 ${
                       isSelected
-                        ? 'border-stone-400 shadow-sm'
-                        : 'border-stone-200 hover:border-stone-300'
-                    } flex flex-col gap-3`}
+                        ? 'border-[#08090C] ring-4 ring-[#C5A059]/20 shadow-xl'
+                        : 'border-stone-900/80 hover:border-stone-950 shadow-[0_2px_8px_rgba(0,0,0,0.05),0_12px_28px_rgba(0,0,0,0.04)] hover:shadow-xl'
+                    } flex flex-col gap-4`}
                   >
                     {/* Fila Cabecera: Monograma, Nombre y Estado */}
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0">
-                        {/* Avatar Iniciales */}
-                        <div className="w-10 h-10 rounded-full bg-stone-100 text-stone-700 flex items-center justify-center font-semibold text-sm shrink-0">
+                      <div className="flex items-start gap-3.5 min-w-0">
+                        {/* Avatar Iniciales en Negro Obsidiana con Borde Dorado */}
+                        <div className="w-11 h-11 rounded-full bg-[#08090C] border border-[#C5A059]/50 text-[#F0CF85] flex items-center justify-center font-bold text-sm shrink-0 shadow-md">
                           {initials || 'EC'}
                         </div>
 
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-extrabold text-base text-stone-900 tracking-tight truncate">
+                            <h4 className="font-extrabold text-base sm:text-lg text-stone-950 tracking-tight truncate font-display">
                               {lead.name}
                             </h4>
                             <span className="hidden">
                               #{String(lead.id || '').slice(0, 8)}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-stone-500 mt-0.5 tabular-nums">
-                                                        <span>{lead.date}</span>
+                          <div className="flex items-center gap-2 text-xs text-stone-500 mt-0.5 tabular-nums font-medium">
+                            <span>{lead.date}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Badge de Estado */}
+                      {/* Badge de Estado con Borde Definido */}
                       <div className="shrink-0">
                         {lead.status === 'new' ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600">
-                            <span className="w-2 h-2 rounded-full bg-rose-500" />
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border-2 border-rose-500/80 text-xs font-bold text-rose-800 shadow-2xs">
+                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                             {panelLang === 'es' ? 'Pendiente' : 'Unanswered'}
                           </span>
                         ) : lead.status === 'contacted' ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border-2 border-amber-500/80 text-xs font-bold text-amber-900 shadow-2xs">
                             <span className="w-2 h-2 rounded-full bg-amber-500" />
                             {panelLang === 'es' ? 'En Contacto' : 'Contacted'}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border-2 border-emerald-500/80 text-xs font-bold text-emerald-900 shadow-2xs">
                             <span className="w-2 h-2 rounded-full bg-emerald-500" />
                             {panelLang === 'es' ? 'Aprobado' : 'Accepted'}
                           </span>
@@ -4572,49 +4580,44 @@ export const EcuaplacPortal: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Fila de Metadatos Ejecutivos: Servicio, Municipio, m², Canal */}
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] sm:text-xs text-stone-500">
-                      {/* Servicio principal */}
-                      <span className="inline-flex items-center gap-1 font-medium text-stone-800">
-                        <Briefcase className="w-3.5 h-3.5 text-stone-400" />
+                    {/* Fila de Metadatos Ejecutivos con Contraste: Servicio, Municipio, m² */}
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs">
+                      {/* Servicio principal en Negro Obsidiana */}
+                      <span className="inline-flex items-center gap-1.5 font-bold text-white bg-[#08090C] border border-[#C5A059]/40 px-3 py-1 rounded-lg shadow-2xs">
+                        <Briefcase className="w-3.5 h-3.5 text-[#F0CF85]" />
                         <span>{lead.service || lead.work_type || 'Reforma'}</span>
                       </span>
 
                       {/* Ubicación / Municipio */}
                       {lead.location && (
-                        <span className="inline-flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5 text-stone-400" />
+                        <span className="inline-flex items-center gap-1 font-semibold text-stone-900 bg-stone-100 border border-stone-900/30 px-2.5 py-1 rounded-lg">
+                          <MapPin className="w-3.5 h-3.5 text-stone-600" />
                           <span>{lead.location}</span>
                         </span>
                       )}
 
                       {/* Metros cuadrados (m²) */}
                       {lead.sqm && (
-                        <span className="inline-flex items-center gap-1 tabular-nums">
+                        <span className="inline-flex items-center gap-1 tabular-nums font-bold text-stone-900 bg-stone-100 border border-stone-900/30 px-2.5 py-1 rounded-lg">
                           <span>{lead.sqm}</span>
                         </span>
                       )}
-
-                      {/* Origen del formulario */}
-                      <span className="hidden">
-                        {lead.source_channel === 'tally' ? '⚡ Tally' : lead.source_channel === 'gmail' ? '✉️ Gmail' : '🌐 Web'}
-                      </span>
                     </div>
 
-                    {/* Mensaje / Tipo de Obra */}
+                    {/* Mensaje / Tipo de Obra (Caja con Borde Negro Fuerte y Fondo Contraste) */}
                     {(lead.client_message || lead.work_type) && (
-                      <div className="w-full max-w-full overflow-hidden">
-                        <div className="hidden">
-                          <MessageSquare className="w-3 h-3 text-[#C5A059]" />
-                          <span>{panelLang === 'es' ? 'Mensaje o detalles:' : 'Client message:'}</span>
+                      <div className="w-full max-w-full rounded-xl bg-[#F8F7F4] border-2 border-stone-900/85 p-4 space-y-1.5 shadow-2xs">
+                        <div className="flex items-center gap-2 text-xs font-extrabold text-stone-950 uppercase tracking-wider">
+                          <MessageSquare className="w-3.5 h-3.5 text-[#C5A059]" />
+                          <span>{panelLang === 'es' ? 'Mensaje del cliente' : 'Client message'}</span>
                         </div>
-                        <p className="text-[15px] sm:text-sm text-stone-900 leading-relaxed break-words [overflow-wrap:anywhere]">
+                        <p className="text-[14.5px] sm:text-sm text-stone-950 font-medium leading-relaxed font-sans break-words [overflow-wrap:anywhere]">
                           {lead.client_message || lead.work_type}
                         </p>
                       </div>
                     )}
 
-                    {/* Botón interactivo para ver foto o plano si fue adjuntado */}
+                    {/* Botón interactivo para ver foto o plano con Borde Negro y Relieve */}
                     {lead.photo_url && (
                       <div className="w-full">
                         <a
@@ -4622,28 +4625,35 @@ export const EcuaplacPortal: React.FC = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center justify-between w-full px-3 py-2.5 rounded-xl bg-stone-50 border border-stone-200 hover:border-stone-300 text-stone-800 text-[13px] sm:text-xs font-medium transition-colors group/photo cursor-pointer"
+                          className="inline-flex items-center justify-between w-full px-4 py-3 rounded-xl bg-white border-2 border-stone-900 hover:bg-stone-50 text-stone-950 text-xs font-bold transition-all group/photo cursor-pointer shadow-xs"
                           title="Abrir foto o plano adjunto por el cliente"
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-7 h-7 rounded-lg bg-white border border-stone-200 text-stone-600 flex items-center justify-center shrink-0">
-                              <Camera className="w-3.5 h-3.5" />
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-[#08090C] text-[#F0CF85] border border-[#C5A059]/40 flex items-center justify-center shrink-0 shadow-2xs">
+                              <Camera className="w-4 h-4" />
                             </div>
-                            <span className="truncate">Ver foto o plano adjunto</span>
+                            <div className="truncate text-left">
+                              <span className="font-extrabold block text-stone-950 truncate text-[13px] sm:text-xs">
+                                {panelLang === 'es' ? 'Plano o foto adjunta por el cliente' : 'Attachment from client'}
+                              </span>
+                              <span className="text-[11px] text-stone-600 block font-normal">
+                                {panelLang === 'es' ? 'Pulsa para abrir el archivo en alta resolución' : 'Click to open in full resolution'}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 text-stone-400 text-xs shrink-0">
-                            <span className="hidden sm:inline">Ver archivo</span>
+                          <div className="flex items-center gap-1.5 text-stone-900 font-extrabold text-xs shrink-0 pl-2">
+                            <span>{panelLang === 'es' ? 'Ver archivo' : 'View file'}</span>
                             <ExternalLink className="w-3.5 h-3.5 group-hover/photo:translate-x-0.5 transition-transform" />
                           </div>
                         </a>
                       </div>
                     )}
 
-                    {/* Fila de Datos: Presupuesto, Teléfono, Email */}
+                    {/* Fila de Datos con Bordes Negros: Presupuesto, Teléfono, Email */}
                     <div className="flex flex-wrap items-center gap-2">
                       {lead.budget_estimate && (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50/90 border border-amber-200 text-amber-900 text-xs font-bold shadow-2xs">
-                          <span className="text-[10px] text-amber-700/80 uppercase tracking-wider font-semibold">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border-2 border-stone-900/80 text-amber-950 text-xs font-bold shadow-2xs">
+                          <span className="text-[10px] text-amber-800 uppercase tracking-wider font-semibold">
                             {panelLang === 'es' ? 'Presupuesto:' : 'Budget:'}
                           </span>
                           <span className="font-mono font-extrabold">{lead.budget_estimate}</span>
@@ -4657,12 +4667,12 @@ export const EcuaplacPortal: React.FC = () => {
                             e.stopPropagation();
                             handleCopyLeadInfo(lead.phone, 'Teléfono');
                           }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-300 text-xs font-mono transition-colors shadow-2xs active:scale-95"
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border-2 border-stone-900/80 text-stone-950 hover:bg-stone-100 text-xs font-mono font-bold transition-colors shadow-2xs active:scale-95"
                           title="Clic para copiar teléfono"
                         >
-                          <Phone className="w-3 h-3 text-stone-400" />
+                          <Phone className="w-3.5 h-3.5 text-stone-600" />
                           <span>{lead.phone}</span>
-                          <Copy className="w-2.5 h-2.5 text-stone-400 ml-0.5" />
+                          <Copy className="w-2.5 h-2.5 text-stone-500 ml-0.5" />
                         </button>
                       )}
 
@@ -4673,34 +4683,84 @@ export const EcuaplacPortal: React.FC = () => {
                             e.stopPropagation();
                             handleCopyLeadInfo(lead.email, 'Email');
                           }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-300 text-xs font-mono transition-colors shadow-2xs truncate max-w-[220px] active:scale-95"
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border-2 border-stone-900/80 text-stone-950 hover:bg-stone-100 text-xs font-mono font-bold transition-colors shadow-2xs truncate max-w-[240px] active:scale-95"
                           title="Clic para copiar correo"
                         >
-                          <Mail className="w-3 h-3 text-stone-400" />
+                          <Mail className="w-3.5 h-3.5 text-stone-600" />
                           <span className="truncate">{lead.email}</span>
-                          <Copy className="w-2.5 h-2.5 text-stone-400 ml-0.5 shrink-0" />
+                          <Copy className="w-2.5 h-2.5 text-stone-500 ml-0.5 shrink-0" />
                         </button>
                       )}
                     </div>
 
-                    {/* Nota interna con icono sobrio de documento (Sin estrellas/sparkles AI) */}
+                    {/* Nota interna con Borde Negro Fino */}
                     {lead.notes && (
-                      <div className="flex items-start gap-2 bg-stone-100/90 border border-stone-200/90 rounded-xl p-2.5 text-xs text-stone-700">
+                      <div className="flex items-start gap-2 bg-stone-100/90 border-2 border-stone-900/60 rounded-xl p-3 text-xs text-stone-800">
                         <FileText className="w-3.5 h-3.5 text-[#C5A059] shrink-0 mt-0.5" />
                         <span>
-                          <strong className="text-stone-900 font-bold">{panelLang === 'es' ? 'Nota:' : 'Note:'}</strong> {lead.notes}
+                          <strong className="text-stone-950 font-bold">{panelLang === 'es' ? 'Nota:' : 'Note:'}</strong> {lead.notes}
                         </span>
                       </div>
                     )}
 
-                    {/* Barra de Acciones Ejecutivas: 2 Filas Claras y Cómodas */}
+                    {/* Barra de Acciones Ejecutivas: Responsive (Móvil: 2 filas / Desktop: 1 fila balanceada) */}
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="pt-3 border-t border-stone-100 flex flex-col gap-2"
+                      className="pt-3.5 border-t-2 border-stone-900/15 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
                     >
-                      {/* Fila 1: Contacto Inmediato WhatsApp y Llamada */}
+                      {/* Segmented Control de Estados (1-Click) + Botón Eliminar con Bordes Negros */}
+                      <div className="flex items-center gap-2 order-2 md:order-1">
+                        {/* Selector de estado segmentado */}
+                        <div className="flex-1 md:flex-initial grid grid-cols-3 md:flex items-center gap-1 bg-stone-200/90 border border-stone-900/30 p-1 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLeadStatus(lead.id, 'new')}
+                            className={`min-h-[34px] md:min-h-[32px] py-1.5 md:py-1 px-3 rounded-lg text-[12px] sm:text-xs font-bold transition-all text-center leading-none ${
+                              lead.status === 'new'
+                                ? 'bg-[#08090C] text-white shadow-sm'
+                                : 'text-stone-700 hover:text-stone-950 hover:bg-white/60'
+                            }`}
+                          >
+                            {panelLang === 'es' ? 'Pendiente' : 'Pending'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLeadStatus(lead.id, 'contacted')}
+                            className={`min-h-[34px] md:min-h-[32px] py-1.5 md:py-1 px-3 rounded-lg text-[12px] sm:text-xs font-bold transition-all text-center leading-none ${
+                              lead.status === 'contacted'
+                                ? 'bg-[#08090C] text-white shadow-sm'
+                                : 'text-stone-700 hover:text-stone-950 hover:bg-white/60'
+                            }`}
+                          >
+                            {panelLang === 'es' ? 'En contacto' : 'Contacted'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLeadStatus(lead.id, 'approved')}
+                            className={`min-h-[34px] md:min-h-[32px] py-1.5 md:py-1 px-3 rounded-lg text-[12px] sm:text-xs font-bold transition-all text-center leading-none ${
+                              lead.status === 'approved'
+                                ? 'bg-[#08090C] text-white shadow-sm'
+                                : 'text-stone-700 hover:text-stone-950 hover:bg-white/60'
+                            }`}
+                          >
+                            {panelLang === 'es' ? 'Aprobado' : 'Accepted'}
+                          </button>
+                        </div>
+
+                        {/* Botón de Borrar Lead */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLead(lead.id, lead.name)}
+                          className="min-h-[42px] min-w-[42px] md:min-h-[36px] md:min-w-[36px] flex items-center justify-center rounded-xl text-stone-500 hover:text-rose-600 bg-white hover:bg-rose-50 border-2 border-stone-900/60 hover:border-rose-600 transition-all active:scale-95 shrink-0 cursor-pointer shadow-2xs"
+                          title={panelLang === 'es' ? 'Quitar de la bandeja (se mantiene seguro en el servidor)' : 'Dismiss from inbox (kept safely on server)'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Contacto Inmediato WhatsApp y Llamada */}
                       {lead.phone && (
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 md:flex items-center gap-2.5 order-1 md:order-2">
                           <a
                             href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone)}?text=${encodeURIComponent(
                               `Hola ${lead.name}, te contacto de Ecuaplac sobre tu solicitud de presupuesto${
@@ -4712,9 +4772,9 @@ export const EcuaplacPortal: React.FC = () => {
                             onClick={() => {
                               addAuditLog(`Contacto vía WhatsApp con «${lead.name}» (${lead.phone})`, 'Ecuaplac Leads', 'success', 'contact');
                             }}
-                            className="inline-flex items-center justify-center gap-2 px-3.5 py-3 sm:py-2.5 min-h-[48px] sm:min-h-[42px] rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white font-bold text-sm sm:text-xs shadow-xs transition-all active:scale-98"
+                            className="inline-flex items-center justify-center gap-2 px-4 py-3 md:py-2 min-h-[48px] md:min-h-[36px] rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white font-extrabold text-sm md:text-xs shadow-xs transition-all active:scale-98"
                           >
-                            <MessageSquare className="w-4 h-4" />
+                            <MessageSquare className="w-4 h-4 md:w-3.5 md:h-3.5" />
                             <span>WhatsApp</span>
                           </a>
                           <a
@@ -4722,63 +4782,13 @@ export const EcuaplacPortal: React.FC = () => {
                             onClick={() => {
                               addAuditLog(`Llamada telefónica a «${lead.name}» (${lead.phone})`, 'Ecuaplac Leads', 'info', 'contact');
                             }}
-                            className="inline-flex items-center justify-center gap-2 px-3.5 py-3 sm:py-2.5 min-h-[48px] sm:min-h-[42px] rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-sm sm:text-xs shadow-xs transition-all active:scale-98"
+                            className="inline-flex items-center justify-center gap-2 px-4 py-3 md:py-2 min-h-[48px] md:min-h-[36px] rounded-xl bg-[#08090C] hover:bg-stone-800 text-white border border-[#C5A059]/40 font-extrabold text-sm md:text-xs shadow-xs transition-all active:scale-98"
                           >
-                            <Phone className="w-3.5 h-3.5 text-white/70" />
+                            <Phone className="w-3.5 h-3.5 md:w-3 md:h-3 text-[#F0CF85]" />
                             <span>{panelLang === 'es' ? 'Llamar' : 'Call'}</span>
                           </a>
                         </div>
                       )}
-
-                      {/* Fila 2: Segmented Control de Estados (1-Click) + Botón Eliminar */}
-                      <div className="flex items-center gap-2">
-                        {/* Selector de estado segmentado */}
-                        <div className="flex-1 grid grid-cols-3 gap-0.5 bg-stone-100 p-1 rounded-xl">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateLeadStatus(lead.id, 'new')}
-                            className={`min-h-[34px] py-1.5 px-1 rounded-lg text-[12px] sm:text-xs font-semibold transition-all text-center leading-none ${
-                              lead.status === 'new'
-                                ? 'bg-white text-stone-900 shadow-sm'
-                                : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
-                            }`}
-                          >
-                            {panelLang === 'es' ? 'Pendiente' : 'Pending'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateLeadStatus(lead.id, 'contacted')}
-                            className={`min-h-[34px] py-1.5 px-1 rounded-lg text-[12px] sm:text-xs font-semibold transition-all text-center leading-none ${
-                              lead.status === 'contacted'
-                                ? 'bg-white text-stone-900 shadow-sm'
-                                : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
-                            }`}
-                          >
-                            {panelLang === 'es' ? 'En contacto' : 'Contacted'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateLeadStatus(lead.id, 'approved')}
-                            className={`min-h-[34px] py-1.5 px-1 rounded-lg text-[12px] sm:text-xs font-semibold transition-all text-center leading-none ${
-                              lead.status === 'approved'
-                                ? 'bg-white text-stone-900 shadow-sm'
-                                : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
-                            }`}
-                          >
-                            {panelLang === 'es' ? 'Aprobado' : 'Accepted'}
-                          </button>
-                        </div>
-
-                        {/* Botón de Borrar Lead (Quitar de la bandeja sin tocar Supabase) */}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteLead(lead.id, lead.name)}
-                          className="min-h-[42px] min-w-[42px] flex items-center justify-center rounded-xl text-stone-400 hover:text-rose-600 bg-white hover:bg-rose-50 border border-stone-200 hover:border-rose-200 transition-all active:scale-95 shrink-0 cursor-pointer"
-                          title={panelLang === 'es' ? 'Quitar de la bandeja (se mantiene seguro en Supabase)' : 'Dismiss from inbox (kept in Supabase)'}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
                     </div>
                   </div>
                 );
