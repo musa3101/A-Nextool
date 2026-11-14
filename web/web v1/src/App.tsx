@@ -5,6 +5,7 @@ import { TenantProvider } from './context/TenantContext';
 import { AppLayout } from './components/layout/AppLayout';
 
 // Admin Views
+import { MusaAdminPortal } from '@clientes/musa-mnx/MusaAdminPortal';
 import { AdminDashboard } from './views/admin/AdminDashboard';
 import { ClientList } from './views/admin/ClientList';
 import { ModulesCatalog } from './views/admin/ModulesCatalog';
@@ -37,8 +38,9 @@ export const App: React.FC = () => {
               <Route path="ecuaplac" element={<EcuaplacPortal />} />
               <Route path="buon-appetito" element={<Navigate to="/app/buon-appetito" replace />} />
 
-              {/* MYNEXT ADMIN Routes */}
-              <Route path="admin" element={<AdminDashboard />} />
+              {/* MYNEXT MUSA PERSONAL ADMIN Routes */}
+              <Route path="admin" element={<MusaAdminPortal />} />
+              <Route path="musa-mnx" element={<MusaAdminPortal />} />
               <Route path="admin/clientes" element={<ClientList />} />
               <Route path="admin/modulos" element={<ModulesCatalog />} />
               <Route path="admin/auditoria" element={<AuditLogs />} />
