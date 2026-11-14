@@ -419,6 +419,14 @@ export const EcuaplacPortal: React.FC = () => {
     setLogs((prev) => [tempLog, ...prev]);
     setTotalLogsCount((prev) => (prev > 0 ? prev + 1 : 1));
 
+    try {
+      const cached = localStorage.getItem('ecuaplac_recent_audit_logs');
+      const list = cached ? JSON.parse(cached) : [];
+      const updated = [tempLog, ...list.filter((l: any) => l.id !== tempLog.id)].slice(0, 50);
+      localStorage.setItem('ecuaplac_recent_audit_logs', JSON.stringify(updated));
+      window.dispatchEvent(new Event('ecuaplac_audit_log_added'));
+    } catch {}
+
     ecuaplacConnector.addAuditLog(tempLog.entity, action, details).then((saved) => {
       if (saved && saved.id) {
         setLogs((prev) => prev.map((l) => (l.id === tempLog.id ? saved : l)));
@@ -1516,6 +1524,54 @@ export const EcuaplacPortal: React.FC = () => {
   const [isCareOpen, setIsCareOpen] = useState(false);
   const careSectionRef = useRef<HTMLDivElement>(null);
 
+  const [careData, setCareData] = useState(() => {
+    const defaultSamplePdf =
+      'data:application/pdf;base64,JVBERi0xLjQKJeLjz9MKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNTk1IDg0Ml0+PmVuZG9iagp4cmVmCjAgNAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMTggMDAwMDAgbiAKMDAwMDAwMDA2OSAwMDAwMCBuIAowMDAwMDAwMTIxIDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSA0L1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKMTk5CiUlRU9GCg==';
+
+    try {
+      const cached = localStorage.getItem('ecuaplac_mynext_care');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (!parsed.pdfUrl) {
+          parsed.pdfUrl = defaultSamplePdf;
+          parsed.pdfName = 'Guia_Oficial_MyNext_Care_2026.pdf';
+          parsed.pdfSize = '1.2 MB';
+          parsed.pdfUploadDate = '11/11/2026';
+        }
+        return parsed;
+      }
+    } catch {}
+    return {
+      launchDate: '07/06/2026',
+      launchDesc: 'Web oficial en producción · Servidor de Alta Velocidad',
+      lastMaintenanceDate: '11/11/2026',
+      lastMaintenanceDesc: 'Optimización v3.0, Caché Edge & Seguridad PWA',
+      status: 'active',
+      pdfUrl: defaultSamplePdf,
+      pdfName: 'Guia_Oficial_MyNext_Care_2026.pdf',
+      pdfSize: '1.2 MB',
+      pdfUploadDate: '11/11/2026',
+    };
+  });
+
+  useEffect(() => {
+    const handleCareSync = () => {
+      try {
+        const cached = localStorage.getItem('ecuaplac_mynext_care');
+        if (cached) {
+          setCareData(JSON.parse(cached));
+        }
+      } catch {}
+    };
+
+    window.addEventListener('ecuaplac_care_updated', handleCareSync);
+    window.addEventListener('storage', handleCareSync);
+    return () => {
+      window.removeEventListener('ecuaplac_care_updated', handleCareSync);
+      window.removeEventListener('storage', handleCareSync);
+    };
+  }, []);
+
   const handleToggleCare = () => {
     const willOpen = !isCareOpen;
     setIsCareOpen(willOpen);
@@ -1644,16 +1700,44 @@ export const EcuaplacPortal: React.FC = () => {
     },
   ]);
 
-  // Carga inicial y sincronización en tiempo real de facturas/documentos desde InsForge Cloud
+  // Carga inicial y sincronización en tiempo real de facturas/documentos
   useEffect(() => {
     let isMounted = true;
-    ecuaplacConnector.fetchDocumentsOnline().then((liveDocs) => {
-      if (!isMounted) return;
-      if (liveDocs && liveDocs.length > 0) {
-        setProjectDocs(liveDocs);
-      }
-    }).catch(() => {});
-    return () => { isMounted = false; };
+
+    const loadCachedAndLive = async () => {
+      try {
+        const cached = localStorage.getItem('ecuaplac_tenant_docs');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0 && isMounted) {
+            setProjectDocs(parsed);
+          }
+        }
+      } catch {}
+
+      try {
+        const liveDocs = await ecuaplacConnector.fetchDocumentsOnline();
+        if (isMounted && liveDocs && liveDocs.length > 0) {
+          setProjectDocs(liveDocs);
+          localStorage.setItem('ecuaplac_tenant_docs', JSON.stringify(liveDocs));
+        }
+      } catch {}
+    };
+
+    loadCachedAndLive();
+
+    const handleDocsSync = () => {
+      loadCachedAndLive();
+    };
+
+    window.addEventListener('ecuaplac_docs_updated', handleDocsSync);
+    window.addEventListener('storage', handleDocsSync);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('ecuaplac_docs_updated', handleDocsSync);
+      window.removeEventListener('storage', handleDocsSync);
+    };
   }, []);
 
   const handleUploadDoc = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2961,10 +3045,10 @@ export const EcuaplacPortal: React.FC = () => {
                         {panelLang === 'es' ? 'Lanzamiento de web' : 'Website Launch'}
                       </span>
                       <span className="text-sm sm:text-base font-bold text-slate-900 block mt-0.5 font-display">
-                        07/06/2026
+                        {careData.launchDate}
                       </span>
                       <span className="text-xs text-stone-500 font-normal font-sans mt-0.5 block">
-                        Web oficial en producción · Servidor de Alta Velocidad
+                        {careData.launchDesc}
                       </span>
                     </div>
                   </div>
@@ -2984,14 +3068,89 @@ export const EcuaplacPortal: React.FC = () => {
                         </span>
                       </div>
                       <span className="text-sm sm:text-base font-bold text-slate-900 block mt-0.5 font-display">
-                        11/11/2026
+                        {careData.lastMaintenanceDate}
                       </span>
                       <span className="text-xs text-stone-500 font-normal font-sans mt-0.5 block">
-                        Optimización v3.0, Caché Edge & Seguridad PWA
+                        {careData.lastMaintenanceDesc}
                       </span>
                     </div>
                   </div>
                 </div>
+
+                {/* Tarjeta de Documento / Dossier MyNext Care en PDF (Subido por Musa) */}
+                {careData.pdfUrl && (
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-[#141A26] text-white border border-[#C5A059]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-[#C5A059]/15 border border-[#C5A059]/30 flex items-center justify-center text-[#F0CF85] shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs sm:text-sm font-bold text-white block truncate font-display">
+                            {careData.pdfName || 'Guía Oficial MyNext Care.pdf'}
+                          </span>
+                          <span className="text-[9.5px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            {panelLang === 'es' ? 'Documento Oficial' : 'Official Doc'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-stone-300 font-sans mt-0.5 truncate">
+                          {panelLang === 'es'
+                            ? `Dossier explicativo y coberturas del mantenimiento web (${careData.pdfSize || 'PDF'})`
+                            : `Explanatory dossier and maintenance coverage (${careData.pdfSize || 'PDF'})`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!careData.pdfUrl) return;
+                          if (careData.pdfUrl.startsWith('data:')) {
+                            try {
+                              const parts = careData.pdfUrl.split(',');
+                              const mime = parts[0].split(':')[1]?.split(';')[0] || 'application/pdf';
+                              const byteCharacters = atob(parts[1]);
+                              const byteNumbers = new Uint8Array(byteCharacters.length);
+                              for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                              }
+                              const blob = new Blob([byteNumbers], { type: mime });
+                              const blobUrl = URL.createObjectURL(blob);
+                              window.open(blobUrl, '_blank');
+                              return;
+                            } catch (e) {
+                              console.warn('Error abriendo visor:', e);
+                            }
+                          }
+                          window.open(careData.pdfUrl, '_blank');
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-[#F0CF85]" />
+                        <span>{panelLang === 'es' ? 'Ver Documento' : 'View Document'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!careData.pdfUrl) return;
+                          const a = document.createElement('a');
+                          a.href = careData.pdfUrl;
+                          a.download = careData.pdfName || 'Guia_Oficial_MyNext_Care.pdf';
+                          a.target = '_blank';
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }}
+                        className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                        title={panelLang === 'es' ? 'Descargar PDF' : 'Download PDF'}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Pie de Garantía MyNext */}
                 <div className="pt-2 flex items-center justify-between text-[11px] text-stone-500 font-medium px-1 flex-wrap gap-2">

@@ -10,6 +10,12 @@ export const AppLayout: React.FC = () => {
   const { isAuthenticated } = useAuth();
 
   const isAuthPage = location.pathname === '/login';
+  const isMusaAdmin = location.pathname.startsWith('/admin') || location.pathname.startsWith('/musa-mnx');
+
+  // Si está en la consola de superadmin de Musa MNX, cedemos el control total del viewport
+  if (isMusaAdmin) {
+    return <Outlet />;
+  }
 
   // Si no está autenticado o está en la ruta /login:
   // Renderizamos pantalla completa espacial limpia en #03060f (cero blanco en cabecera ni pie)

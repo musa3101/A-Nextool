@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "name": "Musa MNX Admin Control Tower",
+  "client": "musa-mnx",
+  "updatedAt": "2026-11-14T14:23:00.000Z",
+  "notes": "Versión 0.0.1: Lanzamiento inicial del panel de SuperAdmin Musa MNX con cristal obsidiana, arquitectura Bento y 4 pilares: Apps Overview, Facturación Oficial sincronizada, MyNext Care con dossier PDF y Torre de Vigilancia con Auditoría Forense.",
+  "changes": [
+    "Diseño de cristal obsidiana puro (#07090E) con alta legibilidad y micro-biseles luminosos",
+    "Panel Principal Bento para supervisión centralizada de aplicaciones entregadas",
+    "Módulo de Facturación con métricas financieras dinámicas (Emitido, Cobrado, IVA) y tabla sincronizada",
+    "MyNext Care con subida de Dossier PDF oficial para consulta y descarga por parte de los clientes",
+    "Torre de Control de Infraestructura con latencias en tiempo real y registro forense inmutable de logs"
+  ]
+}
