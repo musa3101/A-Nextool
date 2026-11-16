@@ -312,7 +312,7 @@ export const MusaAdminPortal: React.FC = () => {
             {/* Pie del Sidebar: Versión de Admin y Cerrar Sesión */}
             <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between">
               <div className="text-[10.5px] text-slate-400 font-mono">
-                Musa MNX v0.0.2
+                Musa MNX v0.0.3
               </div>
               <button
                 type="button"

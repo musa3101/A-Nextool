@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   Info,
   CheckCircle2,
+  RotateCcw,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -68,6 +69,7 @@ interface BackendAuditInteractiveLogsProps {
   logs: RawAuditLog[];
   isLoading: boolean;
   onRefresh: () => void;
+  onResetClientLogs?: () => Promise<boolean>;
   clientName?: string;
 }
 
@@ -75,6 +77,7 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
   logs,
   isLoading,
   onRefresh,
+  onResetClientLogs,
   clientName = 'Ecuaplac Reformas',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,6 +85,8 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
   const [showFilters, setShowFilters] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeQuickTab, setActiveQuickTab] = useState<'all' | 'galeria' | 'leads' | 'docs' | 'auth'>('all');
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>({
     levels: [],
@@ -101,7 +106,17 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
       let status = '200 OK';
       let statusCode = 200;
 
-      if (act.includes('eliminad') || act.includes('borrad') || act.includes('delete') || act.includes('drop')) {
+      const isResetAction =
+        raw.details?.type === 'client_logs_reset' ||
+        act.includes('reset de historial') ||
+        act.includes('reset logs') ||
+        entity.includes('reset');
+
+      if (isResetAction) {
+        level = 'warning';
+        status = '200 RESET';
+        statusCode = 200;
+      } else if (act.includes('eliminad') || act.includes('borrad') || act.includes('delete') || act.includes('drop')) {
         level = 'error';
         status = '204 DELETED';
         statusCode = 204;
@@ -127,7 +142,10 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
       let service = 'core-system';
       let serviceLabel = 'Sistema & BD';
 
-      if (entity === 'obras' || entity === 'carousel' || entity === 'moreprojects' || act.includes('obra') || act.includes('foto')) {
+      if (isResetAction) {
+        service = 'security-admin';
+        serviceLabel = 'SuperAdmin & Seguridad';
+      } else if (entity === 'obras' || entity === 'carousel' || entity === 'moreprojects' || act.includes('obra') || act.includes('foto')) {
         service = 'gallery-service';
         serviceLabel = 'Galería & Obras';
       } else if (entity === 'leads' || act.includes('presupuesto') || act.includes('lead')) {
@@ -149,6 +167,10 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
 
       // Tags forenses
       const tags: string[] = [service.replace('-service', '').replace('-engine', '').replace('-vault', '')];
+      if (isResetAction) {
+        tags.push('reset-cliente');
+        tags.push('hito-forense');
+      }
       if (level === 'error') tags.push('auditoría-crítica');
       if (level === 'success') tags.push('creación');
       if (level === 'warning') tags.push('mutación');
@@ -157,7 +179,7 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
 
       const userEmail = raw.user_email || 'ecuaplacbyjyg@gmail.com';
       let userName = 'José (Titular)';
-      if (userEmail.toLowerCase().includes('musa') || userEmail.toLowerCase().includes('mynext')) {
+      if (isResetAction || userEmail.toLowerCase().includes('musa') || userEmail.toLowerCase().includes('mynext')) {
         userName = 'Musa (SuperAdmin)';
       } else if (userEmail.toLowerCase().includes('joffre')) {
         userName = 'Joffre (Gestor)';
@@ -321,7 +343,20 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
             </div>
 
             {/* Acciones de Cabecera */}
-            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+              {onResetClientLogs && (
+                <button
+                  type="button"
+                  onClick={() => setIsResetModalOpen(true)}
+                  disabled={isLoading || isResetting}
+                  className="h-9 px-3 rounded-xl bg-[#C5A059]/15 hover:bg-[#C5A059]/25 border border-[#C5A059]/30 text-xs font-semibold text-[#F0CF85] hover:text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                  title="Poner a 0 los logs en la app de José sin borrar ningún log en SuperAdmin"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 text-[#F0CF85] ${isResetting ? 'animate-spin' : ''}`} />
+                  <span>Resetear Logs Cliente</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={exportAuditJSON}
@@ -335,7 +370,7 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
               <button
                 type="button"
                 onClick={onRefresh}
-                disabled={isLoading}
+                disabled={isLoading || isResetting}
                 className="h-9 px-3.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] text-xs font-semibold text-white transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
               >
                 <RefreshCw className={`w-3.5 h-3.5 text-[#F0CF85] ${isLoading ? 'animate-spin' : ''}`} />
@@ -563,6 +598,10 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
                 filteredLogs.map((log, index) => {
                   const isExpanded = expandedId === log.id;
                   const cfg = levelBadgeConfig[log.level];
+                  const isResetLog =
+                    log.tags.includes('reset-cliente') ||
+                    log.status.includes('RESET') ||
+                    log.message.toLowerCase().includes('reset de historial');
 
                   return (
                     <motion.div
@@ -578,7 +617,11 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
                         type="button"
                         onClick={() => setExpandedId(isExpanded ? null : log.id)}
                         className={`w-full p-4 text-left transition-all flex items-center gap-3 sm:gap-4 hover:bg-white/[0.03] active:bg-white/[0.05] cursor-pointer select-none ${
-                          isExpanded ? 'bg-white/[0.04]' : ''
+                          isResetLog
+                            ? 'bg-[#C5A059]/[0.08] border-y border-[#C5A059]/30 hover:bg-[#C5A059]/[0.12]'
+                            : isExpanded
+                            ? 'bg-white/[0.04]'
+                            : ''
                         }`}
                       >
                         {/* Chevron Animado con rotación 180° */}
@@ -592,10 +635,14 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
 
                         {/* Badge de Nivel */}
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold capitalize border flex items-center gap-1 shrink-0 ${cfg.badge}`}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold capitalize border flex items-center gap-1 shrink-0 ${
+                            isResetLog
+                              ? 'bg-[#C5A059]/20 text-[#F0CF85] border-[#C5A059]/40'
+                              : cfg.badge
+                          }`}
                         >
-                          {cfg.icon}
-                          <span>{log.level}</span>
+                          {isResetLog ? <RotateCcw className="w-2.5 h-2.5 text-[#F0CF85]" /> : cfg.icon}
+                          <span>{isResetLog ? 'Reset Cliente' : log.level}</span>
                         </span>
 
                         {/* Timestamp Horario Monospace */}
@@ -827,6 +874,106 @@ export const BackendAuditInteractiveLogs: React.FC<BackendAuditInteractiveLogsPr
           </div>
         </div>
       </div>
+
+      {/* Modal de Confirmación: Reset de Logs en App de Cliente */}
+      <AnimatePresence>
+        {isResetModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.16 }}
+              className="w-full max-w-lg rounded-2xl bg-[#0C0F17]/95 backdrop-blur-2xl border border-white/15 shadow-[0_25px_70px_rgba(0,0,0,0.85)] p-6 space-y-5"
+            >
+              {/* Cabecera del Modal */}
+              <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#C5A059]/20 border border-[#C5A059]/40 flex items-center justify-center text-[#F0CF85]">
+                    <RotateCcw className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white font-['Clash_Display']">
+                      Resetear Logs en App del Cliente
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Cliente: <span className="text-[#F0CF85] font-semibold">{clientName}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => !isResetting && setIsResetModalOpen(false)}
+                  disabled={isResetting}
+                  className="p-1.5 rounded-lg hover:bg-white/[0.08] text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Contenido Explicativo */}
+              <div className="space-y-3.5 text-xs text-slate-300 leading-relaxed">
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 space-y-1.5">
+                  <p className="font-semibold text-amber-200 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>0% Pérdida de Datos en SuperAdmin</span>
+                  </p>
+                  <p className="text-slate-300">
+                    Tus más de <strong className="text-white">{logs.length} logs históricos</strong> NO se borrarán de la base de datos. Seguirán siempre visibles aquí en tu panel para trazabilidad forense completa.
+                  </p>
+                </div>
+
+                <div className="space-y-2 p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                  <p className="font-semibold text-white">¿Qué ocurrirá al aplicar este corte?</p>
+                  <ul className="space-y-2 text-slate-400 list-disc list-inside">
+                    <li>
+                      <strong className="text-slate-200">En la app de José (Ecuaplac):</strong> El contador de movimientos se mostrará a <span className="text-emerald-400 font-bold">0</span> como una app recién entregada.
+                    </li>
+                    <li>
+                      <strong className="text-slate-200">Monitoreo limpio:</strong> Cualquier acción futura que José realice en su móvil o tablet empezará a sumar desde 1.
+                    </li>
+                    <li>
+                      <strong className="text-slate-200">Hito oficial:</strong> Se registrará un evento inmutable con la fecha y hora de hoy indicando el reset ejecutado por ti.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Botones de Acción */}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/[0.08]">
+                <button
+                  type="button"
+                  onClick={() => setIsResetModalOpen(false)}
+                  disabled={isResetting}
+                  className="px-4 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!onResetClientLogs) return;
+                    setIsResetting(true);
+                    try {
+                      await onResetClientLogs();
+                      setIsResetModalOpen(false);
+                    } finally {
+                      setIsResetting(false);
+                    }
+                  }}
+                  disabled={isResetting}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#C5A059] to-[#E2C37A] hover:brightness-110 text-slate-950 text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin' : ''}`} />
+                  <span>{isResetting ? 'Aplicando Reset...' : 'Sí, Resetear en App Cliente'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
