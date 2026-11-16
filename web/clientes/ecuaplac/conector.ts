@@ -1226,17 +1226,150 @@ export class EcuaplacConnector {
   }
 
   /**
-   * Consulta los logs reales de auditoría desde InsForge Cloud con conteo total y paginación
+   * Consulta la marca de tiempo oficial del último reset de logs para la app del cliente (José)
+   */
+  async fetchClientLogsResetTimestamp(): Promise<string | null> {
+    try {
+      const { data, error } = await insforge.database
+        .from('tenant_documents')
+        .select('*')
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .eq('category', 'client_logs_reset')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        const row = data[0];
+        if (row.notes) {
+          try {
+            const meta = JSON.parse(row.notes);
+            if (meta.resetAt) {
+              return meta.resetAt;
+            }
+          } catch {}
+        }
+        if (row.updated_at) return row.updated_at;
+      }
+    } catch (e) {
+      console.warn('Error consultando fecha de reset de logs:', e);
+    }
+
+    // Fallback local en caso de desconexión momentánea
+    try {
+      return localStorage.getItem('ecuaplac_client_logs_reset_at');
+    } catch {}
+
+    return null;
+  }
+
+  /**
+   * Resetea el historial visual en la app del cliente (José) a 0 movimientos.
+   * IMPORTANTE: No borra ningún log de la base de datos (0% pérdida de datos forenses en SuperAdmin).
+   * Registra el corte en la nube y añade un log inmutable de auditoría para Musa.
+   */
+  async resetClientLogs(adminUserEmail = 'musa@mynext.es'): Promise<{ success: boolean; resetAt: string }> {
+    const nowIso = new Date().toISOString();
+
+    try {
+      // 1. Guardar o actualizar la marca de corte en tenant_documents
+      const notesJson = JSON.stringify({
+        resetAt: nowIso,
+        resetBy: 'Musa (SuperAdmin)',
+        note: 'Historial de la app cliente reinicializado a 0 movimientos',
+      });
+
+      const { data: existing } = await insforge.database
+        .from('tenant_documents')
+        .select('id')
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .eq('category', 'client_logs_reset')
+        .limit(1);
+
+      const payload = {
+        tenant_id: ECUAPLAC_TENANT_ID,
+        doc_type: 'client_logs_reset',
+        doc_number: 'RESET-LOGS',
+        name: 'Client Logs Reset Cutoff',
+        category: 'client_logs_reset',
+        status: 'active',
+        notes: notesJson,
+        updated_at: nowIso,
+      };
+
+      if (existing && existing.length > 0) {
+        await insforge.database
+          .from('tenant_documents')
+          .update(payload)
+          .eq('id', existing[0].id);
+      } else {
+        await insforge.database
+          .from('tenant_documents')
+          .insert([{ ...payload, created_at: nowIso }]);
+      }
+
+      // 2. Insertar un log forense inmutable en audit_logs para el panel SuperAdmin
+      await insforge.database.from('audit_logs').insert([
+        {
+          tenant_id: ECUAPLAC_TENANT_ID,
+          user_email: adminUserEmail,
+          action: 'Reset de historial de cliente aplicado por Musa (SuperAdmin)',
+          entity: 'security',
+          details: {
+            type: 'client_logs_reset',
+            actor: 'Musa (SuperAdmin)',
+            reset_at: nowIso,
+            source: 'admin_portal',
+            note: 'App de José inicializada a 0 movimientos · Trazabilidad activa a partir de hoy',
+          },
+          created_at: nowIso,
+        },
+      ]);
+
+      // 3. Almacenamiento local para respuesta instantánea
+      try {
+        localStorage.setItem('ecuaplac_client_logs_reset_at', nowIso);
+      } catch {}
+
+      return { success: true, resetAt: nowIso };
+    } catch (e) {
+      console.warn('Error al resetear logs del cliente:', e);
+      try {
+        localStorage.setItem('ecuaplac_client_logs_reset_at', nowIso);
+      } catch {}
+      return { success: false, resetAt: nowIso };
+    }
+  }
+
+  /**
+   * Consulta los logs reales de auditoría desde InsForge Cloud con conteo total y paginación.
+   * Si options.forClient es true, solo devuelve los logs posteriores a la fecha de reset de cliente.
    */
   async fetchAuditLogsOnline(
     limit = 50,
-    offset = 0
-  ): Promise<{ logs: EcuaplacAuditLog[]; totalCount: number }> {
+    offset = 0,
+    options: { forClient?: boolean; since?: string } = {}
+  ): Promise<{ logs: EcuaplacAuditLog[]; totalCount: number; resetAt?: string | null }> {
     try {
-      const { data, error, count } = await insforge.database
+      let sinceDate = options.since;
+      let resetAt: string | null = null;
+
+      if (options.forClient) {
+        resetAt = await this.fetchClientLogsResetTimestamp();
+        if (resetAt) {
+          sinceDate = resetAt;
+        }
+      }
+
+      let query = insforge.database
         .from('audit_logs')
         .select('*', { count: 'exact' })
-        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .eq('tenant_id', ECUAPLAC_TENANT_ID);
+
+      if (sinceDate) {
+        query = query.gte('created_at', sinceDate);
+      }
+
+      const { data, error, count } = await query
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -1251,7 +1384,7 @@ export class EcuaplacConnector {
           created_at: d.created_at || new Date().toISOString(),
           time: formatLogTime(d.created_at || new Date().toISOString()),
         }));
-        return { logs, totalCount: typeof count === 'number' ? count : logs.length };
+        return { logs, totalCount: typeof count === 'number' ? count : logs.length, resetAt };
       }
     } catch (e) {
       console.warn('Error al consultar logs en InsForge:', e);
@@ -1612,7 +1745,7 @@ export class EcuaplacConnector {
         launchDesc: care.launchDesc || 'Web oficial en producción · Servidor de Alta Velocidad',
         lastMaintenanceDate: care.lastMaintenanceDate || '',
         lastMaintenanceDesc: care.lastMaintenanceDesc || '',
-        installedVersion: care.installedVersion || '3.1.2',
+        installedVersion: care.installedVersion || '3.1.3',
         pdfUploadDate: care.pdfUploadDate || '',
       });
 

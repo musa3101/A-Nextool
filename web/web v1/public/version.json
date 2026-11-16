@@ -1,14 +1,14 @@
 {
-  "version": "3.1.2",
-  "buildTimestamp": 1794853680000,
+  "version": "3.1.3",
+  "buildTimestamp": 1794857000000,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
-  "updatedAt": "2026-11-16T18:28:00.000Z",
-  "notes": "Versión 3.1.2: Sincronización garantizada de Galería 2 con ecuaplac.com, dossier PDF oficial de MyNext Care en la nube para iPhone/iPad/Mac, optimización táctil anti-zoom y refresco sin caché en PWA.",
+  "updatedAt": "2026-11-16T19:23:00.000Z",
+  "notes": "Versión 3.1.3: Punto de corte inteligente para historial de cliente a 0 movimientos tras entrega, preservación forense íntegra en SuperAdmin y auditoría inmutable en la nube.",
   "changes": [
-    "Sincronización garantizada en Galería 2 con ecuaplac.com y control de errores en tiempo real",
-    "Dossier PDF oficial de MyNext Care sincronizado en la nube para iPhone, iPad y Mac",
-    "Optimización táctil (>= 44px) y prevención de auto-zoom en Safari iPadOS e iOS",
-    "Refresco instantáneo sin caché en modo aplicación instalada (PWA)"
+    "Punto de corte inteligente para historial de cliente a 0 movimientos tras entrega",
+    "Preservación forense íntegra (0% pérdida de datos) en consola SuperAdmin de Musa",
+    "Sincronización en la nube (InsForge tenant_documents & audit_logs) para iPhone, iPad y Mac",
+    "Sincronización garantizada en Galería 2 con ecuaplac.com y control de errores en tiempo real"
   ]
 }

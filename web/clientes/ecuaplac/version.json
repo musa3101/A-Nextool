@@ -2,7 +2,7 @@
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
   "owner": "Jose (José Rivadeneira)",
-  "version": "3.1.2",
+  "version": "3.1.3",
   "last_updated": "2026-11-16",
   "status": "active",
   "route": "/ecuaplac",
@@ -23,9 +23,13 @@
     "smart_autohide_header",
     "header_logo_fade_in",
     "leads_fullscreen_desktop",
-    "white_label_strict"
+    "white_label_strict",
+    "client_logs_reset_filter"
   ],
   "changes": [
+    "Punto de corte inteligente para historial de cliente a 0 movimientos tras entrega",
+    "Preservación forense íntegra (0% pérdida de datos) en consola SuperAdmin de Musa",
+    "Sincronización en la nube (InsForge tenant_documents & audit_logs) para iPhone, iPad y Mac",
     "Sincronización garantizada en Galería 2 con ecuaplac.com y control de errores en tiempo real",
     "Dossier PDF oficial de MyNext Care sincronizado en la nube para iPhone, iPad y Mac",
     "Optimización táctil (>= 44px) y prevención de auto-zoom en Safari iPadOS e iOS",

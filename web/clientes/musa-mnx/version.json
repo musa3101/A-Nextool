@@ -1,10 +1,13 @@
 {
-  "version": "0.0.2",
+  "version": "0.0.3",
   "name": "Musa MNX Admin Control Tower",
   "client": "musa-mnx",
-  "updatedAt": "2026-11-16T18:57:00.000Z",
-  "notes": "Versión 0.0.2: Subida directa de Dossier PDF oficial de MyNext Care a la tabla tenant_documents en InsForge Database (mismo motor que Facturación) para sincronización instantánea en Mac, iPad e iPhone.",
+  "updatedAt": "2026-11-16T19:23:00.000Z",
+  "notes": "Versión 0.0.3: Botón de reset de logs de cliente en Backends & Auditoría con confirmación modal, protección 0% pérdida de datos y visualización forense completa de más de 500 eventos.",
   "changes": [
+    "Botón de reset de logs de cliente en Backends & Auditoría con confirmación de seguridad y 0% pérdida de datos",
+    "Generación automática de hito forense oficial e inmutable en audit_logs al aplicar un corte",
+    "Visualización forense completa de auditoría sin límite artificial de 30 eventos (hasta 500 eventos en vivo)",
     "Subida directa del Dossier PDF de MyNext Care en la nube (InsForge Database tenant_documents) sin bloqueo de Storage",
     "Sincronización bidireccional del estado y PDF de mantenimiento en tiempo real",
     "Diseño de cristal obsidiana puro (#07090E) con alta legibilidad y micro-biseles luminosos",

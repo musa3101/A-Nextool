@@ -639,8 +639,8 @@ export const EcuaplacPortal: React.FC = () => {
       }
     });
 
-    ecuaplacConnector.fetchAuditLogsOnline(50, 0).then((res) => {
-      if (res && res.logs && res.logs.length > 0) {
+    ecuaplacConnector.fetchAuditLogsOnline(50, 0, { forClient: true }).then((res) => {
+      if (res && Array.isArray(res.logs)) {
         setLogs(res.logs);
         setTotalLogsCount(res.totalCount);
       }
@@ -1109,7 +1109,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '3.1.2';
+  const CURRENT_SYSTEM_VERSION = '3.1.3';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState<boolean>(() => {
     try {
@@ -1120,7 +1120,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.1.2)
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.1.3)
     if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
@@ -2159,9 +2159,11 @@ export const EcuaplacPortal: React.FC = () => {
   const handleRefreshLogs = async () => {
     setIsRefreshingLogs(true);
     try {
-      const res = await ecuaplacConnector.fetchAuditLogsOnline(50, 0);
-      setLogs(res.logs);
-      setTotalLogsCount(res.totalCount);
+      const res = await ecuaplacConnector.fetchAuditLogsOnline(50, 0, { forClient: true });
+      if (res && Array.isArray(res.logs)) {
+        setLogs(res.logs);
+        setTotalLogsCount(res.totalCount);
+      }
       showSyncToast(
         panelLang === 'es' ? 'Historial sincronizado con el servidor' : 'History synced with server',
         'success'
@@ -2180,8 +2182,8 @@ export const EcuaplacPortal: React.FC = () => {
     if (isLoadingMoreLogs) return;
     setIsLoadingMoreLogs(true);
     try {
-      const res = await ecuaplacConnector.fetchAuditLogsOnline(50, logs.length);
-      if (res.logs && res.logs.length > 0) {
+      const res = await ecuaplacConnector.fetchAuditLogsOnline(50, logs.length, { forClient: true });
+      if (res && Array.isArray(res.logs) && res.logs.length > 0) {
         setLogs((prev) => [...prev, ...res.logs]);
         setTotalLogsCount(res.totalCount);
       }

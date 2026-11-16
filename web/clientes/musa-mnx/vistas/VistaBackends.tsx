@@ -73,14 +73,14 @@ export const VistaBackends: React.FC<VistaBackendsProps> = ({
     { name: currentClient.backend.tables.adminLogs, role: 'Historial y Registro de Auditoría' },
   ];
 
-  // Cargar logs reales de la aplicación del cliente
+  // Cargar logs reales de la aplicación del cliente (auditoría forense completa sin límite artificial)
   const loadLogs = async () => {
     setIsLoadingLogs(true);
     try {
       const cached = localStorage.getItem('ecuaplac_recent_audit_logs');
       let combined: AuditLogEntry[] = cached ? JSON.parse(cached) : [];
 
-      const live = await ecuaplacConnector.fetchAuditLogsOnline(30, 0);
+      const live = await ecuaplacConnector.fetchAuditLogsOnline(500, 0, { forClient: false });
       if (live && live.logs && live.logs.length > 0) {
         const liveMapped: AuditLogEntry[] = live.logs.map((l) => ({
           id: l.id,
@@ -93,10 +93,14 @@ export const VistaBackends: React.FC<VistaBackendsProps> = ({
         }));
 
         const map = new Map<string, AuditLogEntry>();
-        [...combined, ...liveMapped].forEach((entry) => {
+        [...liveMapped, ...combined].forEach((entry) => {
           map.set(entry.id, entry);
         });
-        combined = Array.from(map.values());
+        combined = Array.from(map.values()).sort((a, b) => {
+          const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return tB - tA;
+        });
       }
 
       if (combined.length === 0) {
@@ -135,6 +139,20 @@ export const VistaBackends: React.FC<VistaBackendsProps> = ({
       setLogs(combined);
     } catch (e) {
       console.warn('Error cargando logs:', e);
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
+  const handleResetClientLogs = async (): Promise<boolean> => {
+    setIsLoadingLogs(true);
+    try {
+      const res = await ecuaplacConnector.resetClientLogs('musa@mynext.es');
+      await loadLogs();
+      return res.success;
+    } catch (e) {
+      console.warn('Error al resetear logs del cliente:', e);
+      return false;
     } finally {
       setIsLoadingLogs(false);
     }
@@ -459,6 +477,7 @@ export const VistaBackends: React.FC<VistaBackendsProps> = ({
         logs={logs}
         isLoading={isLoadingLogs}
         onRefresh={loadLogs}
+        onResetClientLogs={handleResetClientLogs}
         clientName={currentClient.name}
       />
     </div>
