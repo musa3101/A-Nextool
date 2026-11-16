@@ -149,8 +149,14 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
     const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     try {
-      const publicUrl = await ecuaplacConnector.uploadCarePdf(file, file.name);
-      setCarePdfUrl(publicUrl);
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string) || '');
+        reader.onerror = () => reject(new Error('No se pudo leer el archivo PDF'));
+        reader.readAsDataURL(file);
+      });
+
+      setCarePdfUrl(dataUrl);
       setCarePdfName(file.name);
       setCarePdfSize(sizeFormatted);
       setCarePdfDate(today);
@@ -164,7 +170,7 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
         lastMaintenanceDate,
         lastMaintenanceDesc,
         installedVersion,
-        pdfUrl: publicUrl,
+        pdfUrl: dataUrl,
         pdfName: file.name,
         pdfSize: sizeFormatted,
         pdfUploadDate: today,
@@ -177,7 +183,7 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
       if (cloudOk) {
         showToast(`PDF oficial «${file.name}» publicado en la nube para Mac, iPad e iPhone`);
       } else {
-        alert('El archivo se subió, pero no pudo registrarse en la base de datos de la nube. Pulsa Guardar y Publicar de nuevo.');
+        alert('El archivo se cargó en local, pero no pudo registrarse en la nube. Pulsa Guardar y Aplicar Cambios de nuevo.');
       }
     } catch (err) {
       console.error('Error subiendo PDF a la nube:', err);
@@ -262,21 +268,13 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
     setIsSaving(true);
 
     try {
-      let publishedPdfUrl = carePdfUrl;
-      if (publishedPdfUrl && publishedPdfUrl.startsWith('data:')) {
-        const resBlob = await fetch(publishedPdfUrl);
-        const blob = await resBlob.blob();
-        publishedPdfUrl = await ecuaplacConnector.uploadCarePdf(blob, carePdfName || 'MyNextCare.pdf');
-        setCarePdfUrl(publishedPdfUrl);
-      }
-
       const updatedCare = {
         launchDate,
         launchDesc,
         lastMaintenanceDate,
         lastMaintenanceDesc,
         installedVersion,
-        pdfUrl: publishedPdfUrl,
+        pdfUrl: carePdfUrl,
         pdfName: carePdfName,
         pdfSize: carePdfSize,
         pdfUploadDate: carePdfDate,
