@@ -501,6 +501,7 @@ export class EcuaplacConnector {
     try {
       const res = await fetch(`${this.url}/rest/v1/${this.tables.carousel}?select=*&order=sort_order.asc`, {
         headers: this.getHeaders(),
+        cache: 'no-store',
       });
       if (res.ok) {
         const data = await res.json();
@@ -567,6 +568,7 @@ export class EcuaplacConnector {
     try {
       const res = await fetch(`${this.url}/rest/v1/${this.tables.moreProjects}?select=*&order=sort_order.asc`, {
         headers: this.getHeaders(),
+        cache: 'no-store',
       });
       if (res.ok) {
         const data = await res.json();
@@ -882,6 +884,7 @@ export class EcuaplacConnector {
     try {
       const res = await fetch(`${this.url}/rest/v1/${this.tables.adminProfile}?select=*&limit=1`, {
         headers: this.getHeaders(),
+        cache: 'no-store',
       });
       if (res.ok) {
         const data = await res.json();
@@ -932,22 +935,30 @@ export class EcuaplacConnector {
     // 2. Respaldo simultáneo a InsForge Storage (tenants-media)
     try {
       const insforgeFilename = `ecuaplac/${filename}`;
-      const { error } = await (insforge.storage.from('tenants-media') as any).upload(insforgeFilename, file, {
-        contentType: 'image/webp',
-        upsert: true,
-      });
+      const { data: uploadData, error } = await insforge.storage
+        .from('tenants-media')
+        .upload(insforgeFilename, file as File);
 
       if (!error && !publicUrl) {
-        const { data } = insforge.storage.from('tenants-media').getPublicUrl(insforgeFilename);
-        if (data?.publicUrl) {
-          publicUrl = data.publicUrl;
+        if ((uploadData as any)?.url) {
+          publicUrl = (uploadData as any).url;
+        } else {
+          const resolvedKey = (uploadData as any)?.key || insforgeFilename;
+          const { data } = insforge.storage.from('tenants-media').getPublicUrl(resolvedKey);
+          if (data?.publicUrl) {
+            publicUrl = data.publicUrl;
+          }
         }
       }
     } catch (e) {
       console.warn('Fallo en respaldo InsForge Storage:', e);
     }
 
-    return publicUrl || `/ecuaplac/portfolio/${filename.split('/').pop()}`;
+    if (!publicUrl) {
+      throw new Error('No se pudo subir la fotografía a la nube. Comprueba tu conexión.');
+    }
+
+    return publicUrl;
   }
 
   /**
@@ -1007,10 +1018,13 @@ export class EcuaplacConnector {
           savedWork.id = supaItem.id;
         }
       } else {
-        console.warn('Fallo Supabase saveWork HTTP:', res.status, await res.text());
+        const errText = await res.text();
+        console.warn('Fallo Supabase saveWork HTTP:', res.status, errText);
+        throw new Error(`Error al guardar en la web (HTTP ${res.status})`);
       }
     } catch (e) {
       console.warn('Fallo al guardar obra en Supabase:', e);
+      throw e;
     }
 
     // Persistir de inmediato en la caché local para que nunca desaparezca al recargar o forzar sync
@@ -1098,10 +1112,13 @@ export class EcuaplacConnector {
           savedProject.id = supaItem.id;
         }
       } else {
-        console.warn('Fallo Supabase saveProject HTTP:', res.status, await res.text());
+        const errText = await res.text();
+        console.warn('Fallo Supabase saveProject HTTP:', res.status, errText);
+        throw new Error(`Error al guardar en la web (HTTP ${res.status})`);
       }
     } catch (e) {
       console.warn('Fallo al guardar proyecto en Supabase:', e);
+      throw e;
     }
 
     // Persistir de inmediato en la caché local para que nunca desaparezca al recargar o forzar sync
@@ -1156,12 +1173,18 @@ export class EcuaplacConnector {
     // 1. Eliminar de Supabase (web ecuaplac.com) - Solo si el id es un UUID válido
     if (this.isUUID(id)) {
       try {
-        await fetch(`${this.url}/rest/v1/${table}?id=eq.${id}`, {
+        const res = await fetch(`${this.url}/rest/v1/${table}?id=eq.${id}`, {
           method: 'DELETE',
           headers: this.getHeaders(),
         });
+        if (!res.ok) {
+          const errText = await res.text();
+          console.warn('Fallo Supabase deleteItem HTTP:', res.status, errText);
+          throw new Error(`Error al eliminar en la web (HTTP ${res.status})`);
+        }
       } catch (e) {
         console.warn('Fallo al eliminar en Supabase:', e);
+        throw e;
       }
     }
 
@@ -1358,7 +1381,14 @@ export class EcuaplacConnector {
         .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        return data.map((d: any) => ({
+        return data
+          .filter(
+            (d: any) =>
+              d.category !== 'mynext_care' &&
+              d.doc_type !== 'mynext_care' &&
+              d.doc_number !== 'MYNEXT-CARE'
+          )
+          .map((d: any) => ({
           id: d.id,
           number: d.doc_number,
           name: d.name,
@@ -1448,6 +1478,185 @@ export class EcuaplacConnector {
       console.warn('Error eliminando documento de la nube:', e);
     }
     return false;
+  }
+
+  /**
+   * Sube el PDF oficial de MyNext Care a la nube (InsForge Storage / Supabase Storage)
+   * y devuelve su URL pública HTTPS para que funcione en Mac, iPad e iPhone.
+   */
+  async uploadCarePdf(file: File | Blob, fileName: string): Promise<string> {
+    const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_') || 'MyNextCare.pdf';
+    const stamp = Date.now();
+    const insforgePath = `ecuaplac/care/${stamp}_${safeName}`;
+    const supabaseCarePath = `care/${stamp}_${safeName}`;
+    let publicUrl = '';
+
+    try {
+      const { data: uploadData, error } = await insforge.storage
+        .from('tenants-media')
+        .upload(insforgePath, file as File);
+      if (!error) {
+        if ((uploadData as any)?.url) {
+          publicUrl = (uploadData as any).url;
+        } else {
+          const resolvedKey = (uploadData as any)?.key || insforgePath;
+          const { data } = insforge.storage.from('tenants-media').getPublicUrl(resolvedKey);
+          if (data?.publicUrl) {
+            publicUrl = data.publicUrl;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Fallo subiendo PDF MyNext Care a InsForge Storage:', e);
+    }
+
+    if (!publicUrl) {
+      try {
+        const res = await fetch(`${this.url}/storage/v1/object/${this.bucket}/${supabaseCarePath}`, {
+          method: 'POST',
+          headers: {
+            apikey: this.key,
+            Authorization: `Bearer ${this.key}`,
+            'Content-Type': 'application/pdf',
+            'x-upsert': 'true',
+          },
+          body: file,
+        });
+        if (res.ok) {
+          publicUrl = `${this.url}/storage/v1/object/public/${this.bucket}/${supabaseCarePath}`;
+        }
+      } catch (e) {
+        console.warn('Fallo subiendo PDF MyNext Care a Supabase Storage:', e);
+      }
+    }
+
+    if (!publicUrl) {
+      throw new Error('No se pudo subir el PDF de MyNext Care a la nube.');
+    }
+
+    return publicUrl;
+  }
+
+  /**
+   * Lee la configuración y PDF oficial de MyNext Care desde InsForge Cloud (tenant_documents)
+   */
+  async fetchCareConfigOnline(): Promise<{
+    launchDate?: string;
+    launchDesc?: string;
+    lastMaintenanceDate?: string;
+    lastMaintenanceDesc?: string;
+    installedVersion?: string;
+    status?: string;
+    pdfUrl?: string;
+    pdfName?: string;
+    pdfSize?: string;
+    pdfUploadDate?: string;
+    updatedAt?: string;
+  } | null> {
+    try {
+      const { data, error } = await insforge.database
+        .from('tenant_documents')
+        .select('*')
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .eq('category', 'mynext_care')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        const row = data[0];
+        let meta: Record<string, any> = {};
+        try {
+          if (row.notes && row.notes.trim().startsWith('{')) {
+            meta = JSON.parse(row.notes);
+          }
+        } catch {}
+
+        return {
+          launchDate: meta.launchDate,
+          launchDesc: meta.launchDesc,
+          lastMaintenanceDate: meta.lastMaintenanceDate,
+          lastMaintenanceDesc: meta.lastMaintenanceDesc,
+          installedVersion: meta.installedVersion,
+          status: row.status || 'active',
+          pdfUrl: row.file_url || meta.pdfUrl || '',
+          pdfName: row.name || meta.pdfName || '',
+          pdfSize: row.file_size || meta.pdfSize || '',
+          pdfUploadDate: meta.pdfUploadDate,
+          updatedAt: row.updated_at,
+        };
+      }
+    } catch (e) {
+      console.warn('Error consultando MyNext Care en la nube:', e);
+    }
+    return null;
+  }
+
+  /**
+   * Guarda la configuración y PDF oficial de MyNext Care en InsForge Cloud (tenant_documents)
+   */
+  async saveCareConfigOnline(care: {
+    launchDate?: string;
+    launchDesc?: string;
+    lastMaintenanceDate?: string;
+    lastMaintenanceDesc?: string;
+    installedVersion?: string;
+    status?: string;
+    pdfUrl?: string;
+    pdfName?: string;
+    pdfSize?: string;
+    pdfUploadDate?: string;
+  }): Promise<boolean> {
+    try {
+      const notesJson = JSON.stringify({
+        launchDate: care.launchDate || '07/06/2026',
+        launchDesc: care.launchDesc || 'Web oficial en producción · Servidor de Alta Velocidad',
+        lastMaintenanceDate: care.lastMaintenanceDate || '',
+        lastMaintenanceDesc: care.lastMaintenanceDesc || '',
+        installedVersion: care.installedVersion || '3.1.2',
+        pdfUploadDate: care.pdfUploadDate || '',
+      });
+
+      const { data: existing, error: selectErr } = await insforge.database
+        .from('tenant_documents')
+        .select('id')
+        .eq('tenant_id', ECUAPLAC_TENANT_ID)
+        .eq('category', 'mynext_care')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      if (selectErr) {
+        return false;
+      }
+
+      const payload = {
+        tenant_id: ECUAPLAC_TENANT_ID,
+        doc_type: 'mynext_care',
+        doc_number: 'MYNEXT-CARE',
+        name: care.pdfName !== undefined ? care.pdfName : 'MyNextCare.pdf',
+        file_url: care.pdfUrl || '',
+        file_size: care.pdfSize || '',
+        category: 'mynext_care',
+        status: care.status || 'active',
+        notes: notesJson,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (existing && existing.length > 0) {
+        const { error } = await insforge.database
+          .from('tenant_documents')
+          .update(payload)
+          .eq('id', existing[0].id);
+        return !error;
+      }
+
+      const { error } = await insforge.database
+        .from('tenant_documents')
+        .insert([{ ...payload, created_at: new Date().toISOString() }]);
+      return !error;
+    } catch (e) {
+      console.warn('Error guardando MyNext Care en la nube:', e);
+      return false;
+    }
   }
 }
 

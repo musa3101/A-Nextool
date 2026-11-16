@@ -1,14 +1,14 @@
 {
-  "version": "3.1.1",
-  "buildTimestamp": 1794665200000,
+  "version": "3.1.2",
+  "buildTimestamp": 1794853680000,
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
-  "updatedAt": "2026-11-14T13:07:00.000Z",
-  "notes": "Versión 3.1.1: Bandeja de presupuestos en pantalla completa nativa, rediseño con bordes negros de precisión, White-Label estricto y desactivación de subida de facturas desde panel de cliente.",
+  "updatedAt": "2026-11-16T18:28:00.000Z",
+  "notes": "Versión 3.1.2: Sincronización garantizada de Galería 2 con ecuaplac.com, dossier PDF oficial de MyNext Care en la nube para iPhone/iPad/Mac, optimización táctil anti-zoom y refresco sin caché en PWA.",
   "changes": [
-    "Bandeja de presupuestos en pantalla completa nativa para Mac, iPad y móvil",
-    "Rediseño sobrio con bordes negros de precisión y cajas de mensaje con relieve",
-    "Blindaje estricto de White-Label sin menciones de infraestructura en la interfaz",
-    "Desactivación segura del botón de subida de facturas desde el panel de cliente"
+    "Sincronización garantizada en Galería 2 con ecuaplac.com y control de errores en tiempo real",
+    "Dossier PDF oficial de MyNext Care sincronizado en la nube para iPhone, iPad y Mac",
+    "Optimización táctil (>= 44px) y prevención de auto-zoom en Safari iPadOS e iOS",
+    "Refresco instantáneo sin caché en modo aplicación instalada (PWA)"
   ]
 }

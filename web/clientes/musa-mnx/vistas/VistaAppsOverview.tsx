@@ -88,7 +88,7 @@ export const VistaAppsOverview: React.FC<VistaAppsOverviewProps> = ({
                   <span className="text-[10px] uppercase font-mono tracking-widest text-slate-400 block">
                     Versión
                   </span>
-                  <span className="text-sm font-mono font-bold text-[#F0CF85]">v3.1.1</span>
+                  <span className="text-sm font-mono font-bold text-[#F0CF85]">v3.1.2</span>
                 </div>
               </div>
 
@@ -225,7 +225,7 @@ export const VistaAppsOverview: React.FC<VistaAppsOverviewProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Mantenimiento web activo para <strong className="text-slate-200">{primaryClient.name}</strong>. Revisión preventiva y actualización v3.1.1 en producción.
+              Mantenimiento web activo para <strong className="text-slate-200">{primaryClient.name}</strong>. Revisión preventiva y actualización v3.1.2 en producción.
             </p>
             <button
               type="button"

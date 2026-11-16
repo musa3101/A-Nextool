@@ -242,7 +242,7 @@ const InteractiveTrafficBars: React.FC<{
       {/* Contenedor de las 7 barras interactivas */}
       <div className="relative">
         <div
-          className="flex items-end justify-between gap-1.5 h-8 sm:h-9 cursor-pointer"
+          className="flex items-end justify-between gap-1.5 h-11 cursor-pointer"
           onMouseLeave={() => setActiveBarIndex(null)}
         >
           {barsData.map((bar, i) => {
@@ -254,7 +254,6 @@ const InteractiveTrafficBars: React.FC<{
                 key={i}
                 onMouseEnter={() => setActiveBarIndex(i)}
                 onClick={() => setActiveBarIndex(activeBarIndex === i ? null : i)}
-                onTouchStart={() => setActiveBarIndex(activeBarIndex === i ? null : i)}
                 className="flex-1 h-full flex items-end group relative py-0.5"
                 style={{ touchAction: 'manipulation' }}
                 title={`${bar.dayLabel}: ${bar.visitors} ${panelLang === 'es' ? 'visitas' : 'visitors'}`}
@@ -746,19 +745,35 @@ export const EcuaplacPortal: React.FC = () => {
     setIsForceSyncing(true);
     setSyncFeedback(false);
     try {
-      const [liveWorks, liveProjects, liveLeads] = await Promise.all([
+      const [liveWorks, liveProjects, liveLeads, liveContacts, liveCare, liveDocs] = await Promise.all([
         ecuaplacConnector.fetchWorksOnline(),
         ecuaplacConnector.fetchProjectsOnline(),
         ecuaplacConnector.fetchLeadsOnline(),
+        ecuaplacConnector.fetchContactsOnline(),
+        ecuaplacConnector.fetchCareConfigOnline(),
+        ecuaplacConnector.fetchDocumentsOnline(),
       ]);
       if (liveWorks && liveWorks.length > 0) setWorks(liveWorks);
       if (liveProjects && liveProjects.length > 0) setMoreProjects(liveProjects);
       if (liveLeads && liveLeads.length > 0) setLeads(liveLeads);
+      if (liveContacts && liveContacts.length > 0) {
+        setContacts(liveContacts);
+      }
+      if (liveCare) {
+        setCareData((prev: any) => ({ ...prev, ...liveCare }));
+      }
+      if (Array.isArray(liveDocs) && liveDocs.length > 0) {
+        setProjectDocs(liveDocs);
+      }
       setSyncFeedback(true);
       setTimeout(() => setSyncFeedback(false), 2500);
-      addAuditLog('Actualización forzada: Web y backend sincronizados', 'Ecuaplac Web', 'success');
+      addAuditLog('Actualización forzada: Web y datos sincronizados', 'Ecuaplac Web', 'success');
     } catch (err) {
       console.error('Error al forzar actualización:', err);
+      showSyncToast(
+        panelLang === 'es' ? 'Error al sincronizar con la web' : 'Error syncing with website',
+        'error'
+      );
     } finally {
       setIsForceSyncing(false);
     }
@@ -1094,7 +1109,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [feedbackSentSuccess, setFeedbackSentSuccess] = useState(false);
 
   // Versión del Sistema Next Tools
-  const CURRENT_SYSTEM_VERSION = '3.1.1';
+  const CURRENT_SYSTEM_VERSION = '3.1.2';
   const [isUpdatesExpanded, setIsUpdatesExpanded] = useState(false);
   const [autoCheckUpdates, setAutoCheckUpdates] = useState<boolean>(() => {
     try {
@@ -1105,7 +1120,7 @@ export const EcuaplacPortal: React.FC = () => {
   const [updateCheckState, setUpdateCheckState] = useState<'idle' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'installed'>('idle');
   const [installedVersion, setInstalledVersion] = useState(() => {
     const cached = localStorage.getItem('nextool_app_version');
-    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.1.1)
+    // La versión oficial instalada en este código siempre es CURRENT_SYSTEM_VERSION (3.1.2)
     if (!cached || cached !== CURRENT_SYSTEM_VERSION) {
       localStorage.setItem('nextool_app_version', CURRENT_SYSTEM_VERSION);
       return CURRENT_SYSTEM_VERSION;
@@ -1525,18 +1540,15 @@ export const EcuaplacPortal: React.FC = () => {
   const careSectionRef = useRef<HTMLDivElement>(null);
 
   const [careData, setCareData] = useState(() => {
-    const defaultSamplePdf =
-      'data:application/pdf;base64,JVBERi0xLjQKJeLjz9MKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNTk1IDg0Ml0+PmVuZG9iagp4cmVmCjAgNAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMTggMDAwMDAgbiAKMDAwMDAwMDA2OSAwMDAwMCBuIAowMDAwMDAwMTIxIDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSA0L1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKMTk5CiUlRU9GCg==';
-
     try {
       const cached = localStorage.getItem('ecuaplac_mynext_care');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (!parsed.pdfUrl) {
-          parsed.pdfUrl = defaultSamplePdf;
-          parsed.pdfName = 'Guia_Oficial_MyNext_Care_2026.pdf';
-          parsed.pdfSize = '1.2 MB';
-          parsed.pdfUploadDate = '11/11/2026';
+        // Limpiar el antiguo PDF en blanco de ejemplo si estaba cacheado
+        if (parsed.pdfUrl && parsed.pdfUrl.includes('JVBERi0xLjQKJeLjz9MKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+')) {
+          parsed.pdfUrl = '';
+          parsed.pdfName = '';
+          parsed.pdfSize = '';
         }
         return parsed;
       }
@@ -1544,29 +1556,73 @@ export const EcuaplacPortal: React.FC = () => {
     return {
       launchDate: '07/06/2026',
       launchDesc: 'Web oficial en producción · Servidor de Alta Velocidad',
-      lastMaintenanceDate: '11/11/2026',
-      lastMaintenanceDesc: 'Optimización v3.0, Caché Edge & Seguridad PWA',
+      lastMaintenanceDate: '15/11/2026',
+      lastMaintenanceDesc: 'Optimización general, máxima velocidad y seguridad',
       status: 'active',
-      pdfUrl: defaultSamplePdf,
-      pdfName: 'Guia_Oficial_MyNext_Care_2026.pdf',
-      pdfSize: '1.2 MB',
-      pdfUploadDate: '11/11/2026',
+      pdfUrl: '',
+      pdfName: '',
+      pdfSize: '',
+      pdfUploadDate: '',
     };
   });
 
   useEffect(() => {
+    let isMounted = true;
+    const isBlankSamplePdf = (url?: string) =>
+      Boolean(url && url.includes('JVBERi0xLjQKJeLjz9MKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+'));
+
+    const loadCareFromCloud = async () => {
+      try {
+        const cloudCare = await ecuaplacConnector.fetchCareConfigOnline();
+        if (isMounted && cloudCare) {
+          setCareData((prev: any) => {
+            const cleanPdfUrl = isBlankSamplePdf(cloudCare.pdfUrl) ? '' : cloudCare.pdfUrl;
+            const merged = {
+              ...prev,
+              ...(cloudCare.launchDate !== undefined && { launchDate: cloudCare.launchDate }),
+              ...(cloudCare.launchDesc !== undefined && { launchDesc: cloudCare.launchDesc }),
+              ...(cloudCare.lastMaintenanceDate !== undefined && { lastMaintenanceDate: cloudCare.lastMaintenanceDate }),
+              ...(cloudCare.lastMaintenanceDesc !== undefined && { lastMaintenanceDesc: cloudCare.lastMaintenanceDesc }),
+              ...(cloudCare.installedVersion !== undefined && { installedVersion: cloudCare.installedVersion }),
+              ...(cloudCare.status !== undefined && { status: cloudCare.status }),
+              ...(cleanPdfUrl !== undefined && { pdfUrl: cleanPdfUrl }),
+              ...(cloudCare.pdfName !== undefined && { pdfName: cleanPdfUrl === '' ? '' : cloudCare.pdfName }),
+              ...(cloudCare.pdfSize !== undefined && { pdfSize: cleanPdfUrl === '' ? '' : cloudCare.pdfSize }),
+              ...(cloudCare.pdfUploadDate !== undefined && { pdfUploadDate: cloudCare.pdfUploadDate }),
+            };
+            try {
+              localStorage.setItem('ecuaplac_mynext_care', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      } catch (e) {
+        console.warn('Error sincronizando MyNext Care desde la nube:', e);
+      }
+    };
+
+    loadCareFromCloud();
+
     const handleCareSync = () => {
       try {
         const cached = localStorage.getItem('ecuaplac_mynext_care');
         if (cached) {
-          setCareData(JSON.parse(cached));
+          const parsed = JSON.parse(cached);
+          if (isBlankSamplePdf(parsed.pdfUrl)) {
+            parsed.pdfUrl = '';
+            parsed.pdfName = '';
+            parsed.pdfSize = '';
+          }
+          setCareData(parsed);
         }
       } catch {}
+      loadCareFromCloud();
     };
 
     window.addEventListener('ecuaplac_care_updated', handleCareSync);
     window.addEventListener('storage', handleCareSync);
     return () => {
+      isMounted = false;
       window.removeEventListener('ecuaplac_care_updated', handleCareSync);
       window.removeEventListener('storage', handleCareSync);
     };
@@ -1709,8 +1765,13 @@ export const EcuaplacPortal: React.FC = () => {
         const cached = localStorage.getItem('ecuaplac_tenant_docs');
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0 && isMounted) {
-            setProjectDocs(parsed);
+          if (Array.isArray(parsed)) {
+            const filtered = parsed.filter(
+              (d: any) => d?.category !== 'mynext_care' && d?.doc_type !== 'mynext_care'
+            );
+            if (filtered.length > 0 && isMounted) {
+              setProjectDocs(filtered);
+            }
           }
         }
       } catch {}
@@ -1810,12 +1871,8 @@ export const EcuaplacPortal: React.FC = () => {
     setIsInvoiceViewerOpen(true);
   };
 
-  const handleViewInvoicePdf = (fileUrl?: string, fileName?: string) => {
-    if (!fileUrl) {
-      window.print();
-      return;
-    }
-
+  const openPdfSafely = (fileUrl?: string) => {
+    if (!fileUrl) return;
     if (fileUrl.startsWith('data:')) {
       try {
         const parts = fileUrl.split(',');
@@ -1831,21 +1888,21 @@ export const EcuaplacPortal: React.FC = () => {
         if (!win) {
           window.location.href = blobUrl;
         }
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
         return;
       } catch (e) {
         console.warn('Error al abrir PDF:', e);
       }
     }
-    window.open(fileUrl, '_blank');
+    const win = window.open(fileUrl, '_blank');
+    if (!win) {
+      window.location.href = fileUrl;
+    }
   };
 
-  const handleOpenFullscreenInvoice = (fileUrl?: string, fileName?: string) => {
-    const targetName = fileName || selectedInvoiceForView?.name || 'Factura_Ecuaplac.pdf';
-
-    if (!fileUrl) {
-      window.print();
-      return;
-    }
+  const downloadPdfSafely = async (fileUrl?: string, fileName?: string) => {
+    if (!fileUrl) return;
+    const targetName = fileName || 'Documento_Ecuaplac.pdf';
 
     if (fileUrl.startsWith('data:')) {
       try {
@@ -1861,15 +1918,35 @@ export const EcuaplacPortal: React.FC = () => {
         const a = document.createElement('a');
         a.href = blobUrl;
         a.download = targetName;
-        a.target = '_blank';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
         return;
       } catch (e) {
         console.warn('Error al decodificar data URL para descarga:', e);
       }
     }
+
+    // Para URLs HTTPS cross-origin en Safari iOS/iPadOS, descargar como Blob local primero
+    try {
+      const res = await fetch(fileUrl);
+      if (res.ok) {
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = targetName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+        return;
+      }
+    } catch (e) {
+      console.warn('Fallback descarga directa:', e);
+    }
+
     const a = document.createElement('a');
     a.href = fileUrl;
     a.download = targetName;
@@ -1877,6 +1954,23 @@ export const EcuaplacPortal: React.FC = () => {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  const handleViewInvoicePdf = (fileUrl?: string, _fileName?: string) => {
+    if (!fileUrl) {
+      window.print();
+      return;
+    }
+    openPdfSafely(fileUrl);
+  };
+
+  const handleOpenFullscreenInvoice = (fileUrl?: string, fileName?: string) => {
+    const targetName = fileName || selectedInvoiceForView?.name || 'Factura_Ecuaplac.pdf';
+    if (!fileUrl) {
+      window.print();
+      return;
+    }
+    void downloadPdfSafely(fileUrl, targetName);
   };
 
   const handleUploadInvoice = handleUploadDoc;
@@ -2058,7 +2152,7 @@ export const EcuaplacPortal: React.FC = () => {
       playLeadNotificationSound();
       setNotificationFeedback(panelLang === 'es' ? 'Notificaciones activadas (simulado)' : 'Notifications enabled (simulated)');
       setTimeout(() => setNotificationFeedback(null), 3500);
-      addAuditLog('Notificaciones activadas (simulación en navegador sin Web Push)', 'Ecuaplac App', 'info');
+      addAuditLog('Notificaciones activadas en este dispositivo', 'Ecuaplac App', 'info');
     }
   };
 
@@ -2232,7 +2326,8 @@ export const EcuaplacPortal: React.FC = () => {
 
   const handleMoveUp = async (item: EcuaplacWorkItem) => {
     const isCarousel = activeTab === 'obras';
-    const list = isCarousel ? [...works] : [...moreProjects];
+    const prevSnapshot = isCarousel ? [...works] : [...moreProjects];
+    const list = [...prevSnapshot];
     const index = list.findIndex((i) => i.id === item.id);
     if (index <= 0) return;
 
@@ -2245,28 +2340,48 @@ export const EcuaplacPortal: React.FC = () => {
       sort_order: (idx + 1) * 10,
     }));
 
-    if (isCarousel) {
-      setWorks(reordered);
-      ecuaplacConnector.saveWorks(reordered);
-      ecuaplacConnector.saveWork({ id: item.id, sort_order: reordered[index - 1].sort_order });
-      ecuaplacConnector.saveWork({ id: prevItem.id, sort_order: reordered[index].sort_order });
-    } else {
-      setMoreProjects(reordered);
-      ecuaplacConnector.saveMoreProjects(reordered);
-      ecuaplacConnector.saveProject({ id: item.id, sort_order: reordered[index - 1].sort_order });
-      ecuaplacConnector.saveProject({ id: prevItem.id, sort_order: reordered[index].sort_order });
-    }
+    try {
+      if (isCarousel) {
+        setWorks(reordered);
+        ecuaplacConnector.saveWorks(reordered);
+        await Promise.all([
+          ecuaplacConnector.saveWork({ id: item.id, sort_order: reordered[index - 1].sort_order }),
+          ecuaplacConnector.saveWork({ id: prevItem.id, sort_order: reordered[index].sort_order }),
+        ]);
+      } else {
+        setMoreProjects(reordered);
+        ecuaplacConnector.saveMoreProjects(reordered);
+        await Promise.all([
+          ecuaplacConnector.saveProject({ id: item.id, sort_order: reordered[index - 1].sort_order }),
+          ecuaplacConnector.saveProject({ id: prevItem.id, sort_order: reordered[index].sort_order }),
+        ]);
+      }
 
-    addAuditLog(
-      `Orden actualizado: «${item.title_es}» movido hacia arriba`,
-      'Ecuaplac Web',
-      'info'
-    );
+      addAuditLog(
+        `Orden actualizado: «${item.title_es}» movido hacia arriba`,
+        'Ecuaplac Web',
+        'info'
+      );
+    } catch (e) {
+      console.warn('Error al guardar el orden:', e);
+      if (isCarousel) {
+        setWorks(prevSnapshot);
+        ecuaplacConnector.saveWorks(prevSnapshot);
+      } else {
+        setMoreProjects(prevSnapshot);
+        ecuaplacConnector.saveMoreProjects(prevSnapshot);
+      }
+      showSyncToast(
+        panelLang === 'es' ? 'Error al actualizar el orden en la web' : 'Error updating order on website',
+        'error'
+      );
+    }
   };
 
   const handleMoveDown = async (item: EcuaplacWorkItem) => {
     const isCarousel = activeTab === 'obras';
-    const list = isCarousel ? [...works] : [...moreProjects];
+    const prevSnapshot = isCarousel ? [...works] : [...moreProjects];
+    const list = [...prevSnapshot];
     const index = list.findIndex((i) => i.id === item.id);
     if (index === -1 || index >= list.length - 1) return;
 
@@ -2279,23 +2394,42 @@ export const EcuaplacPortal: React.FC = () => {
       sort_order: (idx + 1) * 10,
     }));
 
-    if (isCarousel) {
-      setWorks(reordered);
-      ecuaplacConnector.saveWorks(reordered);
-      ecuaplacConnector.saveWork({ id: item.id, sort_order: reordered[index + 1].sort_order });
-      ecuaplacConnector.saveWork({ id: nextItem.id, sort_order: reordered[index].sort_order });
-    } else {
-      setMoreProjects(reordered);
-      ecuaplacConnector.saveMoreProjects(reordered);
-      ecuaplacConnector.saveProject({ id: item.id, sort_order: reordered[index + 1].sort_order });
-      ecuaplacConnector.saveProject({ id: nextItem.id, sort_order: reordered[index].sort_order });
-    }
+    try {
+      if (isCarousel) {
+        setWorks(reordered);
+        ecuaplacConnector.saveWorks(reordered);
+        await Promise.all([
+          ecuaplacConnector.saveWork({ id: item.id, sort_order: reordered[index + 1].sort_order }),
+          ecuaplacConnector.saveWork({ id: nextItem.id, sort_order: reordered[index].sort_order }),
+        ]);
+      } else {
+        setMoreProjects(reordered);
+        ecuaplacConnector.saveMoreProjects(reordered);
+        await Promise.all([
+          ecuaplacConnector.saveProject({ id: item.id, sort_order: reordered[index + 1].sort_order }),
+          ecuaplacConnector.saveProject({ id: nextItem.id, sort_order: reordered[index].sort_order }),
+        ]);
+      }
 
-    addAuditLog(
-      `Orden actualizado: «${item.title_es}» movido hacia abajo`,
-      'Ecuaplac Web',
-      'info'
-    );
+      addAuditLog(
+        `Orden actualizado: «${item.title_es}» movido hacia abajo`,
+        'Ecuaplac Web',
+        'info'
+      );
+    } catch (e) {
+      console.warn('Error al guardar el orden:', e);
+      if (isCarousel) {
+        setWorks(prevSnapshot);
+        ecuaplacConnector.saveWorks(prevSnapshot);
+      } else {
+        setMoreProjects(prevSnapshot);
+        ecuaplacConnector.saveMoreProjects(prevSnapshot);
+      }
+      showSyncToast(
+        panelLang === 'es' ? 'Error al actualizar el orden en la web' : 'Error updating order on website',
+        'error'
+      );
+    }
   };
 
   const handleDelete = (item: EcuaplacWorkItem) => {
@@ -2383,7 +2517,14 @@ export const EcuaplacPortal: React.FC = () => {
             finalImage = uploadedUrl;
           }
         } catch (err) {
-          console.warn('Fallo al subir a Storage, continuando con la imagen:', err);
+          console.warn('Fallo al subir a Storage:', err);
+          showSyncToast(
+            panelLang === 'es'
+              ? 'No se pudo subir la foto a la web. Revisa tu conexión e inténtalo de nuevo.'
+              : 'Could not upload photo to website. Check your connection and try again.',
+            'error'
+          );
+          return;
         }
       }
 
@@ -2418,19 +2559,37 @@ export const EcuaplacPortal: React.FC = () => {
         };
 
         if (switchedGallery) {
-          // Cambiar de galería: eliminar de origen y añadir al destino
-          if (originalType === 'carousel') {
-            setWorks((prev) => prev.filter((i) => i.id !== editingItem.id));
-            setMoreProjects((prev) => [updatedItem, ...prev]);
-            await ecuaplacConnector.deleteItem('works', editingItem.id);
-            await ecuaplacConnector.saveProject(updatedItem);
-          } else {
-            setMoreProjects((prev) => prev.filter((i) => i.id !== editingItem.id));
-            setWorks((prev) => [updatedItem, ...prev]);
-            await ecuaplacConnector.deleteItem('projects', editingItem.id);
-            await ecuaplacConnector.saveWork(updatedItem);
+          const prevWorks = [...works];
+          const prevMoreProjects = [...moreProjects];
+          try {
+            // Cambiar de galería: guardar primero en destino (como nuevo) y luego eliminar de origen
+            if (originalType === 'carousel') {
+              const savedProj = await ecuaplacConnector.saveProject(updatedItem, true);
+              await ecuaplacConnector.deleteItem('works', editingItem.id);
+              setWorks((prev) => prev.filter((i) => i.id !== editingItem.id));
+              setMoreProjects((prev) => [savedProj, ...prev.filter((i) => i.id !== editingItem.id && i.id !== savedProj.id)]);
+            } else {
+              const savedWork = await ecuaplacConnector.saveWork(updatedItem, true);
+              await ecuaplacConnector.deleteItem('projects', editingItem.id);
+              setMoreProjects((prev) => prev.filter((i) => i.id !== editingItem.id));
+              setWorks((prev) => [savedWork, ...prev.filter((i) => i.id !== editingItem.id && i.id !== savedWork.id)]);
+            }
+            showSyncToast(
+              panelLang === 'es' ? '¡Obra movida y actualizada en ecuaplac.com!' : 'Project moved and updated on ecuaplac.com!',
+              'success'
+            );
+          } catch (e) {
+            console.warn('Error al cambiar de galería en Supabase:', e);
+            setWorks(prevWorks);
+            setMoreProjects(prevMoreProjects);
+            showSyncToast(
+              panelLang === 'es' ? 'Error al mover la obra en la web. Inténtalo de nuevo.' : 'Error moving project on website. Please try again.',
+              'error'
+            );
+            return;
           }
         } else if (isCarousel) {
+          const prevWorks = [...works];
           setWorks((prev) => prev.map((i) => (i.id === editingItem.id ? updatedItem : i)));
           try {
             await ecuaplacConnector.saveWork(updatedItem);
@@ -2440,8 +2599,16 @@ export const EcuaplacPortal: React.FC = () => {
             );
           } catch (e) {
             console.warn('Error al guardar en Supabase:', e);
+            setWorks(prevWorks);
+            ecuaplacConnector.saveWorks(prevWorks);
+            showSyncToast(
+              panelLang === 'es' ? 'Error al guardar cambios en la web. Inténtalo de nuevo.' : 'Error saving changes on website. Please try again.',
+              'error'
+            );
+            return;
           }
         } else {
+          const prevMoreProjects = [...moreProjects];
           setMoreProjects((prev) => prev.map((i) => (i.id === editingItem.id ? updatedItem : i)));
           try {
             await ecuaplacConnector.saveProject(updatedItem);
@@ -2451,6 +2618,13 @@ export const EcuaplacPortal: React.FC = () => {
             );
           } catch (e) {
             console.warn('Error al guardar en Supabase:', e);
+            setMoreProjects(prevMoreProjects);
+            ecuaplacConnector.saveMoreProjects(prevMoreProjects);
+            showSyncToast(
+              panelLang === 'es' ? 'Error al guardar cambios en la web. Inténtalo de nuevo.' : 'Error saving changes on website. Please try again.',
+              'error'
+            );
+            return;
           }
         }
 
@@ -2484,14 +2658,16 @@ export const EcuaplacPortal: React.FC = () => {
               panelLang === 'es' ? '¡Foto publicada en ecuaplac.com!' : 'Photo published on ecuaplac.com!',
               'success'
             );
+            switchTab('obras');
           } catch (e) {
             console.warn('Error al guardar en Supabase:', e);
+            setWorks((prev) => prev.filter((i) => i.id !== newItem.id));
             showSyncToast(
-              panelLang === 'es' ? 'Error al sincronizar con la web' : 'Error syncing with website',
+              panelLang === 'es' ? 'Error al sincronizar con la web. Inténtalo de nuevo.' : 'Error syncing with website. Please try again.',
               'error'
             );
+            return;
           }
-          switchTab('obras');
         } else {
           setMoreProjects((prev) => [newItem, ...prev]);
           try {
@@ -2503,14 +2679,16 @@ export const EcuaplacPortal: React.FC = () => {
               panelLang === 'es' ? '¡Proyecto publicado en ecuaplac.com!' : 'Project published on ecuaplac.com!',
               'success'
             );
+            switchTab('more_projects');
           } catch (e) {
             console.warn('Error al guardar en Supabase:', e);
+            setMoreProjects((prev) => prev.filter((i) => i.id !== newItem.id));
             showSyncToast(
-              panelLang === 'es' ? 'Error al sincronizar con la web' : 'Error syncing with website',
+              panelLang === 'es' ? 'Error al sincronizar con la web. Inténtalo de nuevo.' : 'Error syncing with website. Please try again.',
               'error'
             );
+            return;
           }
-          switchTab('more_projects');
         }
 
         addAuditLog(
@@ -2596,7 +2774,7 @@ export const EcuaplacPortal: React.FC = () => {
             href="https://ecuaplac.com"
             target="_blank"
             rel="noreferrer"
-            className="group relative inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 min-h-[38px] sm:min-h-0 rounded-full bg-[#181A20] hover:bg-[#222630] active:scale-95 border border-white/15 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.3)] text-white hover:text-[#F0CF85] transition-all duration-200 text-xs font-bold cursor-pointer select-none"
+            className="group relative inline-flex items-center gap-2 px-3.5 py-2 min-h-[44px] sm:min-h-0 rounded-full bg-[#181A20] hover:bg-[#222630] active:scale-95 border border-white/15 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.3)] text-white hover:text-[#F0CF85] transition-all duration-200 text-xs font-bold cursor-pointer select-none"
             title={panelLang === 'es' ? 'Abrir ecuaplac.com en directo' : 'Open ecuaplac.com live'}
           >
             <WindowIcon
@@ -2713,7 +2891,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCfPeriod('30d')}
-                className={`relative px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
+                className={`relative px-4 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                   cfPeriod === '30d'
                     ? 'bg-[#1E293B] hover:bg-slate-700 text-[#F0CF85] shadow-[0_3px_10px_-2px_rgba(30,41,59,0.35)] ring-1 ring-white/15 border border-slate-700/50 font-bold'
                     : 'text-stone-600 hover:text-slate-900 hover:bg-black/[0.03] font-medium'
@@ -2726,7 +2904,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCfPeriod('3m')}
-                className={`relative px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
+                className={`relative px-4 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0 rounded-xl sm:rounded-full text-xs font-bold font-sans tracking-tight transition-all duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                   cfPeriod === '3m'
                     ? 'bg-[#1E293B] hover:bg-slate-700 text-[#F0CF85] shadow-[0_3px_10px_-2px_rgba(30,41,59,0.35)] ring-1 ring-white/15 border border-slate-700/50 font-bold'
                     : 'text-stone-600 hover:text-slate-900 hover:bg-black/[0.03] font-medium'
@@ -2824,7 +3002,7 @@ export const EcuaplacPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsLeadsModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold shadow-xs border border-slate-700/50 active:scale-95 transition-all group/btn font-sans cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] sm:min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold shadow-xs border border-slate-700/50 active:scale-95 transition-all group/btn font-sans cursor-pointer"
                   title="Abrir bandeja de presupuestos"
                 >
                   <span>Ver Bandeja</span>
@@ -2863,7 +3041,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleToggleFacturas}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold active:scale-95 transition-all shadow-xs border border-slate-700/50 font-sans group cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] sm:min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold active:scale-95 transition-all shadow-xs border border-slate-700/50 font-sans group cursor-pointer shrink-0"
                 title={isFacturasOpen ? 'Ocultar panel de facturas' : 'Abrir facturas'}
               >
                 <span>{isFacturasOpen ? 'Ocultar Facturas' : 'Abrir Facturas'}</span>
@@ -3019,7 +3197,7 @@ export const EcuaplacPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleToggleCare}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold active:scale-95 transition-all shadow-xs border border-slate-700/50 font-sans group cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] sm:min-h-[40px] rounded-full bg-[#1E293B] hover:bg-slate-700 text-white text-xs font-bold active:scale-95 transition-all shadow-xs border border-slate-700/50 font-sans group cursor-pointer shrink-0"
                 title={isCareOpen ? 'Ocultar detalles de MyNext Care' : 'Ver información de MyNext Care'}
               >
                 <span>{isCareOpen ? (panelLang === 'es' ? 'Ocultar' : 'Hide') : (panelLang === 'es' ? 'Ver Detalles' : 'Ver Detalles')}</span>
@@ -3077,8 +3255,8 @@ export const EcuaplacPortal: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Tarjeta de Documento / Dossier MyNext Care en PDF (Subido por Musa) */}
-                {careData.pdfUrl && (
+                {/* Tarjeta de Documento / Dossier MyNext Care en PDF (Sincronizado desde la nube) */}
+                {careData.pdfUrl ? (
                   <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-[#141A26] text-white border border-[#C5A059]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-xl bg-[#C5A059]/15 border border-[#C5A059]/30 flex items-center justify-center text-[#F0CF85] shrink-0">
@@ -3101,53 +3279,46 @@ export const EcuaplacPortal: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
                       <button
                         type="button"
-                        onClick={() => {
-                          if (!careData.pdfUrl) return;
-                          if (careData.pdfUrl.startsWith('data:')) {
-                            try {
-                              const parts = careData.pdfUrl.split(',');
-                              const mime = parts[0].split(':')[1]?.split(';')[0] || 'application/pdf';
-                              const byteCharacters = atob(parts[1]);
-                              const byteNumbers = new Uint8Array(byteCharacters.length);
-                              for (let i = 0; i < byteCharacters.length; i++) {
-                                byteNumbers[i] = byteCharacters.charCodeAt(i);
-                              }
-                              const blob = new Blob([byteNumbers], { type: mime });
-                              const blobUrl = URL.createObjectURL(blob);
-                              window.open(blobUrl, '_blank');
-                              return;
-                            } catch (e) {
-                              console.warn('Error abriendo visor:', e);
-                            }
-                          }
-                          window.open(careData.pdfUrl, '_blank');
-                        }}
-                        className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                        onClick={() => openPdfSafely(careData.pdfUrl)}
+                        className="flex-1 sm:flex-initial min-h-[44px] px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
                       >
-                        <Eye className="w-3.5 h-3.5 text-[#F0CF85]" />
+                        <Eye className="w-4 h-4 text-[#F0CF85]" />
                         <span>{panelLang === 'es' ? 'Ver Documento' : 'View Document'}</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => {
-                          if (!careData.pdfUrl) return;
-                          const a = document.createElement('a');
-                          a.href = careData.pdfUrl;
-                          a.download = careData.pdfName || 'Guia_Oficial_MyNext_Care.pdf';
-                          a.target = '_blank';
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
+                          void downloadPdfSafely(
+                            careData.pdfUrl,
+                            careData.pdfName || 'Guia_Oficial_MyNext_Care.pdf'
+                          );
                         }}
-                        className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                        aria-label={panelLang === 'es' ? 'Descargar PDF de MyNext Care' : 'Download MyNext Care PDF'}
+                        className="min-h-[44px] min-w-[44px] p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center justify-center transition-all cursor-pointer active:scale-95"
                         title={panelLang === 'es' ? 'Descargar PDF' : 'Download PDF'}
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Download className="w-4 h-4" />
                       </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-dashed border-stone-300 text-stone-600 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center text-stone-400 shrink-0">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-slate-800 block font-sans">
+                        {panelLang === 'es' ? 'Dossier informativo en preparación' : 'Maintenance dossier in preparation'}
+                      </span>
+                      <span className="text-[11px] text-stone-500 block font-sans">
+                        {panelLang === 'es'
+                          ? 'El PDF oficial de coberturas aparecerá aquí en cuanto se publique.'
+                          : 'The official coverage PDF will appear here once published.'}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -3208,7 +3379,7 @@ export const EcuaplacPortal: React.FC = () => {
                   ? 'bg-emerald-600 border-emerald-500 text-white shadow-emerald-200'
                   : 'bg-gradient-to-r from-[#C5A059] via-[#D8B467] to-[#E5C882] hover:brightness-105 border-[#B89248] text-slate-950 shadow-xs'
               }`}
-              title="Sincronizar y forzar actualización con el backend"
+              title="Sincronizar y actualizar con la web"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-slate-950 ${isForceSyncing ? 'animate-spin' : ''}`} />
               <span>{isForceSyncing ? 'Sincronizando...' : syncFeedback ? '¡Actualizado en la web!' : 'Forzar Actualización'}</span>
@@ -3631,7 +3802,7 @@ export const EcuaplacPortal: React.FC = () => {
                         type="tel"
                         value={contactForm.josePhone}
                         onChange={(e) => setContactForm({ ...contactForm, josePhone: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-mono font-bold text-slate-900 focus:outline-none transition-all"
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-base lg:text-xs font-mono font-bold text-slate-900 focus:outline-none transition-all"
                         placeholder="+34 678 15 98 78"
                       />
                     </div>
@@ -3645,7 +3816,7 @@ export const EcuaplacPortal: React.FC = () => {
                         type="tel"
                         value={contactForm.joffrePhone}
                         onChange={(e) => setContactForm({ ...contactForm, joffrePhone: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-mono font-bold text-slate-900 focus:outline-none transition-all"
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-base lg:text-xs font-mono font-bold text-slate-900 focus:outline-none transition-all"
                         placeholder="+34 603 40 44 50"
                       />
                     </div>
@@ -3660,7 +3831,7 @@ export const EcuaplacPortal: React.FC = () => {
                       type="email"
                       value={contactForm.email}
                       onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-xs font-mono font-semibold text-slate-900 focus:outline-none transition-all"
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#08090C]/30 focus:border-[#08090C] text-base lg:text-xs font-mono font-semibold text-slate-900 focus:outline-none transition-all"
                       placeholder="ecuaplac.jyg.sl@gmail.com"
                     />
                   </div>
@@ -3915,23 +4086,25 @@ export const EcuaplacPortal: React.FC = () => {
                           >
                             Comprobar de nuevo
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSimulatedUpdateAvailable(true);
-                              setNewVersionNotice('3.0.8');
-                              setNewVersionChanges([
-                                'Nuevo panel de Contacto sincronizado en vivo con ecuaplac.com',
-                                'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
-                                'Notificaciones en tiempo real y sonido acústico para nuevos presupuestos'
-                              ]);
-                              setUpdateCheckState('available');
-                            }}
-                            className="text-[11px] font-semibold text-[#C5A059] hover:underline cursor-pointer"
-                            title="Simula que hay una nueva actualización lista para instalar"
-                          >
-                            {panelLang === 'es' ? 'Simular nueva v3.0.8' : 'Simulate new v3.0.8'}
-                          </button>
+                          {(import.meta as any).env?.DEV && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSimulatedUpdateAvailable(true);
+                                setNewVersionNotice('3.0.8');
+                                setNewVersionChanges([
+                                  'Nuevo panel de Contacto sincronizado en vivo con ecuaplac.com',
+                                  'Bordes finos y sutiles en todos los iconos de ajustes y perfil de lujo',
+                                  'Notificaciones en tiempo real y sonido acústico para nuevos presupuestos'
+                                ]);
+                                setUpdateCheckState('available');
+                              }}
+                              className="text-[11px] font-semibold text-[#C5A059] hover:underline cursor-pointer"
+                              title="Simula que hay una nueva actualización lista para instalar"
+                            >
+                              {panelLang === 'es' ? 'Simular nueva v3.0.8' : 'Simulate new v3.0.8'}
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -4333,7 +4506,7 @@ export const EcuaplacPortal: React.FC = () => {
                     setFormImageUrl(e.target.value);
                     setUploadStats(null);
                   }}
-                  className="w-full border border-stone-200 rounded-xl px-3 py-2 text-[16px] sm:text-xs focus:ring-2 focus:ring-[#C5A059]/40 font-sans"
+                  className="w-full border border-stone-200 rounded-xl px-3 py-2 text-base lg:text-xs focus:ring-2 focus:ring-[#C5A059]/40 font-sans"
                 />
               </div>
             )}
@@ -4349,7 +4522,7 @@ export const EcuaplacPortal: React.FC = () => {
               placeholder="Ej. Reforma Integral de Baño con Bañera Exenta"
               value={formTitleEs}
               onChange={(e) => setFormTitleEs(e.target.value)}
-              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50 font-sans"
+              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-base lg:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50 font-sans"
             />
           </div>
 
@@ -4362,7 +4535,7 @@ export const EcuaplacPortal: React.FC = () => {
               placeholder="Ej. Andratx, Palma, Calvià, Sóller..."
               value={formLocation}
               onChange={(e) => setFormLocation(e.target.value)}
-              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-[16px] sm:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50 font-sans"
+              className="w-full border border-stone-200 rounded-xl px-3.5 py-2.5 text-base lg:text-xs focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40 bg-stone-50/50 font-sans"
             />
             {/* Chips rápidos de municipios de Mallorca */}
             <div className="flex items-center gap-1.5 mt-2 flex-wrap">
@@ -4427,7 +4600,7 @@ export const EcuaplacPortal: React.FC = () => {
                 placeholder="Se genera automático si se deja en blanco"
                 value={formTitleEn}
                 onChange={(e) => setFormTitleEn(e.target.value)}
-                className="w-full border border-stone-200 rounded-xl px-3.5 py-2 text-[16px] sm:text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40"
+                className="w-full border border-stone-200 rounded-xl px-3.5 py-2 text-base lg:text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40"
               />
             </div>
 
@@ -4440,7 +4613,7 @@ export const EcuaplacPortal: React.FC = () => {
                 placeholder="Wird automatisch generiert..."
                 value={formTitleDe}
                 onChange={(e) => setFormTitleDe(e.target.value)}
-                className="w-full border border-stone-200 rounded-xl px-3.5 py-2 text-[16px] sm:text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40"
+                className="w-full border border-stone-200 rounded-xl px-3.5 py-2 text-base lg:text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#C5A059]/40"
               />
             </div>
           </div>
@@ -4563,7 +4736,7 @@ export const EcuaplacPortal: React.FC = () => {
                         ? 'Buscar por cliente, teléfono, email o descripción...'
                         : 'Search by client, phone, email or work description...'
                     }
-                    className="w-full bg-transparent text-base sm:text-xs text-stone-950 font-medium placeholder:text-stone-400 focus:outline-none"
+                    className="w-full bg-transparent text-base lg:text-xs text-stone-950 font-medium placeholder:text-stone-400 focus:outline-none"
                   />
                   {leadSearchQuery && (
                     <button
@@ -5033,7 +5206,7 @@ export const EcuaplacPortal: React.FC = () => {
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
               placeholder={panelLang === 'es' ? 'Ej. José Rivadeneira' : 'e.g. José Rivadeneira'}
-              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
+              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-base lg:text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
             />
           </div>
 
@@ -5045,7 +5218,7 @@ export const EcuaplacPortal: React.FC = () => {
               type="email"
               disabled
               value="ecuaplacbyjyg@gmail.com"
-              className="w-full px-4 py-3 rounded-2xl bg-stone-100 border border-stone-200 text-stone-500 text-sm cursor-not-allowed font-mono"
+              className="w-full px-4 py-3 rounded-2xl bg-stone-100 border border-stone-200 text-stone-500 text-base lg:text-sm cursor-not-allowed font-mono"
             />
           </div>
 
@@ -5137,7 +5310,7 @@ export const EcuaplacPortal: React.FC = () => {
                   ? 'Introduce la contraseña actual (ej. admin)'
                   : 'Enter current password (e.g. admin)'
               }
-              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
+              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-base lg:text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
             />
           </div>
 
@@ -5153,7 +5326,7 @@ export const EcuaplacPortal: React.FC = () => {
               placeholder={
                 panelLang === 'es' ? 'Mínimo 4 caracteres' : 'Minimum 4 characters'
               }
-              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
+              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-base lg:text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
             />
           </div>
 
@@ -5169,7 +5342,7 @@ export const EcuaplacPortal: React.FC = () => {
               placeholder={
                 panelLang === 'es' ? 'Repite la nueva contraseña' : 'Repeat the new password'
               }
-              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
+              className="w-full px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 text-slate-900 text-base lg:text-sm focus:outline-none focus:border-[#C5A059] focus:bg-white transition-all"
             />
           </div>
 
@@ -5428,7 +5601,7 @@ export const EcuaplacPortal: React.FC = () => {
                   ? (panelLang === 'es' ? 'Ej: Me gustaría un botón para descargar presupuestos' : 'e.g. Would love a button to export leads')
                   : (panelLang === 'es' ? 'Ej: ¿Cómo cambio el número de teléfono de la web?' : 'e.g. How do I change phone number?')
               }
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-200/90 text-slate-900 text-xs placeholder:text-stone-400 focus:outline-none focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 transition-all font-medium font-sans shadow-xs"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-200/90 text-slate-900 text-base lg:text-xs placeholder:text-stone-400 focus:outline-none focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 transition-all font-medium font-sans shadow-xs"
             />
           </div>
 
@@ -5446,7 +5619,7 @@ export const EcuaplacPortal: React.FC = () => {
                   ? 'Explica aquí con claridad qué ha sucedido o qué te gustaría añadir a la app...'
                   : 'Write here what went wrong or what you would like to improve...'
               }
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-200/90 text-slate-900 text-xs placeholder:text-stone-400 focus:outline-none focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 transition-all resize-none font-medium leading-relaxed font-sans shadow-xs"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-200/90 text-slate-900 text-base lg:text-xs placeholder:text-stone-400 focus:outline-none focus:border-[#C5A059] focus:ring-2 focus:ring-[#C5A059]/20 transition-all resize-none font-medium leading-relaxed font-sans shadow-xs"
             />
           </div>
 
