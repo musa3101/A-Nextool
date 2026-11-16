@@ -1230,31 +1230,30 @@ export class EcuaplacConnector {
    */
   async fetchClientLogsResetTimestamp(): Promise<string | null> {
     try {
+      // 1. Consultar el último registro de tipo 'security' en audit_logs de InsForge Cloud
       const { data, error } = await insforge.database
-        .from('tenant_documents')
-        .select('*')
+        .from('audit_logs')
+        .select('created_at, details, action')
         .eq('tenant_id', ECUAPLAC_TENANT_ID)
-        .eq('category', 'client_logs_reset')
-        .order('updated_at', { ascending: false })
+        .eq('entity', 'security')
+        .order('created_at', { ascending: false })
         .limit(1);
 
       if (!error && data && data.length > 0) {
-        const row = data[0];
-        if (row.notes) {
+        const item = data[0];
+        const stamp = item.details?.reset_at || item.created_at;
+        if (stamp) {
           try {
-            const meta = JSON.parse(row.notes);
-            if (meta.resetAt) {
-              return meta.resetAt;
-            }
+            localStorage.setItem('ecuaplac_client_logs_reset_at', stamp);
           } catch {}
+          return stamp;
         }
-        if (row.updated_at) return row.updated_at;
       }
     } catch (e) {
-      console.warn('Error consultando fecha de reset de logs:', e);
+      console.warn('Error consultando fecha de reset de logs en audit_logs:', e);
     }
 
-    // Fallback local en caso de desconexión momentánea
+    // 2. Fallback de localStorage
     try {
       return localStorage.getItem('ecuaplac_client_logs_reset_at');
     } catch {}
@@ -1365,8 +1364,13 @@ export class EcuaplacConnector {
         .select('*', { count: 'exact' })
         .eq('tenant_id', ECUAPLAC_TENANT_ID);
 
-      if (sinceDate) {
-        query = query.gte('created_at', sinceDate);
+      if (options.forClient) {
+        // Excluir registros de seguridad interna del superadmin
+        query = query.neq('entity', 'security');
+        // Si hay una fecha de corte de reset, traer únicamente los movimientos estrictamente posteriores
+        if (sinceDate) {
+          query = query.gt('created_at', sinceDate);
+        }
       }
 
       const { data, error, count } = await query
