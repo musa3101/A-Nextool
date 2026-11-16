@@ -204,7 +204,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
         <div className="text-center">
           <span className="text-[10px] text-slate-400 font-mono">
-            NexTool Architecture v3.1.1
+            NexTool Architecture v3.1.2
           </span>
         </div>
       </div>

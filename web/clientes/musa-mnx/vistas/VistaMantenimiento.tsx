@@ -25,6 +25,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { MUSA_ADMIN_CONFIG, ManagedClientConfig } from '../config';
+import { ecuaplacConnector } from '../../ecuaplac/conector';
 
 interface VistaMantenimientoProps {
   currentClient: ManagedClientConfig;
@@ -45,8 +46,8 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
   const [launchDate, setLaunchDate] = useState('07/06/2026');
   const [launchDesc, setLaunchDesc] = useState('Web oficial en producción · Servidor de Alta Velocidad');
   const [lastMaintenanceDate, setLastMaintenanceDate] = useState('11/11/2026');
-  const [lastMaintenanceDesc, setLastMaintenanceDesc] = useState('Optimización v3.0, Caché Edge & Seguridad PWA');
-  const [installedVersion, setInstalledVersion] = useState('3.1.1');
+  const [lastMaintenanceDesc, setLastMaintenanceDesc] = useState('Optimización general, máxima velocidad y seguridad');
+  const [installedVersion, setInstalledVersion] = useState('3.1.2');
   const [slaStatus, setSlaStatus] = useState('optimal');
 
   // PDF Explicativo de MyNext Care (Dossier oficial para el cliente)
@@ -66,7 +67,7 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Carga inicial de datos
+  // Carga inicial de datos (localStorage + nube InsForge)
   useEffect(() => {
     try {
       const cached = localStorage.getItem('ecuaplac_mynext_care');
@@ -77,48 +78,12 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
         if (parsed.lastMaintenanceDate) setLastMaintenanceDate(parsed.lastMaintenanceDate);
         if (parsed.lastMaintenanceDesc) setLastMaintenanceDesc(parsed.lastMaintenanceDesc);
         if (parsed.installedVersion) setInstalledVersion(parsed.installedVersion);
-        if (parsed.pdfUrl) {
+        if (parsed.pdfUrl && !parsed.pdfUrl.includes('JVBERi0xLjQKJeLjz9MKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+')) {
           setCarePdfUrl(parsed.pdfUrl);
-          setCarePdfName(parsed.pdfName || 'Guía_Oficial_MyNext_Care.pdf');
-          setCarePdfSize(parsed.pdfSize || '1.4 MB');
-          setCarePdfDate(parsed.pdfUploadDate || '11/11/2026');
-        } else {
-          // Precarga por defecto para que Goyo tenga siempre disponible la guía oficial inicial
-          const defaultPdfName = 'Guia_Oficial_MyNext_Care_2026.pdf';
-          const defaultPdfSize = '1.2 MB';
-          const defaultDate = '11/11/2026';
-          // Generamos una dataUrl básica representativa si aún no ha subido uno propio
-          const sampleDataUrl = 'data:application/pdf;base64,JVBERi0xLjQKJeLjz9MKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNTk1IDg0Ml0+PmVuZG9iagp4cmVmCjAgNAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMTggMDAwMDAgbiAKMDAwMDAwMDA2OSAwMDAwMCBuIAowMDAwMDAwMTIxIDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSA0L1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKMTk5CiUlRU9GCg==';
-          setCarePdfUrl(sampleDataUrl);
-          setCarePdfName(defaultPdfName);
-          setCarePdfSize(defaultPdfSize);
-          setCarePdfDate(defaultDate);
+          setCarePdfName(parsed.pdfName || 'MyNextCare.pdf');
+          setCarePdfSize(parsed.pdfSize || 'PDF');
+          setCarePdfDate(parsed.pdfUploadDate || '15/11/2026');
         }
-      } else {
-        const defaultPdfName = 'Guia_Oficial_MyNext_Care_2026.pdf';
-        const defaultPdfSize = '1.2 MB';
-        const defaultDate = '11/11/2026';
-        const sampleDataUrl = 'data:application/pdf;base64,JVBERi0xLjQKJeLjz9MKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNTk1IDg0Ml0+PmVuZG9iagp4cmVmCjAgNAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMTggMDAwMDAgbiAKMDAwMDAwMDA2OSAwMDAwMCBuIAowMDAwMDAwMTIxIDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSA0L1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKMTk5CiUlRU9GCg==';
-        setCarePdfUrl(sampleDataUrl);
-        setCarePdfName(defaultPdfName);
-        setCarePdfSize(defaultPdfSize);
-        setCarePdfDate(defaultDate);
-
-        localStorage.setItem(
-          'ecuaplac_mynext_care',
-          JSON.stringify({
-            launchDate: '07/06/2026',
-            launchDesc: 'Web oficial en producción · Servidor de Alta Velocidad',
-            lastMaintenanceDate: '11/11/2026',
-            lastMaintenanceDesc: 'Optimización v3.0, Caché Edge & Seguridad PWA',
-            installedVersion: '3.1.1',
-            status: 'active',
-            pdfUrl: sampleDataUrl,
-            pdfName: defaultPdfName,
-            pdfSize: defaultPdfSize,
-            pdfUploadDate: defaultDate,
-          })
-        );
       }
 
       const cachedHistory = localStorage.getItem('ecuaplac_care_history');
@@ -147,15 +112,34 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
     } catch (e) {
       console.warn('Error al cargar datos de MyNext Care:', e);
     }
+
+    // Sincronizar desde InsForge Cloud
+    ecuaplacConnector.fetchCareConfigOnline().then((cloud) => {
+      if (!cloud) return;
+      if (cloud.launchDate !== undefined) setLaunchDate(cloud.launchDate);
+      if (cloud.launchDesc !== undefined) setLaunchDesc(cloud.launchDesc);
+      if (cloud.lastMaintenanceDate !== undefined) setLastMaintenanceDate(cloud.lastMaintenanceDate);
+      if (cloud.lastMaintenanceDesc !== undefined) setLastMaintenanceDesc(cloud.lastMaintenanceDesc);
+      if (cloud.installedVersion !== undefined) setInstalledVersion(cloud.installedVersion);
+      if (cloud.pdfUrl !== undefined) {
+        const isBlank = cloud.pdfUrl.includes('JVBERi0xLjQKJeLjz9MKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+');
+        const cleanUrl = isBlank ? '' : cloud.pdfUrl;
+        setCarePdfUrl(cleanUrl);
+        setCarePdfName(cleanUrl ? (cloud.pdfName || 'MyNextCare.pdf') : '');
+        setCarePdfSize(cleanUrl ? (cloud.pdfSize || 'PDF') : '');
+        setCarePdfDate(cleanUrl ? (cloud.pdfUploadDate || '') : '');
+      }
+    }).catch(() => {});
   }, [currentClient]);
 
-  // Manejo de Subida del PDF de MyNext Care
-  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Manejo de Subida del PDF de MyNext Care (a la nube + caché local)
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
       alert('Por favor selecciona un archivo en formato PDF.');
+      e.target.value = '';
       return;
     }
 
@@ -164,57 +148,75 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
     const sizeFormatted = sizeInKb > 1024 ? `${(sizeInKb / 1024).toFixed(1)} MB` : `${sizeInKb} KB`;
     const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = (reader.result as string) || '';
-      setCarePdfUrl(dataUrl);
+    try {
+      const publicUrl = await ecuaplacConnector.uploadCarePdf(file, file.name);
+      setCarePdfUrl(publicUrl);
       setCarePdfName(file.name);
       setCarePdfSize(sizeFormatted);
       setCarePdfDate(today);
 
-      try {
-        const cached = localStorage.getItem('ecuaplac_mynext_care');
-        const base = cached ? JSON.parse(cached) : {};
-        const updated = {
-          ...base,
-          pdfUrl: dataUrl,
-          pdfName: file.name,
-          pdfSize: sizeFormatted,
-          pdfUploadDate: today,
-        };
-        localStorage.setItem('ecuaplac_mynext_care', JSON.stringify(updated));
-        window.dispatchEvent(new Event('ecuaplac_care_updated'));
-        showToast(`PDF oficial «${file.name}» cargado en MyNext Care para Goyo`);
-      } catch (err) {
-        console.error('Error guardando PDF:', err);
-      } finally {
-        setIsUploadingPdf(false);
+      const cached = localStorage.getItem('ecuaplac_mynext_care');
+      const base = cached ? JSON.parse(cached) : {};
+      const updated = {
+        ...base,
+        launchDate,
+        launchDesc,
+        lastMaintenanceDate,
+        lastMaintenanceDesc,
+        installedVersion,
+        pdfUrl: publicUrl,
+        pdfName: file.name,
+        pdfSize: sizeFormatted,
+        pdfUploadDate: today,
+        status: 'active',
+      };
+
+      localStorage.setItem('ecuaplac_mynext_care', JSON.stringify(updated));
+      const cloudOk = await ecuaplacConnector.saveCareConfigOnline(updated);
+      window.dispatchEvent(new Event('ecuaplac_care_updated'));
+      if (cloudOk) {
+        showToast(`PDF oficial «${file.name}» publicado en la nube para Mac, iPad e iPhone`);
+      } else {
+        alert('El archivo se subió, pero no pudo registrarse en la base de datos de la nube. Pulsa Guardar y Publicar de nuevo.');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error subiendo PDF a la nube:', err);
+      alert('No se pudo subir el PDF a la nube. Revisa tu conexión e inténtalo de nuevo.');
+    } finally {
+      e.target.value = '';
+      setIsUploadingPdf(false);
+    }
   };
 
-  const handleRemovePdf = () => {
+  const handleRemovePdf = async () => {
     if (!window.confirm('¿Deseas retirar el PDF de MyNext Care de la app de Goyo?')) return;
-    setCarePdfUrl('');
-    setCarePdfName('');
-    setCarePdfSize('');
-    setCarePdfDate('');
 
     try {
       const cached = localStorage.getItem('ecuaplac_mynext_care');
-      if (cached) {
-        const base = JSON.parse(cached);
-        delete base.pdfUrl;
-        delete base.pdfName;
-        delete base.pdfSize;
-        delete base.pdfUploadDate;
-        localStorage.setItem('ecuaplac_mynext_care', JSON.stringify(base));
-        window.dispatchEvent(new Event('ecuaplac_care_updated'));
-        showToast('PDF de MyNext Care retirado de la app de Goyo');
+      const base = cached ? JSON.parse(cached) : {};
+      const nextLocal = {
+        ...base,
+        pdfUrl: '',
+        pdfName: '',
+        pdfSize: '',
+        pdfUploadDate: '',
+      };
+      const cloudOk = await ecuaplacConnector.saveCareConfigOnline(nextLocal);
+      if (!cloudOk) {
+        alert('No se pudo retirar el PDF en la nube. Comprueba tu conexión.');
+        return;
       }
+
+      setCarePdfUrl('');
+      setCarePdfName('');
+      setCarePdfSize('');
+      setCarePdfDate('');
+      localStorage.setItem('ecuaplac_mynext_care', JSON.stringify(nextLocal));
+      window.dispatchEvent(new Event('ecuaplac_care_updated'));
+      showToast('PDF de MyNext Care retirado de la nube y de la app de Goyo');
     } catch (err) {
       console.error('Error retirando PDF:', err);
+      alert('Error retirando el PDF de la nube.');
     }
   };
 
@@ -254,19 +256,27 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
     document.body.removeChild(a);
   };
 
-  // Guardar y publicar directamente en la app del cliente
-  const handleSaveAndPublish = (e: React.FormEvent) => {
+  // Guardar y publicar directamente en la app del cliente (Nube + localStorage)
+  const handleSaveAndPublish = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
 
     try {
+      let publishedPdfUrl = carePdfUrl;
+      if (publishedPdfUrl && publishedPdfUrl.startsWith('data:')) {
+        const resBlob = await fetch(publishedPdfUrl);
+        const blob = await resBlob.blob();
+        publishedPdfUrl = await ecuaplacConnector.uploadCarePdf(blob, carePdfName || 'MyNextCare.pdf');
+        setCarePdfUrl(publishedPdfUrl);
+      }
+
       const updatedCare = {
         launchDate,
         launchDesc,
         lastMaintenanceDate,
         lastMaintenanceDesc,
         installedVersion,
-        pdfUrl: carePdfUrl,
+        pdfUrl: publishedPdfUrl,
         pdfName: carePdfName,
         pdfSize: carePdfSize,
         pdfUploadDate: carePdfDate,
@@ -274,8 +284,9 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
         updatedAt: new Date().toISOString(),
       };
 
-      // 1. Guardar en clave compartida que lee la app del cliente
+      // 1. Guardar en clave compartida local + InsForge Cloud para Mac, iPad e iPhone
       localStorage.setItem('ecuaplac_mynext_care', JSON.stringify(updatedCare));
+      const cloudOk = await ecuaplacConnector.saveCareConfigOnline(updatedCare);
 
       // 2. Registrar en el historial de revisiones si es una fecha nueva
       const newHistoryItem: MaintenanceHistoryItem = {
@@ -292,7 +303,11 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
       // 3. Emitir evento en caliente para que la app de Ecuaplac se actualice inmediatamente
       window.dispatchEvent(new Event('ecuaplac_care_updated'));
 
-      showToast(`Mantenimiento MyNext Care guardado y publicado en la app de ${currentClient.name}`);
+      showToast(
+        cloudOk
+          ? `Mantenimiento MyNext Care guardado y publicado en la nube para ${currentClient.name}`
+          : `Guardado en local (aviso: no se pudo sincronizar con la nube)`
+      );
     } catch (err) {
       console.error('Error al guardar mantenimiento:', err);
       alert('Error al guardar los datos');
@@ -716,7 +731,7 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
                     required
                     value={installedVersion}
                     onChange={(e) => setInstalledVersion(e.target.value)}
-                    placeholder="3.1.1"
+                    placeholder="3.1.2"
                     className="w-full h-10 px-3.5 rounded-xl bg-black/50 border border-white/[0.08] text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-[#C5A059]"
                   />
                 </div>
@@ -732,7 +747,7 @@ export const VistaMantenimiento: React.FC<VistaMantenimientoProps> = ({ currentC
                   required
                   value={lastMaintenanceDesc}
                   onChange={(e) => setLastMaintenanceDesc(e.target.value)}
-                  placeholder="Optimización v3.1.1, aceleración web y revisión periódica"
+                  placeholder="Optimización v3.1.2, aceleración web y revisión periódica"
                   className="w-full p-3 rounded-xl bg-black/50 border border-white/[0.08] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#C5A059] resize-none"
                 />
               </div>

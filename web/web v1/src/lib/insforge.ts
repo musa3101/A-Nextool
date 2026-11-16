@@ -9,5 +9,7 @@ const anonKey =
 export const insforge = createClient({
   baseUrl,
   anonKey,
+  fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+    globalThis.fetch(input, { ...init, cache: init?.cache ?? 'no-store' }),
 });
 

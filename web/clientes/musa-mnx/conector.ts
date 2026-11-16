@@ -550,8 +550,8 @@ export class MusaConnector {
       launchDate: client.launchDate,
       lastMaintenance: client.lastMaintenance,
       slaStatus: client.slaStatus,
-      notes: 'Mantenimiento preventivo activo. Sistema de galerías con persistencia en Supabase, leads de Tally desbloqueados y versión 3.1.1 en producción.',
-      installedVersion: '3.1.1',
+      notes: 'Mantenimiento preventivo activo. Sistema de galerías con persistencia en Supabase, MyNext Care en la nube y versión 3.1.2 en producción.',
+      installedVersion: '3.1.2',
       cloudSyncStatus: 'synced',
     };
   }

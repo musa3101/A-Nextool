@@ -2,8 +2,8 @@
   "client": "ecuaplac",
   "name": "Ecuaplac Reformas Integrales",
   "owner": "Jose (José Rivadeneira)",
-  "version": "3.1.1",
-  "last_updated": "2026-11-14",
+  "version": "3.1.2",
+  "last_updated": "2026-11-16",
   "status": "active",
   "route": "/ecuaplac",
   "modules": [
@@ -26,9 +26,9 @@
     "white_label_strict"
   ],
   "changes": [
-    "Bandeja de presupuestos en pantalla completa nativa para Mac, iPad y móvil",
-    "Rediseño sobrio con bordes negros de precisión y cajas de mensaje con relieve",
-    "Blindaje estricto de White-Label sin menciones de infraestructura en la interfaz",
-    "Desactivación segura del botón de subida de facturas desde el panel de cliente"
+    "Sincronización garantizada en Galería 2 con ecuaplac.com y control de errores en tiempo real",
+    "Dossier PDF oficial de MyNext Care sincronizado en la nube para iPhone, iPad y Mac",
+    "Optimización táctil (>= 44px) y prevención de auto-zoom en Safari iPadOS e iOS",
+    "Refresco instantáneo sin caché en modo aplicación instalada (PWA)"
   ]
 }
