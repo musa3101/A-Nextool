@@ -643,6 +643,11 @@ export const EcuaplacPortal: React.FC = () => {
       if (res && Array.isArray(res.logs)) {
         setLogs(res.logs);
         setTotalLogsCount(res.totalCount);
+        if (res.logs.length === 0) {
+          try {
+            localStorage.removeItem('ecuaplac_recent_audit_logs');
+          } catch {}
+        }
       }
     });
 
@@ -2163,6 +2168,11 @@ export const EcuaplacPortal: React.FC = () => {
       if (res && Array.isArray(res.logs)) {
         setLogs(res.logs);
         setTotalLogsCount(res.totalCount);
+        if (res.logs.length === 0) {
+          try {
+            localStorage.removeItem('ecuaplac_recent_audit_logs');
+          } catch {}
+        }
       }
       showSyncToast(
         panelLang === 'es' ? 'Historial sincronizado con el servidor' : 'History synced with server',
