@@ -1,7 +1,7 @@
 {
   "30d": {
     "period": "30d",
-    "periodLabel": "Noviembre 2026 (27 días)",
+    "periodLabel": "Noviembre 2026 (28 días)",
     "totalVisits": 10,
     "uniqueVisitors": 10,
     "pageViews": 10,
@@ -12,9 +12,9 @@
     "trendPercentage": "-87.8%",
     "isPositiveTrend": false,
     "status": "optimal",
-    "updatedAt": "2026-11-27T17:57:39.153Z",
+    "updatedAt": "2026-11-28T16:43:22.717Z",
     "closingInfo": {
-      "type": "monthly_progress",
+      "type": "official_month_close",
       "closedMonth": {
         "name": "Octubre 2026",
         "visits": 90,
@@ -25,7 +25,7 @@
         "name": "Noviembre 2026",
         "visits": 10,
         "pageViews": 10,
-        "period": "2026-11-01 al 2026-11-27"
+        "period": "2026-11-01 al 2026-11-28"
       }
     }
   },
@@ -42,6 +42,6 @@
     "trendPercentage": "+28.6%",
     "isPositiveTrend": true,
     "status": "optimal",
-    "updatedAt": "2026-11-27T17:57:39.153Z"
+    "updatedAt": "2026-11-28T16:43:22.717Z"
   }
 }
